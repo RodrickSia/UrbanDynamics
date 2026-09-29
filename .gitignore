@@ -1,0 +1,22 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+build/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
