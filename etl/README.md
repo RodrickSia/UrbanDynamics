@@ -1,3 +1,7 @@
 # ETL
 
-This service owns extraction, transformation, and loading into the warehouse. Keep source connectors under `src/extract/`, transformations under `src/transform/`, and warehouse writers under `src/load/`. The runner and schedule are deliberately left open for the ETL framework decision.
+This service owns extraction, transformation, and loading into the warehouse. Each data domain has an independent pipeline under `src/pipelines/`; keep its source handling, transformations, models, and loading logic together. Put only genuinely shared infrastructure under `src/shared/`.
+
+Run a selected pipeline with `python -m src.main population_hcmc` or `python -m src.main rainwater`. The current stage functions are placeholders and raise `NotImplementedError` until each source, data contract, and warehouse writer are selected. Tests are organized under `tests/pipelines/` to mirror the pipeline modules.
+
+Scheduling remains separate from pipeline logic so each pipeline can later receive its own cadence or scheduler configuration.
