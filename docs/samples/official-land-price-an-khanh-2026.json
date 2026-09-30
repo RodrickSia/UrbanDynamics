@@ -1,0 +1,32 @@
+{
+  "source": "HCMC Resolution 87/2025/NQ-HDND, Annex II, An Khanh ward",
+  "source_url": "https://congbao.hochiminhcity.gov.vn/cong-bao/van-ban/nghi-quyet/so/87-2025-nq-hdnd/ngay/26-12-2025/tai-ve/48983?cbid=48993",
+  "effective_from": "2026-01-01",
+  "published_unit": "1000 VND/m2",
+  "records": [
+    {
+      "road": "TRẦN NÃO",
+      "from": "XẠ LỘ HÀ NỘI",
+      "to": "LƯƠNG ĐỊNH CỦA",
+      "residential_1000_vnd_m2": 152900,
+      "commercial_1000_vnd_m2": 91700,
+      "other_nonagricultural_1000_vnd_m2": 76500
+    },
+    {
+      "road": "LƯƠNG ĐỊNH CỦA",
+      "from": "NGÃ TƯ TRẦN NÃO - LƯƠNG ĐỊNH CỦA",
+      "to": "CẦU ÔNG TRANH",
+      "residential_1000_vnd_m2": 152900,
+      "commercial_1000_vnd_m2": 91700,
+      "other_nonagricultural_1000_vnd_m2": 76500
+    },
+    {
+      "road": "ĐƯỜNG SỐ 1, PHƯỜNG AN KHÁNH",
+      "from": "TRẦN NÃO",
+      "to": "CUỐI ĐƯỜNG",
+      "residential_1000_vnd_m2": 88600,
+      "commercial_1000_vnd_m2": 53200,
+      "other_nonagricultural_1000_vnd_m2": 44300
+    }
+  ]
+}
