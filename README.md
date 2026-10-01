@@ -4,7 +4,7 @@ UrbanDynamics is organized as a monorepo with separate frontend, backend, and ET
 
 ## Services
 
-- `frontend/` contains the web client. The initial scaffold serves a placeholder page; choose the application framework when the UI work begins.
+- `frontend/` contains the React/TypeScript urban map workspace built with Vite, MapLibre GL JS, and Goong Map Tiles.
 - `backend/` contains the FastAPI application and APIs used by the frontend.
 - `etl/` contains the hourly data pipeline entry point. Its implementation and scheduler are intentionally undecided.
 - `infra/warehouse/` is reserved for warehouse schema and migrations once the warehouse technology is selected.

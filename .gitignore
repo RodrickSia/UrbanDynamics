@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+*.key
+*.pem
 
 # Python
 __pycache__/
@@ -15,6 +17,7 @@ venv/
 node_modules/
 dist/
 build/
+*.tsbuildinfo
 
 # Editors and OS
 .DS_Store
