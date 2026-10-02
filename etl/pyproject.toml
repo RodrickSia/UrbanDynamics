@@ -7,7 +7,9 @@ authors = [
     { name = "rodricksia", email = "doquocduy698@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+]
 
 [project.scripts]
 etl = "etl:main"
