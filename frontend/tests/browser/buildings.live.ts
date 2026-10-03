@@ -39,9 +39,11 @@ test('Goong building geometry and elevation agree with the rendered scene', asyn
   // visible surface must win, while still projecting exactly under the pointer.
   expect(point.buildingHeightMeters).toBeGreaterThan(0);
   const picked = await page.evaluate(`window.harness.project(${point.longitude},${point.latitude},${point.elevationMeters})`);
-  expect(Math.hypot(picked.x - Math.floor(screen.x), picked.y - Math.floor(screen.y))).toBeLessThan(1.5);
+  expect(Math.hypot(picked.x - Math.floor(screen.x), picked.y - Math.floor(screen.y)))
+    .toBeLessThan(point.snap.kind === 'face' ? 1.5 : 8.1);
   await page.evaluate('window.harness.reset()');
   await page.mouse.move(screen.x, screen.y + 15);
-  await expect.poll(() => page.evaluate('window.harness.laserPixels().length')).toBeGreaterThan(5);
-  await page.screenshot({ path: 'test-results/goong-building-height-guide.png' });
+  await expect.poll(() => page.evaluate('window.harness.state().preview?.snap?.kind')).toMatch(/vertex|edge|face|ground/);
+  await expect(page.locator('.measurement-distance-pill')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/goong-building-snap.png' });
 });

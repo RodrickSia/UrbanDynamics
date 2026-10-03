@@ -109,7 +109,7 @@ describe('map domain', () => {
       },
     ];
 
-    expect(createMeasurementSegments(points, '3d').map((segment) => segment.kind)).toEqual([
+    expect(createMeasurementSegments(points, '3d', true).map((segment) => segment.kind)).toEqual([
       'distance',
       'horizontal',
       'vertical',
@@ -132,7 +132,7 @@ describe('map domain', () => {
     ]);
 
     expect(summary.elevationAvailable).toBe(false);
-    expect(formatMeasurementDistance(842.4)).toBe('842 m');
+    expect(formatMeasurementDistance(842.4)).toBe('842.40 m');
     expect(formatMeasurementDistance(1_420)).toBe('1.42 km');
   });
 

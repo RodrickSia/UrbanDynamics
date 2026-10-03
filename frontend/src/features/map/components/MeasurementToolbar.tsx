@@ -1,41 +1,20 @@
-import { Check, RotateCcw, Ruler } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { Check, RotateCcw, Ruler, TriangleRight } from 'lucide-react';
+import { useRef } from 'react';
 
 import { gsap, motionDuration, useGSAP } from '../motion';
 import type { MapMode, MeasurementState } from '../types/map';
-import { calculateMeasurementSummary, formatMeasurementDistance } from '../utils/measurement';
+import { calculateMeasurementSummary, formatMeasurementDistance, measurementPhase } from '../utils/measurement';
 
 interface MeasurementToolbarProps {
   measurement: MeasurementState;
   mode: MapMode;
+  onToggleComponents: () => void;
   onNew: () => void;
   onDone: () => void;
 }
 
-export function MeasurementToolbar({ measurement, mode, onNew, onDone }: MeasurementToolbarProps) {
+export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNew, onDone }: MeasurementToolbarProps) {
   const toolbarRef = useRef<HTMLElement>(null);
-  const committedSummary = useMemo(
-    () => calculateMeasurementSummary(measurement.points),
-    [measurement.points],
-  );
-  const displaySummary = useMemo(
-    () => calculateMeasurementSummary(
-      measurement.preview ? [...measurement.points, measurement.preview] : measurement.points,
-    ),
-    [measurement.points, measurement.preview],
-  );
-  const total = mode === '3d'
-    ? committedSummary.totalSpatialMeters
-    : committedSummary.totalHorizontalMeters;
-  const lastSegment = mode === '3d'
-    ? displaySummary.lastSegment?.spatialMeters
-    : displaySummary.lastSegment?.horizontalMeters;
-  const totalAvailable = mode === '2d'
-    || measurement.points.length < 2
-    || committedSummary.elevationAvailable;
-  const segmentAvailable = mode === '2d'
-    || displaySummary.lastSegment == null
-    || displaySummary.elevationAvailable;
 
   useGSAP(
     () => {
@@ -53,6 +32,9 @@ export function MeasurementToolbar({ measurement, mode, onNew, onDone }: Measure
     : measurement.points.length === 0
       ? 'Click the map to start'
       : `${measurement.points.length} ${measurement.points.length === 1 ? 'point' : 'points'}`;
+  const summary = calculateMeasurementSummary(measurement.points);
+  const total = mode === '2d' ? summary.totalHorizontalMeters : summary.totalSpatialMeters;
+  const snap = measurement.preview?.snap?.kind;
 
   return (
     <aside
@@ -60,36 +42,26 @@ export function MeasurementToolbar({ measurement, mode, onNew, onDone }: Measure
       className="measurement-toolbar glass-panel"
       role="region"
       aria-label="Distance measurement"
+      data-phase={measurementPhase(measurement)}
     >
-      <div className="measurement-heading">
+      <div className="measurement-heading" aria-live="polite">
         <Ruler aria-hidden="true" size={18} />
         <div>
           <strong>{status}</strong>
-          {measurement.status === 'active' && measurement.points.length > 0 && (
-            <span>Click to add another point</span>
+          {measurement.points.length > 0 && (
+            <span>{mode === '3d' && !summary.elevationAvailable ? 'Elevation unavailable' : `Total ${formatMeasurementDistance(total)}`}</span>
           )}
+          {measurement.status === 'active' && snap && <span className="sr-only">{snap} snap</span>}
         </div>
       </div>
-      <div className="measurement-metrics" aria-live="polite">
-        <span>
-          <small>{mode === '3d' ? '3D total' : 'Horizontal total'}</small>
-          {totalAvailable ? formatMeasurementDistance(total) : '—'}
-        </span>
-        <span>
-          <small>{measurement.preview ? 'Current segment' : 'Last segment'}</small>
-          {lastSegment == null || !segmentAvailable ? '—' : formatMeasurementDistance(lastSegment)}
-        </span>
-        {mode === '3d' && displaySummary.lastSegment && (
-          <>
-            <span><small>Horizontal</small>{formatMeasurementDistance(displaySummary.lastSegment.horizontalMeters)}</span>
-            <span><small>Δ height</small>{segmentAvailable ? formatMeasurementDistance(displaySummary.lastSegment.verticalMeters) : '—'}</span>
-          </>
-        )}
-        {mode === '3d' && measurement.points.length > 0 && !displaySummary.elevationAvailable && (
-          <span className="measurement-warning">Elevation unavailable</span>
-        )}
-      </div>
       <div className="measurement-actions">
+        {mode === '3d' && (
+          <button type="button" className="secondary-button" onClick={onToggleComponents}
+            aria-label="Show distance components" aria-pressed={!!measurement.showComponents}
+            title="Horizontal and vertical components for unrelated 3D points">
+            <TriangleRight aria-hidden="true" size={15} /> Components
+          </button>
+        )}
         <button type="button" className="secondary-button" onClick={onNew} aria-label="New measurement">
           <RotateCcw aria-hidden="true" size={15} /> New measurement
         </button>

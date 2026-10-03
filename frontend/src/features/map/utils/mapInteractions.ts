@@ -16,13 +16,14 @@ export function createMapInteractionHandlers(
   projection?: MeasurementProjection,
 ) {
   let previewFrame = 0;
+  let committedPointer: { x: number; y: number; pointId: string } | null = null;
 
   return {
     click(event: MapMouseEvent) {
       const current = getCurrent();
       if (current.measurement.status === 'active') {
         cancelAnimationFrame(previewFrame);
-        current.onMeasurementPoint(resolveMeasurementPoint(
+        const point = resolveMeasurementPoint(
           map,
           event.lngLat.lng,
           event.lngLat.lat,
@@ -30,7 +31,11 @@ export function createMapInteractionHandlers(
           event.point,
           undefined,
           projection,
-        ));
+        );
+        if (point) {
+          committedPointer = { x: event.point.x, y: event.point.y, pointId: point.id };
+          current.onMeasurementPoint(point);
+        }
         return;
       }
       const visibleFeatures = map
@@ -62,6 +67,14 @@ export function createMapInteractionHandlers(
       previewFrame = requestAnimationFrame(() => {
         const latest = getCurrent();
         if (latest.measurement.status !== 'active' || map.isMoving()) return;
+        // Mousemove can fire immediately after click (including device jitter).
+        // Keep the committed white anchor instead of recreating a red preview
+        // on top of it; meaningful movement still starts the next segment.
+        if (committedPointer && latest.measurement.points.at(-1)?.id === committedPointer.pointId
+          && Math.hypot(event.point.x - committedPointer.x, event.point.y - committedPointer.y) <= 3) {
+          latest.onMeasurementPreview(null);
+          return;
+        }
         latest.onMeasurementPreview(resolveMeasurementPoint(
           map,
           event.lngLat.lng,
@@ -78,12 +91,12 @@ export function createMapInteractionHandlers(
       getCurrent().onMeasurementPreview(null);
     },
     movestart() {
+      committedPointer = null;
       invalidateMeasurementPicking(map);
       cancelAnimationFrame(previewFrame);
       getCurrent().onMeasurementPreview(null);
     },
     idle() {
-      invalidateMeasurementPicking(map);
       const current = getCurrent();
       if (current.mode !== '3d' || current.measurement.points.length === 0) return;
       const points = current.measurement.points.map((point) => (
@@ -92,6 +105,9 @@ export function createMapInteractionHandlers(
       if (!measurementPointsEqual(points, current.measurement.points)) {
         current.onMeasurementPointsChange(points);
       }
+    },
+    scenechange() {
+      invalidateMeasurementPicking(map);
     },
     dispose() {
       cancelAnimationFrame(previewFrame);

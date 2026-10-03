@@ -20,6 +20,22 @@ export interface UserLocation {
 export type MeasurementSurface = 'terrain' | 'building' | 'ground';
 export type MeasurementStatus = 'idle' | 'active' | 'complete';
 
+/** Geographic positions, altitude in metres; never screen coordinates. */
+export interface MeasurementEdge {
+  id: string;
+  objectId: string;
+  start: [number, number, number];
+  end: [number, number, number];
+}
+
+export interface MeasurementSnap {
+  kind: 'vertex' | 'edge' | 'face' | 'ground';
+  objectId?: string;
+  primitiveId?: string;
+  /** Incident edges for vertices; the single underlying edge for an edge snap. */
+  edges?: MeasurementEdge[];
+}
+
 export interface MeasurementPoint {
   id: string;
   longitude: number;
@@ -28,12 +44,14 @@ export interface MeasurementPoint {
   elevationAvailable: boolean;
   surface: MeasurementSurface;
   buildingHeightMeters?: number;
+  snap?: MeasurementSnap;
 }
 
 export interface MeasurementState {
   status: MeasurementStatus;
   points: MeasurementPoint[];
   preview: MeasurementPoint | null;
+  showComponents?: boolean;
 }
 
 export interface PlaceDetails {

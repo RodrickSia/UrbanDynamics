@@ -66,13 +66,17 @@ describe('distance measurement workflow', () => {
 
     const toolbar = screen.getByRole('region', { name: 'Distance measurement' });
     expect(within(toolbar).getByText('2 points')).toBeInTheDocument();
-    expect(within(toolbar).getByText('Horizontal total')).toBeInTheDocument();
-    expect(within(toolbar).getByText('Last segment')).toBeInTheDocument();
+    expect(within(toolbar).queryByText('Horizontal total')).not.toBeInTheDocument();
+    expect(within(toolbar).queryByText('Last segment')).not.toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: 'Done' })).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: 'Switch to 3D' }));
     expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');
-    expect(within(toolbar).getByText('3D total')).toBeInTheDocument();
+    expect(within(toolbar).queryByText('3D total')).not.toBeInTheDocument();
+    const components = within(toolbar).getByRole('button', { name: 'Show distance components' });
+    expect(components).toHaveAttribute('aria-pressed', 'false');
+    await user.click(components);
+    expect(components).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(within(toolbar).getByRole('button', { name: 'Done' }));
     expect(within(toolbar).getByText('Measurement complete')).toBeInTheDocument();
@@ -80,6 +84,7 @@ describe('distance measurement workflow', () => {
     await user.click(within(toolbar).getByRole('button', { name: 'New measurement' }));
     expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('0');
     expect(within(toolbar).getByText('Click the map to start')).toBeInTheDocument();
+    expect(components).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(screen.getByRole('button', { name: 'Add first point' }));
     await user.click(screen.getByRole('button', { name: 'Add unavailable point' }));

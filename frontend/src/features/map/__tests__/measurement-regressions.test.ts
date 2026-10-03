@@ -27,6 +27,11 @@ describe('3D measurement regressions', () => {
   it('reads Goong max_height instead of inventing a 12m building', () => {
     expect(readBuildingHeight({ max_height: 68, min_height: 12 })).toBe(68);
   });
+  it('treats zero building height as unavailable, without masking a valid alternate height', () => {
+    expect(readBuildingHeight({ max_height: 0 })).toBeNull();
+    expect(readBuildingHeight({ max_height: '0', height: 18 })).toBe(18);
+    expect(readBuildingHeight({ max_height: -2, render_height: 24 })).toBe(24);
+  });
   it('hides the duplicate Goong extrusion when managing the building layer', () => {
     const setLayoutProperty = vi.fn();
     const map = {
@@ -71,7 +76,7 @@ describe('3D measurement regressions', () => {
     const projection = new MeasurementProjection(MercatorCoordinate);
     const m = MercatorCoordinate.fromLngLat([106.7008, 10.8002]);
     vi.spyOn(projection, 'ray').mockReturnValue({ near: [m.x, m.y, 0.001], far: [m.x, m.y, 0] });
-    const point = resolveMeasurementPoint(map, 106.73, 10.83, '3d', [240, 180], 'building', projection);
+    const point = resolveMeasurementPoint(map, 106.73, 10.83, '3d', [240, 180], 'building', projection)!;
 
     expect(point.longitude).toBeCloseTo(106.7008, 7);
     expect(point.latitude).toBeCloseTo(10.8002, 7);
@@ -118,7 +123,7 @@ describe('3D measurement regressions', () => {
     expect(MEASUREMENT_SURFACE_OFFSET_METERS).toBe(0);
   });
 
-  it('keeps the horizontal laser visible when both 3D points have equal elevation', () => {
+  it('does not duplicate a level distance with a horizontal component', () => {
     const points = [
       {
         id: 'start', longitude: 106.7, latitude: 10.8, elevationMeters: 12,
@@ -132,7 +137,6 @@ describe('3D measurement regressions', () => {
 
     expect(createMeasurementSegments(points, '3d').map((segment) => segment.kind)).toEqual([
       'distance',
-      'horizontal',
     ]);
   });
 

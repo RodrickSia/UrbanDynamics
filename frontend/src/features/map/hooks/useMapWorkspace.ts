@@ -78,6 +78,10 @@ export function useMapWorkspace() {
     setMeasurement(EMPTY_MEASUREMENT);
   }, []);
 
+  const toggleMeasurementComponents = useCallback(() => {
+    setMeasurement(current => ({ ...current, showComponents: !current.showComponents }));
+  }, []);
+
   const completeMeasurement = useCallback(() => {
     setMeasurement((current) => (
       current.points.length < 2
@@ -230,6 +234,7 @@ export function useMapWorkspace() {
     startMeasurement,
     cancelMeasurement,
     completeMeasurement,
+    toggleMeasurementComponents,
     handleMeasurementPoint,
     handleMeasurementPreview,
     handleMeasurementPointsChange,

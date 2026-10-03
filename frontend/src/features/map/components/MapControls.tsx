@@ -19,6 +19,7 @@ interface MapControlsProps {
   onStartMeasurement: () => void;
   onCancelMeasurement: () => void;
   onCompleteMeasurement: () => void;
+  onToggleMeasurementComponents: () => void;
   onClearSelection: () => void;
 }
 
@@ -31,6 +32,7 @@ export function MapControls(props: MapControlsProps) {
         <MeasurementToolbar
           measurement={props.measurement}
           mode={props.mode}
+          onToggleComponents={props.onToggleMeasurementComponents}
           onNew={props.onStartMeasurement}
           onDone={props.onCompleteMeasurement}
         />

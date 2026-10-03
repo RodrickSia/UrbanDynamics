@@ -46,6 +46,9 @@ test('application loads the configured basemap and measurement UI in 3D', async 
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled();
   await page.mouse.click(650, 440);
   await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeEnabled();
+  await expect(page.locator('.measurement-distance-pill')).toHaveCount(1);
+  await expect(page.locator('.measurement-distance-pill')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Distance measurement' })).not.toContainText('3D total');
   await test.info().attach('map-network', { body: JSON.stringify(requests, null, 2), contentType: 'application/json' });
   await page.waitForLoadState('networkidle');
   await page.screenshot({ path: 'test-results/application-measurement-live.png' });

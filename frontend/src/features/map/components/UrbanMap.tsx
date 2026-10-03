@@ -13,6 +13,7 @@ import {
 } from '../layers/measurementLayer';
 import { setTerrain } from '../layers/terrain';
 import { createMapInteractionHandlers } from '../utils/mapInteractions';
+import { MeasurementLabels } from './MeasurementLabels';
 import type { UrbanMapProps } from './UrbanMap.types';
 
 export function UrbanMap(props: UrbanMapProps) {
@@ -122,6 +123,8 @@ export function UrbanMap(props: UrbanMapProps) {
         map.on('mouseout', interactions.mouseout);
         map.on('movestart', interactions.movestart);
         map.on('idle', interactions.idle);
+        map.on('sourcedata', interactions.scenechange);
+        map.on('styledata', interactions.scenechange);
         map.on('error', () =>
           propsRef.current.onStatusChange(false, 'Some map data could not be loaded'),
         );
@@ -195,5 +198,15 @@ export function UrbanMap(props: UrbanMapProps) {
     );
   }
 
-  return <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />;
+  return (
+    <>
+      <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />
+      <MeasurementLabels
+        map={mapRef.current}
+        projection={measurementLayerRef.current?.projection ?? null}
+        measurement={measurement}
+        mode={mode}
+      />
+    </>
+  );
 }

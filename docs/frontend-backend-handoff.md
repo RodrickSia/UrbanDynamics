@@ -2,7 +2,21 @@
 
 Tài liệu này ghi lại trạng thái frontend sau đợt cải tiến giao diện bản đồ và hợp đồng dữ liệu mà backend cần cung cấp. Mục tiêu là để backend có thể tích hợp từng nguồn dữ liệu mà không phải suy đoán hành vi của UI.
 
-## Measurement fixes — 2026-10-03
+## Context-aware 3D measurement — 2026-10-03
+
+- Sửa lỗi tại Bến Tre: `max_height = 0` được xử lý như thiếu chiều cao, tiếp tục tìm trường chiều cao dương khác; nếu không có thì dùng fallback hiển thị 12 m đã có. Đây chỉ là khối minh họa, không phải chiều cao thật. Picking vẫn trả `Elevation unavailable` và neo ở mặt đất khi thiếu chiều cao; không thay đổi terrain/exaggeration hoặc building có chiều cao hợp lệ.
+- Sau click chốt điểm, bỏ qua mousemove trong bán kính 3 CSS px tại vị trí click để không tái tạo viên preview đỏ đè lên anchor. Ra khỏi vùng này vẫn preview/đo điểm tiếp theo; đổi camera xóa vùng bỏ qua. Không tự kết thúc phép đo ở điểm thứ hai.
+
+- Raycast dùng camera matrix thực của custom layer để chọn mái/mặt đứng gần nhất; so sánh với terrain raycast từ `map.unproject`. Snap đỉnh (8 CSS px) ưu tiên hơn cạnh (6 CSS px); kiểm tra vật che trước khi chấp nhận. Khoảng bắt chuột chỉ chọn hình học, không dùng pixel để tính khoảng cách.
+- `MeasurementPoint.snap` lưu `kind` (`vertex`, `edge`, `face`, `ground`), `objectId`, `primitiveId` và các cạnh liên quan. Mỗi cạnh lưu ID và hai đầu `[longitude, latitude, elevationMeters]`. Vertex giữ các cạnh kề để nhận ra hai đỉnh cùng một cạnh. ID cạnh dựa trên topology và ID building, không phụ thuộc camera/DEM LOD.
+- Hover trước click có marker, highlight toàn cạnh thật (nếu snap cạnh) và laser tham chiếu cao độ trong 3D; không có distance label hoặc tam giác. Sau click, tọa độ và snap context được giữ nguyên qua zoom/pan/2D–3D. Luồng nhiều điểm tiếp tục tới `Done`; `New measurement` xóa toàn phép đo.
+- Mặc định luôn đo trực tiếp. Cùng cạnh, cùng XY hoặc cùng cao độ chỉ có một đoạn/nhãn. Nút `Components` trong 3D chỉ thêm cạnh `H`/`ΔZ` khi hai điểm không chung cạnh và cả hai thành phần đều lớn hơn 2 cm. Thiếu cao độ không dựng tam giác giả.
+- Highlight cạnh đỏ/cam tách biệt với đoạn đo cam/trắng, các cạnh phụ mảnh và laser cao độ. Laser hoạt động độc lập với `Components`, số điểm đã chọn và loại snap: luôn khả dụng khi rê chuột trong phép đo 3D active với cao độ hợp lệ, kể cả trước click đầu. Laser ẩn khi `Done`, con trỏ rời map, chuyển 2D hoặc thiếu cao độ; không tạo thêm cạnh đo/tam giác.
+- Hình học picking và snap được cache theo scene; invalidate khi camera bắt đầu di chuyển hoặc source/style thay đổi. Di chuột không tạo lại map/scene. Label là HTML pill hướng camera, kích thước cố định; số mét hiển thị hai chữ số thập phân (không đồng nghĩa dữ liệu có độ chính xác centimet).
+- Backend cần cung cấp `gid`/feature ID ổn định, footprint đúng, `max_height`/`height`, `min_height` và cao độ đáng tin cậy. Tile clipping/LOD có thể thay topology cạnh; muốn định danh xuyên mọi tile cần ID cạnh và hình học công trình nguyên vẹn từ backend.
+- Phạm vi hiện tại: building extrusion Goong và terrain/ground. Repo chưa có custom 3D mesh/object source; chưa bổ sung giả lập picking cho mesh tùy ý. Khi có nguồn đó, cần adapter raycast với cùng world-space hit/snap context. Chưa triển khai kéo sửa đầu đo hoặc lưu phép đo lên backend.
+
+## Terrain/rendering fixes — 2026-10-03
 
 - DEM dùng Terrarium, tile 512 px, `maxzoom: 12`, exaggeration 1. Việt Nam dùng nguồn toàn cầu khoảng 30 m; phóng to tiếp dùng overzoom. Không dùng độ phân giải này như dữ liệu khảo sát công trình.
 - Nguồn hillshade tách khỏi terrain để tránh xung đột độ phân giải render. Tile zoom 14 tại khu vực kiểm tra trả 404; zoom 12 trả 200.
@@ -10,7 +24,7 @@ Tài liệu này ghi lại trạng thái frontend sau đợt cải tiến giao d
 - Tọa độ và cao độ đã xác nhận được giữ nguyên khi zoom/pan/đổi chế độ. Khi tile đang tải, giá trị 0 mặc định của MapLibre không được coi là cao độ thật. GPU dùng tọa độ tương đối quanh điểm gốc để tránh mất chính xác float32.
 - Goong cung cấp chiều cao qua `max_height`, không phải chỉ `height`/`render_height`. Render và ray picking đã đọc cùng trường này; `min_height` giới hạn chân mặt đứng. Lớp extrusion `building` có sẵn của Goong được ẩn khi ứng dụng quản lý lớp nhà, tránh dựng hai bộ hình học chồng nhau gây z-fighting.
 - Laser được thay bằng vệt amber mảnh tại giao của mặt phẳng cùng cao độ với bề mặt đang nhìn thấy. Shader đọc depth buffer chung của terrain/building và snap cao độ tham chiếu vào bề mặt dưới con trỏ. Laser là trợ giúp cao độ, không phải cạnh đo; các cạnh tam giác cố định vẫn là overlay riêng. Texture/framebuffer tái sử dụng, chỉ cấp lại khi đổi kích thước; không tạo lại map/scene mỗi lần di chuột.
-- Laser chỉ xuất hiện trong phép đo 3D đang active, khi có cao độ hợp lệ; không vẽ qua khoảng trống, bề mặt bị che hoặc tô kín mái đồng phẳng. Đây là hiệu ứng trên depth của cảnh hiện tại, không phải phân tích giao cắt toàn bộ dữ liệu ngoài màn hình. Độ chính xác vẫn phụ thuộc DEM và chiều cao do nguồn dữ liệu cung cấp.
+- Laser chỉ xuất hiện trong phép đo 3D đang active với cao độ hợp lệ, độc lập với `Components`; không vẽ qua khoảng trống, bề mặt bị che hoặc tô kín mái đồng phẳng. Đây là hiệu ứng trên depth của cảnh hiện tại, không phải phân tích giao cắt toàn bộ dữ liệu ngoài màn hình. Độ chính xác vẫn phụ thuộc DEM và chiều cao do nguồn dữ liệu cung cấp.
 - DEM cục bộ có giá trị khác 0 vẫn dùng được khi tile ở nơi khác đang tải. Giá trị 0 chưa rõ nguồn vẫn được giữ là unavailable trong thời gian tải, không tạo cao độ giả.
 - Kiểm thử bao gồm trường `max_height`, loại lớp extrusion trùng, mái/mặt đứng, neo điểm sau đổi camera/chế độ, laser bám mặt đứng/địa hình dốc và resize. Test live kiểm tra cả building thật từ Goong, không chỉ mô hình thử.
 - Kiểm tra: `npm test`, `npm run build`, `npm run lint`, `npm run test:map`; kiểm tra nguồn thật bằng `npm run test:map:live` trong thư mục `frontend`. Chromium cần cài bằng `npx playwright install chromium`. `@playwright/test` chỉ là dev dependency.
@@ -29,7 +43,9 @@ Backend hiện chỉ có `GET /health`. Frontend đã hoàn thiện lớp giao d
 
 Giao diện hiển thị hoàn toàn bằng tiếng Anh. Search và Place details nằm bên trái; Data Layers dùng drawer toàn chiều cao bên phải, còn Distance measurement là thanh công cụ nhỏ ở giữa cạnh dưới. Marker người dùng chỉ xuất hiện sau khi định vị thành công; marker địa điểm xuất hiện sau khi chọn kết quả hoặc chọn điểm trên bản đồ. Click vùng bản đồ trống lần thứ hai sẽ đóng chi tiết chung; click POI có tên luôn mở hoặc cập nhật Place details.
 
-Phép đo được giữ nguyên khi chuyển 2D/3D và khi zoom/pan. 2D ưu tiên khoảng cách ngang; 3D hiển thị đoạn thẳng không gian, laser ngang, chênh lệch cao và các điểm đo luôn nhìn thấy trên lớp tương tác. Frontend chỉ dùng cao độ thật từ global Mapterhorn DEM TileJSON (`https://tiles.mapterhorn.com/tilejson.json`, theo ví dụ terrain chính thức của MapLibre) và thuộc tính chiều cao của building. Nếu một trong hai nguồn không cung cấp cao độ, UI báo `Elevation unavailable`; frontend không tạo số cao độ giả và không ghi đè cao độ hợp lệ đã chốt trong lúc tile DEM đang tải lại. Measurement hiện là state cục bộ, chưa lưu hoặc gửi backend.
+Phép đo được giữ nguyên khi chuyển 2D/3D và khi zoom/pan. 2D ưu tiên khoảng cách ngang; 3D mặc định hiển thị đoạn thẳng không gian, bổ sung snap cạnh/đỉnh và chỉ phân rã khi bật `Components` trong ngữ cảnh phù hợp. Frontend dùng cao độ từ Mapterhorn DEM TileJSON và chiều cao building; khi thiếu dữ liệu, UI báo `Elevation unavailable` thay vì tạo số đo giả. Measurement là state cục bộ, chưa lưu hoặc gửi backend.
+
+Khoảng cách không hiển thị thành bảng metrics. Mỗi đoạn đã chốt và preview có HTML pill gần trung điểm 3D: nền gần đen trong suốt, chữ trắng, kích thước cố định. Projection dùng camera matrix nên label bám đoạn khi pitch/rotate/zoom, luôn hướng viewport; đoạn ngắn có offset để tránh che đầu đo. GSAP chỉ animate opacity/transform khi xuất hiện. Toolbar giữ trạng thái/tổng ngắn gọn, `Components`, `New measurement` và `Done`.
 
 Nền Satellite dùng style raster-only từ `satellite.goong.io`, không nạp thêm symbol layer của style hybrid để tránh nhãn địa điểm bị lặp trên ảnh vệ tinh. Vì style này không có source `composite / VN_Building`, 3D building sẽ tự giảm cấp trong Satellite; địa hình DEM vẫn có thể hoạt động độc lập.
 
@@ -275,7 +291,8 @@ Khi tích hợp, frontend cần thêm trạng thái loading/empty/error, hủy r
 - `frontend/src/features/map/components/PlaceDetailsPanel.tsx`: drawer chi tiết địa điểm bên trái.
 - `frontend/src/features/map/components/LayerPanel.tsx`: bật/tắt/độ mờ của layer.
 - `frontend/src/features/map/components/UrbanMap.tsx`: ranh giới tích hợp nguồn/layer MapLibre.
-- `frontend/src/features/map/components/MeasurementToolbar.tsx`: tổng khoảng cách, đoạn gần nhất và thao tác New measurement/Done.
+- `frontend/src/features/map/components/MeasurementLabels.tsx`: distance pill camera-facing, kích thước màn hình cố định cho từng đoạn đo/preview.
+- `frontend/src/features/map/components/MeasurementToolbar.tsx`: trạng thái phép đo và thao tác New measurement/Done; không chứa bảng metrics.
 - `frontend/src/features/map/layers/measurementLayer.ts`: custom WebGL layer 3D cho đoạn đo, laser, cạnh đứng và điểm đo.
 - `frontend/src/features/map/utils/measurement.ts`: phép tính khoảng cách ngang và khoảng cách thẳng 3D.
 - `frontend/src/features/map/utils/measurementElevation.ts`: lấy cao độ terrain/building và quy tắc fallback không tạo dữ liệu giả.

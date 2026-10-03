@@ -3,8 +3,15 @@ import type { FillExtrusionLayerSpecification, Map as MapLibreMap, StyleSpecific
 export const BUILDINGS_LAYER_ID = 'urban-buildings-3d';
 export const BUILDING_PAINT: FillExtrusionLayerSpecification['paint'] = {
   'fill-extrusion-color': '#a9b6ae',
-  // to-number(null) is zero: coalesce must run BEFORE numeric conversion.
-  'fill-extrusion-height': ['to-number', ['coalesce', ['get', 'max_height'], ['get', 'height'], ['get', 'render_height'], ['get', 'building:height'], 12], 12],
+  // Some Goong areas use 0 for unavailable height. A zero extrusion coincides
+  // with terrain; use the existing visual-only fallback, never a measured Z.
+  'fill-extrusion-height': ['case',
+    ['>', ['to-number', ['get', 'max_height'], 0], 0], ['to-number', ['get', 'max_height'], 12],
+    ['>', ['to-number', ['get', 'height'], 0], 0], ['to-number', ['get', 'height'], 12],
+    ['>', ['to-number', ['get', 'render_height'], 0], 0], ['to-number', ['get', 'render_height'], 12],
+    ['>', ['to-number', ['get', 'building:height'], 0], 0], ['to-number', ['get', 'building:height'], 12],
+    12,
+  ],
   'fill-extrusion-base': ['to-number', ['coalesce', ['get', 'min_height'], ['get', 'render_min_height'], 0], 0],
 };
 

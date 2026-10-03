@@ -8,6 +8,7 @@ import type {
 import type { MapMode, MeasurementState } from '../types/map';
 import {
   createMeasurementSegments,
+  createSnapHighlights,
   type MeasurementRenderSegment,
 } from '../utils/measurement';
 import { localProjectionMatrix, MeasurementProjection, type Position3 } from '../utils/measurementProjection';
@@ -17,9 +18,10 @@ export const MEASUREMENT_LAYER_ID = 'urban-distance-measurement';
 export const MEASUREMENT_SURFACE_OFFSET_METERS = 0;
 export const MEASUREMENT_LINE_WIDTH_PIXELS = 4;
 export const MEASUREMENT_COLORS = {
-  distance: [0.03, 0.48, 0.55, 1],
+  distance: [1, 0.36, 0.08, 1],
   horizontal: [0.98, 0.68, 0.12, 1],
   vertical: [0.95, 0.36, 0.14, 1],
+  'edge-highlight': [1, 0.32, 0.06, 0.9],
 } as const;
 export const FLOATS_PER_LINE_VERTEX = 12;
 
@@ -53,6 +55,8 @@ export function createMeasurementLayer(
   let lineVertexArray: WebGLVertexArrayObject | null = null;
   let pointVertexArray: WebGLVertexArrayObject | null = null;
   let lineVertices: Float32Array<ArrayBufferLike> = new Float32Array();
+  let highlightVertices: Float32Array<ArrayBufferLike> = new Float32Array();
+  let helperVertices: Float32Array<ArrayBufferLike> = new Float32Array();
   let pointVertices = new Float32Array();
   let heightGuide: HeightGuide | null = null;
   let guideHeight: { position: Position3; units: number } | null = null;
@@ -63,8 +67,12 @@ export function createMeasurementLayer(
       : measurement.points;
     const first = renderPoints[0];
     origin = first ? projectedPosition(MercatorCoordinateClass, [first.longitude, first.latitude], 0) : [0, 0, 0];
-    const segments = createMeasurementSegments(renderPoints, mode);
+    const segments = createMeasurementSegments(renderPoints, mode, measurement.showComponents);
+    highlightVertices = buildMeasurementLineVertices(MercatorCoordinateClass, createSnapHighlights(measurement, mode), origin);
+    helperVertices = buildMeasurementLineVertices(MercatorCoordinateClass, segments.filter(s => s.kind !== 'distance'), origin);
     guideHeight = null;
+    // A world-height reference, independent of distance components, anchors
+    // and snap kind. It must also work while hovering before the first click.
     if (mode === '3d' && measurement.status === 'active' && measurement.preview?.elevationAvailable) {
       const p = measurement.preview;
       const position = MercatorCoordinateClass.fromLngLat([p.longitude, p.latitude], p.elevationMeters);
@@ -73,7 +81,7 @@ export function createMeasurementLayer(
     }
     lineVertices = buildMeasurementLineVertices(
       MercatorCoordinateClass,
-      segments,
+      segments.filter(s => s.kind === 'distance'),
       origin,
     );
     pointVertices = new Float32Array(renderPoints.flatMap((point, index) => {
@@ -82,7 +90,7 @@ export function createMeasurementLayer(
         MercatorCoordinateClass,
         [point.longitude, point.latitude],
         (mode === '3d' ? point.elevationMeters : 0) + MEASUREMENT_SURFACE_OFFSET_METERS,
-        isPreview ? [0.05, 0.72, 0.78, 0.72] : [0.98, 0.99, 0.98, 1],
+        isPreview ? [1, 0.3, 0.1, 0.9] : [0.98, 0.99, 0.98, 1],
         origin,
       );
     }));
@@ -139,14 +147,18 @@ export function createMeasurementLayer(
         gl.drawingBufferWidth,
         gl.drawingBufferHeight,
       );
-      gl.uniform1f(
-        gl.getUniformLocation(lineProgram, 'u_line_width'),
-        MEASUREMENT_LINE_WIDTH_PIXELS * (map?.getPixelRatio() ?? 1),
-      );
       gl.bindVertexArray(lineVertexArray);
       gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, lineVertices, gl.DYNAMIC_DRAW);
-      gl.drawArrays(gl.TRIANGLES, 0, lineVertices.length / FLOATS_PER_LINE_VERTEX);
+      for (const [vertices, width, segmented] of [
+        [highlightVertices, 2.5, false], [helperVertices, 1.5, false],
+        [lineVertices, MEASUREMENT_LINE_WIDTH_PIXELS, true],
+      ] as const) {
+        gl.uniform1f(gl.getUniformLocation(lineProgram, 'u_line_width'), width * (map?.getPixelRatio() ?? 1));
+        gl.uniform1i(gl.getUniformLocation(lineProgram, 'u_segmented'), segmented ? 1 : 0);
+        gl.uniform1f(gl.getUniformLocation(lineProgram, 'u_pixel_ratio'), map?.getPixelRatio() ?? 1);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / FLOATS_PER_LINE_VERTEX);
+      }
 
       gl.useProgram(pointProgram);
       gl.uniformMatrix4fv(gl.getUniformLocation(pointProgram, 'u_matrix'), false, matrix);
@@ -280,6 +292,7 @@ function createLineProgram(gl: WebGL2RenderingContext): WebGLProgram {
     uniform vec2 u_viewport;
     uniform float u_line_width;
     out vec4 v_color;
+    out vec2 v_distance;
     void main() {
       vec4 start_clip = u_matrix * vec4(a_start, 1.0);
       vec4 end_clip = u_matrix * vec4(a_end, 1.0);
@@ -290,6 +303,7 @@ function createLineProgram(gl: WebGL2RenderingContext): WebGLProgram {
       if (start_near < 0.0 && end_near < 0.0) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         v_color = a_color;
+        v_distance = vec2(0.0, 1.0);
         return;
       }
       if (start_near < 0.0) start_clip = mix(start_clip, end_clip, start_near / (start_near - end_near));
@@ -304,13 +318,19 @@ function createLineProgram(gl: WebGL2RenderingContext): WebGLProgram {
       current_clip.xy += pixel_offset * 2.0 / u_viewport * current_clip.w;
       gl_Position = current_clip;
       v_color = a_color;
+      v_distance = vec2(a_progress * direction_length * 0.5, 1.0) * current_clip.w;
     }
   `, `#version 300 es
     precision highp float;
     in vec4 v_color;
+    in vec2 v_distance;
+    uniform bool u_segmented;
+    uniform float u_pixel_ratio;
     out vec4 fragColor;
     void main() {
       fragColor = v_color;
+      if (u_segmented && mod(v_distance.x / v_distance.y / u_pixel_ratio, 16.0) > 9.0)
+        fragColor = vec4(1.0);
     }
   `);
 }
@@ -324,7 +344,7 @@ function createPointProgram(gl: WebGL2RenderingContext): WebGLProgram {
     out vec4 v_color;
     void main() {
       gl_Position = u_matrix * vec4(a_position, 1.0);
-      gl_PointSize = u_point_size;
+      gl_PointSize = u_point_size * (a_color.a < 1.0 ? 0.75 : 1.0);
       v_color = a_color;
     }
   `, `#version 300 es

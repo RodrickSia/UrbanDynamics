@@ -1,5 +1,8 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import '../../src/styles.css';
+import { createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { configureMapLibreWorker } from '../../src/features/map/config/maplibreWorker';
 import { BUILDING_PAINT, BUILDINGS_LAYER_ID, setBuildings3d } from '../../src/features/map/layers/buildings3d';
 import { getMapStyle } from '../../src/features/map/config/mapConfig';
@@ -8,19 +11,27 @@ import { setTerrain } from '../../src/features/map/layers/terrain';
 import { createMapInteractionHandlers } from '../../src/features/map/utils/mapInteractions';
 import type { MeasurementState, MapMode } from '../../src/features/map/types/map';
 import type { UrbanMapProps } from '../../src/features/map/components/UrbanMap.types';
+import { MeasurementLabels } from '../../src/features/map/components/MeasurementLabels';
 
 configureMapLibreWorker(maplibregl);
 const isLive = new URLSearchParams(location.search).has('live');
 const isGoong = new URLSearchParams(location.search).has('goong');
+const fixtureHeight = new URLSearchParams(location.search).get('height') === '0' ? 0 : 80;
 const map = new maplibregl.Map({
   container: 'map', center: [106.7, 10.8], zoom: 17, pitch: 60,
   canvasContextAttributes: { preserveDrawingBuffer: true, antialias: true },
   style: isGoong ? getMapStyle(import.meta.env.VITE_GOONG_MAPTILES_KEY) : { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#233440' } }] },
 });
 const layer = createMeasurementLayer(maplibregl.MercatorCoordinate);
+const labelsRoot = createRoot(document.getElementById('labels')!);
 let mode: MapMode = '3d';
 let measurement: MeasurementState = { status: 'active', points: [], preview: null };
-const sync = () => layer.setMeasurement(measurement, mode);
+const sync = () => {
+  layer.setMeasurement(measurement, mode);
+  labelsRoot.render(createElement(MeasurementLabels, {
+    map, projection: layer.projection, measurement, mode,
+  }));
+};
 const props = () => ({
   mode, measurement,
   onMeasurementPoint: (point) => { measurement = { ...measurement, points: [...measurement.points, point], preview: null }; sync(); },
@@ -32,6 +43,8 @@ map.on('click', handlers.click);
 map.on('mousemove', handlers.mousemove);
 map.on('movestart', handlers.movestart);
 map.on('idle', handlers.idle);
+map.on('sourcedata', handlers.scenechange);
+map.on('styledata', handlers.scenechange);
 
 function project(lng: number, lat: number, elevation: number) {
   const p = maplibregl.MercatorCoordinate.fromLngLat([lng, lat], elevation);
@@ -45,6 +58,7 @@ function project(lng: number, lat: number, elevation: number) {
 Object.assign(window, { harness: {
   map, project,
   state: () => structuredClone(measurement),
+  components: (showComponents: boolean) => { measurement = { ...measurement, showComponents }; sync(); },
   reset: () => { measurement = { status: 'active', points: [], preview: null }; sync(); },
   done: () => { measurement = { ...measurement, status: 'complete', preview: null }; sync(); },
   markerError: (lng: number, lat: number, elevation: number) => {
@@ -67,10 +81,12 @@ Object.assign(window, { harness: {
     const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
     gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     let yellow = 0;
+    let direct = 0;
     for (let i = 0; i < pixels.length; i += 4) {
       if (pixels[i] > 220 && pixels[i + 1] > 130 && pixels[i + 1] < 205 && pixels[i + 2] < 65) yellow += 1;
+      if (pixels[i] > 240 && pixels[i + 1] >= 88 && pixels[i + 1] <= 95 && pixels[i + 2] < 30) direct += 1;
     }
-    return { yellow, error: gl.getError() };
+    return { yellow, direct, error: gl.getError() };
   },
   laserPixels: () => {
     const gl = map.getCanvas().getContext('webgl2')!;
@@ -90,7 +106,7 @@ map.on('load', () => {
   if (isGoong) { map.jumpTo({ center: [106.703, 10.776], zoom: 17 }); setBuildings3d(map, true, 1); }
   if (!isLive && !isGoong) {
     map.addSource('test-buildings', { type: 'geojson', data: {
-      type: 'FeatureCollection', features: [{ type: 'Feature', properties: { max_height: 80 }, geometry: {
+      type: 'FeatureCollection', features: [{ type: 'Feature', properties: { max_height: fixtureHeight }, geometry: {
         type: 'Polygon', coordinates: [[[106.6998, 10.7998], [106.7002, 10.7998], [106.7002, 10.8002], [106.6998, 10.8002], [106.6998, 10.7998]]],
       } }],
     } });

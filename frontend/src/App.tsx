@@ -80,8 +80,9 @@ export default function App() {
         />
 
         <MapControls
-          measurement={workspace.measurement}
           mode={workspace.mode}
+          onToggleMeasurementComponents={workspace.toggleMeasurementComponents}
+          measurement={workspace.measurement}
           rightPanelOpen={workspace.rightPanel === 'layers'}
           hasSelection={Boolean(workspace.selection)}
           mapStyle={workspace.mapStyle}
