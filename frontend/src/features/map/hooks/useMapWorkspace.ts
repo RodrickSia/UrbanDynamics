@@ -1,4 +1,3 @@
-import type { Position } from 'geojson';
 import { type PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from 'react';
 
 import type { MapStyleId } from '../config/mapConfig';
@@ -16,15 +15,22 @@ import type {
   MapFocusRequest,
   MapMode,
   MapSelection,
+  MeasurementPoint,
+  MeasurementState,
   PlaceDetails,
   PointSelection,
   TimeRange,
   UrbanLayerDefinition,
   UserLocation,
 } from '../types/map';
-import { createPolygonSelection } from '../utils/geo';
 
-export type RightPanel = 'layers' | 'polygon' | null;
+export type RightPanel = 'layers' | null;
+
+const EMPTY_MEASUREMENT: MeasurementState = {
+  status: 'idle',
+  points: [],
+  preview: null,
+};
 
 export function useMapWorkspace() {
   const lastMapSearchDismissalRef = useRef(0);
@@ -36,7 +42,7 @@ export function useMapWorkspace() {
   const [selection, setSelection] = useState<MapSelection>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [draftCoordinates, setDraftCoordinates] = useState<Position[]>([]);
+  const [measurement, setMeasurement] = useState<MeasurementState>(EMPTY_MEASUREMENT);
   const [rightPanel, setRightPanel] = useState<RightPanel>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPlaceDetailsCollapsed, setIsPlaceDetailsCollapsed] = useState(false);
@@ -60,31 +66,49 @@ export function useMapWorkspace() {
     [handleModeChange, mode],
   );
 
-  const startDrawing = useCallback(() => {
+  const startMeasurement = useCallback(() => {
     setIsSearchOpen(false);
     setSelectedPlace(null);
     setSelection(null);
-    setDraftCoordinates([]);
-    setRightPanel('polygon');
+    setRightPanel(null);
+    setMeasurement({ status: 'active', points: [], preview: null });
   }, []);
 
-  const cancelDrawing = useCallback(() => {
-    setDraftCoordinates([]);
-    setRightPanel(null);
+  const cancelMeasurement = useCallback(() => {
+    setMeasurement(EMPTY_MEASUREMENT);
   }, []);
 
-  const completeDrawing = useCallback(() => {
-    if (draftCoordinates.length < 3) return;
-    setSelection(createPolygonSelection(draftCoordinates));
-    setDraftCoordinates([]);
-    setRightPanel(null);
-  }, [draftCoordinates]);
+  const completeMeasurement = useCallback(() => {
+    setMeasurement((current) => (
+      current.points.length < 2
+        ? current
+        : { ...current, status: 'complete', preview: null }
+    ));
+  }, []);
+
+  const handleMeasurementPoint = useCallback((point: MeasurementPoint) => {
+    setMeasurement((current) => (
+      current.status !== 'active'
+        ? current
+        : { ...current, points: [...current.points, point], preview: null }
+    ));
+  }, []);
+
+  const handleMeasurementPreview = useCallback((point: MeasurementPoint | null) => {
+    setMeasurement((current) => (
+      current.status !== 'active' || current.preview === point
+        ? current
+        : { ...current, preview: point }
+    ));
+  }, []);
+
+  const handleMeasurementPointsChange = useCallback((points: MeasurementPoint[]) => {
+    setMeasurement((current) => ({ ...current, points }));
+  }, []);
 
   const clearSelection = useCallback(() => {
     setSelection(null);
     setSelectedPlace(null);
-    setDraftCoordinates([]);
-    setRightPanel((current) => (current === 'polygon' ? null : current));
   }, []);
 
   const selectPlace = useCallback((place: PlaceDetails) => {
@@ -167,13 +191,8 @@ export function useMapWorkspace() {
       setRightPanel(null);
       return;
     }
-    setDraftCoordinates([]);
     setRightPanel('layers');
   }, [rightPanel]);
-
-  const handleDraftCoordinate = useCallback((coordinate: [number, number]) => {
-    setDraftCoordinates((current) => [...current, coordinate]);
-  }, []);
 
   const handleOpacityChange = useCallback((layer: UrbanLayerDefinition, opacity: number) => {
     setOpacityByLayer((current) => setLayerOpacity(current, layer.id, opacity));
@@ -194,23 +213,26 @@ export function useMapWorkspace() {
     selection,
     selectedPlace,
     userLocation,
-    draftCoordinates,
+    measurement,
     rightPanel,
     isSearchOpen,
     isPlaceDetailsCollapsed,
     mapControlRequest,
     mapFocusRequest,
     mapStatus,
-    isDrawing: rightPanel === 'polygon',
+    isMeasuring: measurement.status !== 'idle',
     setMapStyle,
     setTimeRange,
     setUserLocation,
     setIsSearchOpen,
     handleModeChange,
     handleLayerToggle,
-    startDrawing,
-    cancelDrawing,
-    completeDrawing,
+    startMeasurement,
+    cancelMeasurement,
+    completeMeasurement,
+    handleMeasurementPoint,
+    handleMeasurementPreview,
+    handleMeasurementPointsChange,
     clearSelection,
     selectPlace,
     handlePointSelect,
@@ -219,7 +241,6 @@ export function useMapWorkspace() {
     handleStatusChange,
     handleBuildingsAvailability,
     toggleLayers,
-    handleDraftCoordinate,
     handleOpacityChange,
     closeRightPanel,
     togglePlaceDetails,

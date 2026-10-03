@@ -1,5 +1,3 @@
-import type { Feature, Polygon } from 'geojson';
-
 export type MapMode = '2d' | '3d';
 export type MapControlAction = 'zoom-in' | 'zoom-out' | 'locate';
 
@@ -17,6 +15,25 @@ export interface MapFocusRequest {
 export interface UserLocation {
   longitude: number;
   latitude: number;
+}
+
+export type MeasurementSurface = 'terrain' | 'building' | 'ground';
+export type MeasurementStatus = 'idle' | 'active' | 'complete';
+
+export interface MeasurementPoint {
+  id: string;
+  longitude: number;
+  latitude: number;
+  elevationMeters: number;
+  elevationAvailable: boolean;
+  surface: MeasurementSurface;
+  buildingHeightMeters?: number;
+}
+
+export interface MeasurementState {
+  status: MeasurementStatus;
+  points: MeasurementPoint[];
+  preview: MeasurementPoint | null;
 }
 
 export interface PlaceDetails {
@@ -86,12 +103,4 @@ export interface PointSelection {
   features: Array<{ id: string; label: string; layer: string; isNamedPlace?: boolean }>;
 }
 
-export interface PolygonSelection {
-  kind: 'polygon';
-  geometry: Feature<Polygon>;
-  areaSquareMeters: number;
-  vertexCount: number;
-  bounds: [number, number, number, number];
-}
-
-export type MapSelection = PointSelection | PolygonSelection | null;
+export type MapSelection = PointSelection | null;

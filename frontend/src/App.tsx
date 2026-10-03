@@ -29,13 +29,14 @@ export default function App() {
           mode={workspace.mode}
           buildingsEnabled={Boolean(workspace.layers['buildings-3d'])}
           buildingsOpacity={workspace.opacityByLayer['buildings-3d'] ?? 0.8}
-          isDrawing={workspace.isDrawing}
-          draftCoordinates={workspace.draftCoordinates}
+          measurement={workspace.measurement}
           selection={workspace.selection}
           userLocation={workspace.userLocation}
           focusRequest={workspace.mapFocusRequest}
           controlRequest={workspace.mapControlRequest}
-          onDraftCoordinate={workspace.handleDraftCoordinate}
+          onMeasurementPoint={workspace.handleMeasurementPoint}
+          onMeasurementPreview={workspace.handleMeasurementPreview}
+          onMeasurementPointsChange={workspace.handleMeasurementPointsChange}
           onPointSelect={workspace.handlePointSelect}
           onUserLocationChange={workspace.setUserLocation}
           onStatusChange={workspace.handleStatusChange}
@@ -79,17 +80,17 @@ export default function App() {
         />
 
         <MapControls
-          isDrawing={workspace.isDrawing}
+          measurement={workspace.measurement}
+          mode={workspace.mode}
           rightPanelOpen={workspace.rightPanel === 'layers'}
-          draftVertexCount={workspace.draftCoordinates.length}
           hasSelection={Boolean(workspace.selection)}
           mapStyle={workspace.mapStyle}
           timeRange={workspace.timeRange}
           onMapStyleChange={workspace.setMapStyle}
           onTimeRangeChange={workspace.setTimeRange}
-          onStartDrawing={workspace.startDrawing}
-          onCancelDrawing={workspace.cancelDrawing}
-          onCompleteDrawing={workspace.completeDrawing}
+          onStartMeasurement={workspace.startMeasurement}
+          onCancelMeasurement={workspace.cancelMeasurement}
+          onCompleteMeasurement={workspace.completeMeasurement}
           onClearSelection={workspace.clearSelection}
         />
 

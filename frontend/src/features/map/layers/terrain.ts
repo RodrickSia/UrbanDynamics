@@ -1,23 +1,29 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
-const DEM_SOURCE_ID = 'goong-dem';
-const HILLSHADE_LAYER_ID = 'goong-hillshade';
+const DEM_SOURCE_ID = 'urban-terrain-dem';
+const HILLSHADE_SOURCE_ID = 'urban-terrain-shading-dem';
+const HILLSHADE_LAYER_ID = 'urban-terrain-hillshade';
+export const TERRAIN_TILEJSON_URL = 'https://tiles.mapterhorn.com/tilejson.json';
 
-export function setTerrain(map: MapLibreMap, mapKey: string, enabled: boolean): void {
+export function setTerrain(map: MapLibreMap, enabled: boolean): void {
   if (!enabled) {
     map.setTerrain(null);
     if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID);
+    if (map.getSource(HILLSHADE_SOURCE_ID)) map.removeSource(HILLSHADE_SOURCE_ID);
     if (map.getSource(DEM_SOURCE_ID)) map.removeSource(DEM_SOURCE_ID);
     return;
   }
 
-  if (!map.getSource(DEM_SOURCE_ID)) {
-    map.addSource(DEM_SOURCE_ID, {
+  for (const id of [DEM_SOURCE_ID, HILLSHADE_SOURCE_ID]) {
+    if (map.getSource(id)) continue;
+    map.addSource(id, {
       type: 'raster-dem',
-      tiles: [`https://dem.goong.io/{z}/{x}/{y}.png?api_key=${encodeURIComponent(mapKey)}`],
-      tileSize: 256,
-      maxzoom: 15,
+      url: TERRAIN_TILEJSON_URL,
       encoding: 'terrarium',
+      tileSize: 512,
+      // Vietnam uses the global 30 m DEM. Higher zoom requests return 404;
+      // overzoom the available DEM instead of losing terrain near buildings.
+      maxzoom: 12,
     });
   }
 
@@ -29,7 +35,7 @@ export function setTerrain(map: MapLibreMap, mapKey: string, enabled: boolean): 
       {
         id: HILLSHADE_LAYER_ID,
         type: 'hillshade',
-        source: DEM_SOURCE_ID,
+        source: HILLSHADE_SOURCE_ID,
         paint: {
           'hillshade-exaggeration': 0.42,
           'hillshade-shadow-color': '#244038',
@@ -41,5 +47,6 @@ export function setTerrain(map: MapLibreMap, mapKey: string, enabled: boolean): 
     );
   }
 
-  map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1.18 });
+  // Keep real-world elevation so buildings and measurement heights share one scale.
+  map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1 });
 }

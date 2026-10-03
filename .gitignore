@@ -18,8 +18,15 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+test-results/
+playwright-report/
 
 # Editors and OS
 .DS_Store
 .idea/
 .vscode/
+
+# Local planning notes
+tasks/
+**/plan.md
+**/todo.md

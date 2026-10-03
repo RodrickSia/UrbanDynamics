@@ -46,15 +46,15 @@ describe('premium map workspace', () => {
     expect(layers).toHaveClass('glass-panel');
   });
 
-  it('opens the compact polygon toolbar without shifting the right controls', async () => {
+  it('opens the compact measurement toolbar without shifting the right controls', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Draw polygon' }));
+    await user.click(screen.getByRole('button', { name: 'Measure distance' }));
 
-    expect(screen.getByRole('region', { name: 'Polygon drawing' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Distance measurement' })).toBeInTheDocument();
     expect(screen.getByTestId('navigation-cluster')).toHaveAttribute('data-right-panel-open', 'false');
-    expect(screen.getByRole('button', { name: 'Finish polygon' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled();
   });
 
   it('keeps place details concise and glass-styled', async () => {

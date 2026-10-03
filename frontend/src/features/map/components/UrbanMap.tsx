@@ -1,4 +1,4 @@
-import type { Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_VIEWPORT, getMapStyle } from '../config/mapConfig';
@@ -6,8 +6,13 @@ import { configureMapLibreWorker } from '../config/maplibreWorker';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
 import { setBuildings3d } from '../layers/buildings3d';
-import { ensureSelectionLayers, updateSelectionLayers } from '../layers/selectionLayers';
+import {
+  createMeasurementLayer,
+  MEASUREMENT_LAYER_ID,
+  type MeasurementLayer,
+} from '../layers/measurementLayer';
 import { setTerrain } from '../layers/terrain';
+import { createMapInteractionHandlers } from '../utils/mapInteractions';
 import type { UrbanMapProps } from './UrbanMap.types';
 
 export function UrbanMap(props: UrbanMapProps) {
@@ -17,8 +22,7 @@ export function UrbanMap(props: UrbanMapProps) {
     mode,
     buildingsEnabled,
     buildingsOpacity,
-    isDrawing,
-    draftCoordinates,
+    measurement,
     selection,
     userLocation,
     focusRequest,
@@ -29,6 +33,7 @@ export function UrbanMap(props: UrbanMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerConstructorRef = useRef<typeof import('maplibre-gl').Marker | null>(null);
+  const measurementLayerRef = useRef<MeasurementLayer | null>(null);
   const propsRef = useRef(props);
   const styleRef = useRef(mapStyle);
   const [mapRevision, setMapRevision] = useState(0);
@@ -48,6 +53,7 @@ export function UrbanMap(props: UrbanMapProps) {
     const { mapKey } = configuration;
     let disposed = false;
     let mountedMap: MapLibreMap | null = null;
+    let disposeInteractions: () => void = () => undefined;
 
     void import('maplibre-gl')
       .then((maplibregl) => {
@@ -68,6 +74,8 @@ export function UrbanMap(props: UrbanMapProps) {
         mountedMap = map;
         mapRef.current = map;
         markerConstructorRef.current = maplibregl.Marker;
+        const measurementLayer = createMeasurementLayer(maplibregl.MercatorCoordinate);
+        measurementLayerRef.current = measurementLayer;
         setMapRevision((revision) => revision + 1);
 
         map.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 110 }), 'bottom-left');
@@ -75,6 +83,12 @@ export function UrbanMap(props: UrbanMapProps) {
         const applyMode = () => {
           const current = propsRef.current;
           const in3d = current.mode === '3d';
+          try {
+            // Insert terrain first so its hillshade stays below building extrusions.
+            setTerrain(map, in3d);
+          } catch {
+            if (in3d) current.onStatusChange(true, 'Map ready · 3D terrain unavailable');
+          }
           let buildingsAvailable = true;
           try {
             buildingsAvailable = setBuildings3d(
@@ -86,52 +100,28 @@ export function UrbanMap(props: UrbanMapProps) {
             buildingsAvailable = false;
           }
           current.onBuildingsAvailabilityChange(buildingsAvailable);
-          try {
-            setTerrain(map, mapKey, in3d);
-          } catch {
-            current.onStatusChange(true, 'Map ready · 3D terrain unavailable');
-          }
-          map.easeTo({ pitch: in3d ? 48 : 0, bearing: 0, duration: 600 });
+          map.easeTo({ pitch: in3d ? 60 : 0, bearing: 0, duration: 600 });
         };
 
         const handleStyleLoad = () => {
-          ensureSelectionLayers(map);
-          updateSelectionLayers(map, propsRef.current.draftCoordinates, propsRef.current.selection);
           applyMode();
+          if (!map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
+          measurementLayer.setMeasurement(
+            propsRef.current.measurement,
+            propsRef.current.mode,
+          );
           propsRef.current.onStatusChange(true, 'Goong map is ready');
         };
 
-        const handleClick = (event: MapMouseEvent) => {
-          const current = propsRef.current;
-          if (current.isDrawing) {
-            current.onDraftCoordinate([event.lngLat.lng, event.lngLat.lat]);
-            return;
-          }
-          const visibleFeatures = map
-            .queryRenderedFeatures(event.point)
-            .filter((feature) => !feature.layer.id.startsWith('urban-selection'))
-            .slice(0, 5)
-            .map((feature, index) => {
-              const featureName = feature.properties?.name;
-              const isNamedPlace = typeof featureName === 'string' && featureName.trim().length > 0;
-              return {
-                id: String(feature.id ?? `${feature.layer.id}-${index}`),
-                label: String(featureName ?? feature.properties?.class ?? feature.layer.id),
-                layer: feature.layer.id,
-                isNamedPlace,
-              };
-            });
-          current.onPointSelect({
-            kind: 'point',
-            longitude: event.lngLat.lng,
-            latitude: event.lngLat.lat,
-            zoom: map.getZoom(),
-            features: visibleFeatures,
-          });
-        };
+        const interactions = createMapInteractionHandlers(map, () => propsRef.current, measurementLayer.projection);
+        disposeInteractions = interactions.dispose;
 
         map.on('style.load', handleStyleLoad);
-        map.on('click', handleClick);
+        map.on('click', interactions.click);
+        map.on('mousemove', interactions.mousemove);
+        map.on('mouseout', interactions.mouseout);
+        map.on('movestart', interactions.movestart);
+        map.on('idle', interactions.idle);
         map.on('error', () =>
           propsRef.current.onStatusChange(false, 'Some map data could not be loaded'),
         );
@@ -140,7 +130,9 @@ export function UrbanMap(props: UrbanMapProps) {
 
     return () => {
       disposed = true;
+      disposeInteractions();
       markerConstructorRef.current = null;
+      measurementLayerRef.current = null;
       mountedMap?.remove();
       if (mapRef.current === mountedMap) mapRef.current = null;
     };
@@ -156,31 +148,40 @@ export function UrbanMap(props: UrbanMapProps) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.isStyleLoaded() || !configuration.ok) return;
+    // isStyleLoaded also becomes false while tiles load during camera movement.
+    // Style metadata is enough to apply a user's mode change.
+    if (!map || !map.getStyle() || !configuration.ok) return;
     const in3d = mode === '3d';
+    try {
+      setTerrain(map, in3d);
+    } catch {
+      if (in3d) onStatusChange(true, 'Map ready · 3D terrain unavailable');
+    }
     try {
       const available = setBuildings3d(map, in3d && buildingsEnabled, buildingsOpacity);
       onBuildingsAvailabilityChange(available);
-      setTerrain(map, configuration.mapKey, in3d);
     } catch {
       onBuildingsAvailabilityChange(false);
     }
-    map.easeTo({ pitch: in3d ? 48 : 0, bearing: 0, duration: 600 });
+    map.easeTo({ pitch: in3d ? 60 : 0, bearing: 0, duration: 600 });
   }, [
     buildingsEnabled,
     buildingsOpacity,
     configuration,
     mode,
     onBuildingsAvailabilityChange,
+    onStatusChange,
   ]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.isStyleLoaded()) return;
-    ensureSelectionLayers(map);
-    updateSelectionLayers(map, draftCoordinates, selection);
-    map.getCanvas().classList.toggle('is-drawing', isDrawing);
-  }, [draftCoordinates, isDrawing, selection]);
+    const measurementLayer = measurementLayerRef.current;
+    if (!map || !measurementLayer) return;
+    // Retain every state update even while terrain/vector tiles are loading.
+    measurementLayer.setMeasurement(measurement, mode);
+    if (map.getStyle() && !map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
+    map.getCanvas().classList.toggle('is-measuring', measurement.status === 'active');
+  }, [measurement, mode]);
 
   if (!configuration.ok) {
     return (

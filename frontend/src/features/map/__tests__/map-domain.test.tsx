@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 
 import { getMapConfiguration, getMapStyle } from '../config/mapConfig';
 import { URBAN_LAYERS } from '../layers/layerRegistry';
 import { setLayerOpacity, setMapMode, toggleLayerState } from '../state/layerState';
 import { TIME_RANGE_OPTIONS } from '../types/map';
-import { createPolygonSelection } from '../utils/geo';
 import { createLocationMarkerElement } from '../utils/locationMarkers';
+import {
+  calculateMeasurementSummary,
+  createMeasurementSegments,
+  formatMeasurementDistance,
+} from '../utils/measurement';
+import { readBuildingHeight, resolveMeasurementPoint } from '../utils/measurementElevation';
 
 describe('map domain', () => {
   it('lists priority urban layers before future integrations', () => {
@@ -70,19 +76,97 @@ describe('map domain', () => {
     expect(setLayerOpacity({}, 'buildings-3d', -0.2)).toEqual({ 'buildings-3d': 0 });
   });
 
-  it('closes a polygon and calculates its geometry metadata', () => {
-    const selection = createPolygonSelection([
-      [105.8, 21],
-      [105.9, 21],
-      [105.9, 21.1],
+  it('calculates horizontal, vertical, and straight-line 3D distance', () => {
+    const points = [
+      {
+        id: 'start', longitude: 0, latitude: 0, elevationMeters: 10,
+        elevationAvailable: true, surface: 'terrain' as const,
+      },
+      {
+        id: 'end', longitude: 0.000898315, latitude: 0, elevationMeters: 30,
+        elevationAvailable: true, surface: 'building' as const,
+      },
+    ];
+
+    const summary = calculateMeasurementSummary(points);
+
+    expect(summary.segmentCount).toBe(1);
+    expect(summary.lastSegment?.horizontalMeters).toBeCloseTo(100, 0);
+    expect(summary.lastSegment?.verticalMeters).toBe(20);
+    expect(summary.lastSegment?.spatialMeters).toBeCloseTo(Math.sqrt(10_400), 0);
+    expect(summary.elevationAvailable).toBe(true);
+  });
+
+  it('builds a 3D right triangle but keeps 2D measurement flat', () => {
+    const points = [
+      {
+        id: 'start', longitude: 106.7, latitude: 10.8, elevationMeters: 8,
+        elevationAvailable: true, surface: 'terrain' as const,
+      },
+      {
+        id: 'end', longitude: 106.701, latitude: 10.801, elevationMeters: 28,
+        elevationAvailable: true, surface: 'building' as const,
+      },
+    ];
+
+    expect(createMeasurementSegments(points, '3d').map((segment) => segment.kind)).toEqual([
+      'distance',
+      'horizontal',
+      'vertical',
+    ]);
+    expect(createMeasurementSegments(points, '2d')).toEqual([
+      expect.objectContaining({ kind: 'distance', startElevation: 0, endElevation: 0 }),
+    ]);
+  });
+
+  it('flags unavailable elevation and formats map-scale distances', () => {
+    const summary = calculateMeasurementSummary([
+      {
+        id: 'start', longitude: 106.7, latitude: 10.8, elevationMeters: 0,
+        elevationAvailable: false, surface: 'ground' as const,
+      },
+      {
+        id: 'end', longitude: 106.701, latitude: 10.801, elevationMeters: 0,
+        elevationAvailable: false, surface: 'ground' as const,
+      },
     ]);
 
-    expect(selection.geometry.geometry.coordinates[0][0]).toEqual(
-      selection.geometry.geometry.coordinates[0].at(-1),
+    expect(summary.elevationAvailable).toBe(false);
+    expect(formatMeasurementDistance(842.4)).toBe('842 m');
+    expect(formatMeasurementDistance(1_420)).toBe('1.42 km');
+  });
+
+  it('uses only explicit building elevation data', () => {
+    expect(readBuildingHeight({ height: '36.5' })).toBe(36.5);
+    expect(readBuildingHeight({ levels: 8 })).toBeNull();
+    expect(readBuildingHeight({ name: 'Building without height' })).toBeNull();
+    expect(readBuildingHeight({ height: -4 })).toBeNull();
+  });
+
+  it('does not invent a roof position when no surface intersection is available', () => {
+    const createMap = (terrainElevation: number | null) => ({
+      queryTerrainElevation: () => terrainElevation,
+      getLayer: () => ({}),
+      queryRenderedFeatures: () => [{
+        layer: { id: 'urban-buildings-3d' },
+        properties: { height: 20 },
+      }],
+    }) as unknown as MapLibreMap;
+
+    expect(resolveMeasurementPoint(createMap(8), 106.7, 10.8, '3d', [0, 0], 'roof')).toEqual(
+      expect.objectContaining({
+        elevationMeters: 8,
+        elevationAvailable: false,
+        surface: 'building',
+      }),
     );
-    expect(selection.vertexCount).toBe(3);
-    expect(selection.areaSquareMeters).toBeGreaterThan(0);
-    expect(selection.bounds).toEqual([105.8, 21, 105.9, 21.1]);
+    expect(resolveMeasurementPoint(createMap(null), 106.7, 10.8, '3d', [0, 0], 'ground')).toEqual(
+      expect.objectContaining({
+        elevationMeters: 0,
+        elevationAvailable: false,
+        surface: 'building',
+      }),
+    );
   });
 
   it('creates distinct accessible markers for user and selected locations', () => {

@@ -59,17 +59,18 @@ describe('map-first workspace', () => {
     expect(within(picker).getByRole('button', { name: '1 year' })).toBeEnabled();
   });
 
-  it('uses the right sidebar for layers and a compact bottom toolbar for polygon drawing', async () => {
+  it('uses the right sidebar for layers and a compact bottom toolbar for distance measurement', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: 'Open data layers' }));
     expect(screen.getByRole('region', { name: 'Data layers' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Draw polygon' }));
+    await user.click(screen.getByRole('button', { name: 'Measure distance' }));
     expect(screen.queryByRole('region', { name: 'Data layers' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Polygon drawing' })).toHaveClass('draw-toolbar');
-    expect(screen.getByRole('button', { name: 'Finish polygon' })).toBeDisabled();
+    expect(screen.getByRole('region', { name: 'Distance measurement' })).toHaveClass('measurement-toolbar');
+    expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'New measurement' })).toBeEnabled();
     expect(screen.getByTestId('navigation-cluster')).toHaveAttribute('data-right-panel-open', 'false');
     expect(screen.queryByText('Spatial tools')).not.toBeInTheDocument();
     expect(screen.queryByText('Draw research area')).not.toBeInTheDocument();

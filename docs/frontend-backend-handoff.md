@@ -2,6 +2,19 @@
 
 Tài liệu này ghi lại trạng thái frontend sau đợt cải tiến giao diện bản đồ và hợp đồng dữ liệu mà backend cần cung cấp. Mục tiêu là để backend có thể tích hợp từng nguồn dữ liệu mà không phải suy đoán hành vi của UI.
 
+## Measurement fixes — 2026-10-03
+
+- DEM dùng Terrarium, tile 512 px, `maxzoom: 12`, exaggeration 1. Việt Nam dùng nguồn toàn cầu khoảng 30 m; phóng to tiếp dùng overzoom. Không dùng độ phân giải này như dữ liệu khảo sát công trình.
+- Nguồn hillshade tách khỏi terrain để tránh xung đột độ phân giải render. Tile zoom 14 tại khu vực kiểm tra trả 404; zoom 12 trả 200.
+- Điểm đo được xác định bằng giao tia camera với mái/mặt đứng có cộng cao độ terrain, thay vì gán về tâm footprint. Chiều cao chỉ dùng cho số đo khi có thuộc tính hợp lệ; giá trị 12 m để hiển thị nhà thiếu chiều cao không được coi là dữ liệu đo.
+- Tọa độ và cao độ đã xác nhận được giữ nguyên khi zoom/pan/đổi chế độ. Khi tile đang tải, giá trị 0 mặc định của MapLibre không được coi là cao độ thật. GPU dùng tọa độ tương đối quanh điểm gốc để tránh mất chính xác float32.
+- Goong cung cấp chiều cao qua `max_height`, không phải chỉ `height`/`render_height`. Render và ray picking đã đọc cùng trường này; `min_height` giới hạn chân mặt đứng. Lớp extrusion `building` có sẵn của Goong được ẩn khi ứng dụng quản lý lớp nhà, tránh dựng hai bộ hình học chồng nhau gây z-fighting.
+- Laser được thay bằng vệt amber mảnh tại giao của mặt phẳng cùng cao độ với bề mặt đang nhìn thấy. Shader đọc depth buffer chung của terrain/building và snap cao độ tham chiếu vào bề mặt dưới con trỏ. Laser là trợ giúp cao độ, không phải cạnh đo; các cạnh tam giác cố định vẫn là overlay riêng. Texture/framebuffer tái sử dụng, chỉ cấp lại khi đổi kích thước; không tạo lại map/scene mỗi lần di chuột.
+- Laser chỉ xuất hiện trong phép đo 3D đang active, khi có cao độ hợp lệ; không vẽ qua khoảng trống, bề mặt bị che hoặc tô kín mái đồng phẳng. Đây là hiệu ứng trên depth của cảnh hiện tại, không phải phân tích giao cắt toàn bộ dữ liệu ngoài màn hình. Độ chính xác vẫn phụ thuộc DEM và chiều cao do nguồn dữ liệu cung cấp.
+- DEM cục bộ có giá trị khác 0 vẫn dùng được khi tile ở nơi khác đang tải. Giá trị 0 chưa rõ nguồn vẫn được giữ là unavailable trong thời gian tải, không tạo cao độ giả.
+- Kiểm thử bao gồm trường `max_height`, loại lớp extrusion trùng, mái/mặt đứng, neo điểm sau đổi camera/chế độ, laser bám mặt đứng/địa hình dốc và resize. Test live kiểm tra cả building thật từ Goong, không chỉ mô hình thử.
+- Kiểm tra: `npm test`, `npm run build`, `npm run lint`, `npm run test:map`; kiểm tra nguồn thật bằng `npm run test:map:live` trong thư mục `frontend`. Chromium cần cài bằng `npx playwright install chromium`. `@playwright/test` chỉ là dev dependency.
+
 ## 1. Trạng thái hiện tại
 
 Backend hiện chỉ có `GET /health`. Frontend đã hoàn thiện lớp giao diện và tương tác cho:
@@ -10,11 +23,13 @@ Backend hiện chỉ có `GET /health`. Frontend đã hoàn thiện lớp giao d
 - chuyển đổi rõ ràng giữa 2D và 3D;
 - phóng to, thu nhỏ, định vị bằng Geolocation API của trình duyệt;
 - chuyển nền mặc định/vệ tinh; nền quy hoạch hiện bị khóa vì chưa có nguồn dữ liệu;
-- vẽ vùng polygon và chọn đối tượng bản đồ;
+- đo khoảng cách nhiều điểm trong 2D/3D và chọn đối tượng bản đồ;
 - bảng tìm kiếm, lịch sử tìm kiếm cục bộ, thông tin khu vực/thời tiết mẫu;
 - bảng lớp dữ liệu đô thị.
 
-Giao diện hiển thị hoàn toàn bằng tiếng Anh. Search và Place details nằm bên trái; Data Layers dùng drawer toàn chiều cao bên phải, còn Polygon drawing là thanh công cụ nhỏ ở giữa cạnh dưới. Marker người dùng chỉ xuất hiện sau khi định vị thành công; marker địa điểm xuất hiện sau khi chọn kết quả hoặc chọn điểm trên bản đồ. Click vùng bản đồ trống lần thứ hai sẽ đóng chi tiết chung; click POI có tên luôn mở hoặc cập nhật Place details.
+Giao diện hiển thị hoàn toàn bằng tiếng Anh. Search và Place details nằm bên trái; Data Layers dùng drawer toàn chiều cao bên phải, còn Distance measurement là thanh công cụ nhỏ ở giữa cạnh dưới. Marker người dùng chỉ xuất hiện sau khi định vị thành công; marker địa điểm xuất hiện sau khi chọn kết quả hoặc chọn điểm trên bản đồ. Click vùng bản đồ trống lần thứ hai sẽ đóng chi tiết chung; click POI có tên luôn mở hoặc cập nhật Place details.
+
+Phép đo được giữ nguyên khi chuyển 2D/3D và khi zoom/pan. 2D ưu tiên khoảng cách ngang; 3D hiển thị đoạn thẳng không gian, laser ngang, chênh lệch cao và các điểm đo luôn nhìn thấy trên lớp tương tác. Frontend chỉ dùng cao độ thật từ global Mapterhorn DEM TileJSON (`https://tiles.mapterhorn.com/tilejson.json`, theo ví dụ terrain chính thức của MapLibre) và thuộc tính chiều cao của building. Nếu một trong hai nguồn không cung cấp cao độ, UI báo `Elevation unavailable`; frontend không tạo số cao độ giả và không ghi đè cao độ hợp lệ đã chốt trong lúc tile DEM đang tải lại. Measurement hiện là state cục bộ, chưa lưu hoặc gửi backend.
 
 Nền Satellite dùng style raster-only từ `satellite.goong.io`, không nạp thêm symbol layer của style hybrid để tránh nhãn địa điểm bị lặp trên ảnh vệ tinh. Vì style này không có source `composite / VN_Building`, 3D building sẽ tự giảm cấp trong Satellite; địa hình DEM vẫn có thể hoạt động độc lập.
 
@@ -260,6 +275,10 @@ Khi tích hợp, frontend cần thêm trạng thái loading/empty/error, hủy r
 - `frontend/src/features/map/components/PlaceDetailsPanel.tsx`: drawer chi tiết địa điểm bên trái.
 - `frontend/src/features/map/components/LayerPanel.tsx`: bật/tắt/độ mờ của layer.
 - `frontend/src/features/map/components/UrbanMap.tsx`: ranh giới tích hợp nguồn/layer MapLibre.
+- `frontend/src/features/map/components/MeasurementToolbar.tsx`: tổng khoảng cách, đoạn gần nhất và thao tác New measurement/Done.
+- `frontend/src/features/map/layers/measurementLayer.ts`: custom WebGL layer 3D cho đoạn đo, laser, cạnh đứng và điểm đo.
+- `frontend/src/features/map/utils/measurement.ts`: phép tính khoảng cách ngang và khoảng cách thẳng 3D.
+- `frontend/src/features/map/utils/measurementElevation.ts`: lấy cao độ terrain/building và quy tắc fallback không tạo dữ liệu giả.
 - `frontend/src/features/map/config/maplibreWorker.ts`: URL worker do Vite đóng gói, không phụ thuộc đường dẫn worker mặc định.
 - `frontend/src/features/map/hooks/useMapWorkspace.ts`: state điều phối search, selection, drawer, time range và 2D/3D.
 - `frontend/src/features/map/motion.ts`: đăng ký GSAP React và chính sách reduced motion.

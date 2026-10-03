@@ -1,11 +1,11 @@
-import type { Position } from 'geojson';
-
 import type { MapConfiguration, MapStyleId } from '../config/mapConfig';
 import type {
   MapControlRequest,
   MapFocusRequest,
   MapMode,
   MapSelection,
+  MeasurementPoint,
+  MeasurementState,
   PointSelection,
   UserLocation,
 } from '../types/map';
@@ -16,13 +16,14 @@ export interface UrbanMapProps {
   mode: MapMode;
   buildingsEnabled: boolean;
   buildingsOpacity: number;
-  isDrawing: boolean;
-  draftCoordinates: Position[];
+  measurement: MeasurementState;
   selection: MapSelection;
   userLocation: UserLocation | null;
   focusRequest: MapFocusRequest | null;
   controlRequest: MapControlRequest | null;
-  onDraftCoordinate: (coordinate: [number, number]) => void;
+  onMeasurementPoint: (point: MeasurementPoint) => void;
+  onMeasurementPreview: (point: MeasurementPoint | null) => void;
+  onMeasurementPointsChange: (points: MeasurementPoint[]) => void;
   onPointSelect: (selection: PointSelection) => void;
   onUserLocationChange: (location: UserLocation) => void;
   onStatusChange: (ready: boolean, message: string) => void;
