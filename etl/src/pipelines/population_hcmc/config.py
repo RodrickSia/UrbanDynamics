@@ -1,16 +1,35 @@
-from pydantic import BaseModel, HttpUrl
-from pydantic_settings import BaseSettings, SettingsConfigDict
+"""WorldPop source URLs and local extraction settings."""
+
+from pathlib import Path
+
+from pydantic import BaseModel, Field, HttpUrl
 
 
-class WorldPopSourceConfig(BaseModel):
-    population_url: HttpUrl
-    boundaries_url: HttpUrl
+WORLDPOP_YEARS = tuple(range(2015, 2031))
+WORLDPOP_URL_TEMPLATE = (
+    "https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/"
+    "{year}/VNM/v1/100m/constrained/vnm_pop_{year}_CN_100m_R2025A_v1.tif"
+)
 
 
-class PopulationHCMCConfig(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="POPULATION_HCMC_",
-        env_nested_delimiter="__",
+def _worldpop_population_paths() -> dict[int, HttpUrl]:
+    return {
+        year: HttpUrl(WORLDPOP_URL_TEMPLATE.format(year=year))
+        for year in WORLDPOP_YEARS
+    }
+
+
+class WorldPop(BaseModel):
+    """Vietnam constrained 100 m population rasters, indexed by year."""
+
+    population_paths: dict[int, HttpUrl] = Field(
+        default_factory=_worldpop_population_paths
     )
 
-    worldpop: WorldPopSourceConfig
+
+class PopulationHCMCConfig(BaseModel):
+    worldpop: WorldPop = Field(default_factory=WorldPop)
+    download_dir: Path = Path("data/population_hcmc/worldpop")
+
+
+config = PopulationHCMCConfig()

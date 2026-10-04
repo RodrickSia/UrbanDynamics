@@ -1,8 +1,16 @@
-from src.pipelines.population_hcmc import extract, load, transform
+"""Entry point for extracting the HCMC WorldPop population inputs."""
+
+import logging
+
+from src.pipelines.population_hcmc import extract
 
 
 def run() -> None:
-    """Run the population pipeline once extraction and loading are implemented."""
-    raw_data = extract.run()
-    normalized_data = transform.run(raw_data)
-    load.run(normalized_data)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    downloaded = extract.run()
+    logging.getLogger(__name__).info("Downloaded %s WorldPop population rasters:", len(downloaded))
+    for year, path in downloaded.items():
+        logging.getLogger(__name__).info("%s: %s", year, path)
