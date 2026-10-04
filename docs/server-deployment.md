@@ -43,9 +43,17 @@ Open http://127.0.0.1:51873 for the map and http://127.0.0.1:51874/health for ba
 health. Keep SSH running. When overriding ports, change both sides of the relevant
 forward so the frontend's build-time API URL remains consistent.
 
-HTTP health checks do not verify all map capabilities: the existing Nginx CSP
-still needs a separate terrain-provider allowlist change, geolocation is disabled
-by its Permissions-Policy, and browser API integration will need routing/CORS.
+Nginx explicitly permits `https://tiles.mapterhorn.com` in CSP `connect-src` so
+MapLibre can load terrain metadata and DEM tiles. With the SSH tunnel open, verify
+the actual deployed headers and terrain requests in Chromium from `frontend/`:
+
+```sh
+npx playwright test --config playwright.deploy.config.ts
+```
+
+Set `DEPLOY_BASE_URL` to test a different deployment URL. HTTP health checks alone
+do not verify map rendering. Geolocation is still disabled by Permissions-Policy,
+and browser API integration will need routing/CORS.
 
 Verify the environment generator locally without real keys:
 

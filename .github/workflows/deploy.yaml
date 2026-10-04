@@ -36,6 +36,7 @@ jobs:
         run: |
           curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 "http://127.0.0.1:${BACKEND_PORT}/health"
           curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 --output /dev/null "http://127.0.0.1:${FRONTEND_PORT}/"
+          curl --fail --silent --show-error --max-time 10 --head "http://127.0.0.1:${FRONTEND_PORT}/" | grep -iE '^content-security-policy:.*connect-src[^;]*https://tiles[.]mapterhorn[.]com([ ;]|$)' > /dev/null
       - name: Remove generated secret file
         if: always()
         run: python3 -c "from pathlib import Path; Path('.env').unlink(missing_ok=True)"
