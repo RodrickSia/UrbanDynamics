@@ -1,0 +1,45 @@
+# Standalone local stack for Khoi; no dependency on Duy's unfinished pipelines.
+services:
+  warehouse:
+    image: postgis/postgis:16-3.5
+    environment:
+      POSTGRES_DB: urban
+      POSTGRES_USER: urban
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or shell}
+    ports:
+      - "127.0.0.1:${KHOI_DB_PORT:-55432}:5432"
+    volumes:
+      - khoi_database:/var/lib/postgresql/data
+      - ./infra/warehouse/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urban -d urban"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://urban:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@warehouse:5432/urban
+      DATA_DIR: /data
+    ports:
+      - "127.0.0.1:${KHOI_API_PORT:-8001}:8000"
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      warehouse:
+        condition: service_healthy
+  etl:
+    build: ./etl
+    environment:
+      DATABASE_URL: postgresql://urban:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@warehouse:5432/urban
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    profiles: ["etl"]
+    depends_on:
+      warehouse:
+        condition: service_healthy
+volumes:
+  khoi_database:

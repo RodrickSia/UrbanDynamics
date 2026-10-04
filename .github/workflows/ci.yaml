@@ -9,5 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare build environment
+        run: cp .env.example .env
       - name: Build service images
         run: docker compose build
