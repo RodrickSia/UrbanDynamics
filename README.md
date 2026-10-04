@@ -11,7 +11,7 @@ UrbanDynamics is organized as a monorepo with separate frontend, backend, and ET
 
 ## Local development
 
-Copy `.env.example` to `.env`, then start the services with `docker compose up --build`. The ETL container is opt-in with the `etl` Compose profile: `docker compose --profile etl run --rm etl`.
+Copy `.env.example` to `.env`, then start the services with `docker compose up --build`. ETL services are opt-in: `docker compose --profile etl-population-hcmc run --rm etl-population-hcmc` or `docker compose --profile etl-rainwater run --rm etl-rainwater`.
 
 See [docs/architecture.md](docs/architecture.md) for the initial service boundaries and [docs/development.md](docs/development.md) for repository conventions.
 

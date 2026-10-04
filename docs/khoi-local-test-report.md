@@ -62,4 +62,4 @@ Dữ liệu gốc, geometry OSM lớn và snapshot nằm trong `data/`; `.env`, 
 
 ## Đưa lên GitHub
 
-Đang ở branch `main`; nên tạo `feat/khoi-flood-land-price`, commit thay đổi và mở PR. Các thay đổi dùng chung cần review: `compose.yaml`, Dockerfile backend/ETL, requirements và `.github/workflows/ci.yaml`. Không có bước deploy tự động được thêm vào workflow mới. Chưa push, chưa chạy GitHub Actions thực tế và chưa deploy máy 156.
+Branch bàn giao: `feat/khoi-flood-land-price`. Đã ghép cập nhật `origin/main` về các service ETL dân số/mưa và cấu hình uv; thêm dependencies Khôi vào `pyproject.toml`/`uv.lock`, giữ `requirements.txt` cho Docker và bộ test pip. Các thay đổi dùng chung cần review: `compose.yaml`, Dockerfile backend/ETL, requirements và `.github/workflows/ci.yaml`. Không có bước deploy tự động được thêm vào workflow mới. Kiểm thử trong báo cáo là kiểm thử local; chưa deploy máy 156.
