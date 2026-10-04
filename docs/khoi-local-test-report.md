@@ -63,3 +63,11 @@ Dữ liệu gốc, geometry OSM lớn và snapshot nằm trong `data/`; `.env`, 
 ## Đưa lên GitHub
 
 Branch bàn giao: `feat/khoi-flood-land-price`. Đã ghép cập nhật `origin/main` về các service ETL dân số/mưa và cấu hình uv; thêm dependencies Khôi vào `pyproject.toml`/`uv.lock`, giữ `requirements.txt` cho Docker và bộ test pip. Các thay đổi dùng chung cần review: `compose.yaml`, Dockerfile backend/ETL, requirements và `.github/workflows/ci.yaml`. Không có bước deploy tự động được thêm vào workflow mới. Kiểm thử trong báo cáo là kiểm thử local; chưa deploy máy 156.
+
+## Sửa cấu hình password — 05/10/2026
+
+- Bỏ password mặc định trong script local; thiếu `POSTGRES_PASSWORD` thì dừng trước khi gọi Docker.
+- CI sinh password ngẫu nhiên bằng OpenSSL, che trong log và dùng cùng giá trị cho PostGIS/chuỗi kết nối; container được dọn sau test.
+- Đã chạy chính shell khởi động database của workflow trên máy và đạt 36/36 test với database tạm. Đây là kiểm thử local, không phải kết quả GitHub Actions.
+- Đã đổi password của database test local, lưu riêng trong `.runtime/khoi-local.env` được Git bỏ qua; harness và cả 9 lượt kiểm tra API đều đạt với password mới.
+- Commit cũ vẫn có giá trị test trước đây trong lịch sử; không force-push hoặc sửa lịch sử branch nhóm. Cảnh báo GitGuardian ở commit cũ cần được người có quyền xử lý riêng.

@@ -22,6 +22,8 @@ Python và Docker Desktop đã được thêm vào User PATH. Mở terminal mớ
 ```powershell
 python -m venv .venv
 & .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+$khoiPasswordInput = Read-Host 'Nhap mat khau database local' -AsSecureString
+$env:POSTGRES_PASSWORD = [System.Net.NetworkCredential]::new('', $khoiPasswordInput).Password
 & .venv/Scripts/python.exe scripts/test-khoi-local.py
 ```
 
@@ -31,7 +33,16 @@ Kiểm tra trước khi push, gồm Python 3.12/Linux và build các image:
 & .venv/Scripts/python.exe scripts/test-khoi-local.py --linux-checks
 ```
 
-Script dùng project Docker `khoi-local`, PostGIS `127.0.0.1:55432`, backend `http://127.0.0.1:8001`; không triển khai lên máy 156. Password mặc định trong script chỉ dành cho bộ test local. Dữ liệu nằm ở `data/`, log và kết quả ở `test-results/`; các thư mục này không được commit.
+Script dùng project Docker `khoi-local`, PostGIS `127.0.0.1:55432`, backend `http://127.0.0.1:8001`; không triển khai lên máy 156. Không có password mặc định: đặt `POSTGRES_PASSWORD` trong môi trường, khớp với database đã khởi tạo. Lệnh phía trên nhập ẩn password trên PowerShell. Đổi biến môi trường không tự đổi password của database trong volume đã tồn tại. Dữ liệu nằm ở `data/`, log và kết quả ở `test-results/`; các thư mục này không được commit.
+
+Trên máy phát triển hiện tại, password local đã được đổi và lưu trong `.runtime/khoi-local.env` (Git bỏ qua). Nạp vào terminal mới mà không in password:
+
+```powershell
+$env:POSTGRES_PASSWORD = ((Get-Content .runtime/khoi-local.env -Raw).Trim() -split '=', 2)[1]
+& .venv/Scripts/python.exe scripts/test-khoi-local.py
+```
+
+Tệp này chỉ có trên máy đã cấu hình; người clone repo mới cần tự đặt password cho database của mình.
 
 Lần đầu cần mạng để tải ảnh Docker và dữ liệu nguồn. Các lựa chọn:
 
@@ -105,4 +116,4 @@ Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải gi�
 - OpenStreetMap qua Overpass: giữ attribution OSM/ODbL khi dùng hình học đường.
 - Ranh giới demo: hợp ba quận cũ Thủ Đức, 9, 2 từ bộ dữ liệu nguồn; không phải ranh giới phường hành chính hiện tại.
 
-Workflow `.github/workflows/khoi-checks.yaml` chạy pytest với PostGIS và lưu kết quả. Chưa chạy GitHub Actions thực tế. Scheduler và workflow deploy máy 156 chưa triển khai trong phạm vi Khôi: bàn giao lịch mưa mỗi giờ, GFM mỗi 6 giờ, nguồn ngập/giá đất kiểm tra phiên bản mỗi tháng theo kế hoạch.
+Workflow `.github/workflows/khoi-checks.yaml` sinh password ngẫu nhiên mỗi lần chạy, che password trong log, khởi động PostGIS tạm, chạy pytest và dọn container. Không cần password CI cố định. Scheduler và workflow deploy máy 156 chưa triển khai trong phạm vi Khôi: bàn giao lịch mưa mỗi giờ, GFM mỗi 6 giờ, nguồn ngập/giá đất kiểm tra phiên bản mỗi tháng theo kế hoạch.

@@ -23,13 +23,15 @@ def main():
     parser.add_argument("--road-candidates", action="store_true")
     parser.add_argument("--linux-checks", action="store_true", help="Also test Python 3.12 in Linux Docker")
     args = parser.parse_args()
+    environment = dict(os.environ)
+    password = environment.get("POSTGRES_PASSWORD")
+    if not password or not password.strip():
+        raise SystemExit("Set POSTGRES_PASSWORD in your shell before running local tests; no default password is provided")
     docker = shutil.which("docker")
     if not docker and os.name == "nt":
         docker = r"C:\Program Files\Docker\Docker\resources\bin\docker.exe"
     if not docker or not Path(docker).exists():
         raise SystemExit("Docker not found; install Docker Desktop and start its engine")
-    environment = dict(os.environ)
-    password = environment.setdefault("POSTGRES_PASSWORD", "khoi-local-test-only")
     database_port = environment.get("KHOI_DB_PORT", "55432")
     api_port = environment.get("KHOI_API_PORT", "8001")
     environment["DATABASE_URL"] = f"postgresql://urban:{quote(password,safe='')}@127.0.0.1:{database_port}/urban"
