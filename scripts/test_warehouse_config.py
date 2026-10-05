@@ -6,6 +6,7 @@ from pathlib import Path
 import secrets
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 
@@ -16,13 +17,20 @@ ROOT = Path(__file__).resolve().parents[1]
 class WarehouseConfigurationTests(unittest.TestCase):
     def warehouse_passwords(self, password):
         environ = {**os.environ, "WAREHOUSE_PASSWORD": password}
-        result = subprocess.run(
-            ["docker", "compose", "--env-file", str(ROOT / ".env.example"),
-             "--profile", "etl-population-hcmc", "--profile", "etl-rainwater",
-             "config", "--no-env-resolution", "--format", "json"],
-            cwd=ROOT, env=environ, capture_output=True, text=True, timeout=30,
-        )
-        self.assertEqual(result.returncode, 0, "Compose configuration must parse")
+        # Isolate from local .env files and avoid version-specific Compose flags.
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            shutil.copyfile(ROOT / "compose.yaml", fixture / "compose.yaml")
+            shutil.copyfile(ROOT / ".env.example", fixture / ".env")
+            result = subprocess.run(
+                ["docker", "compose", "--project-name", "warehouse-config-test",
+                 "--env-file", str(fixture / ".env"),
+                 "--profile", "etl-population-hcmc", "--profile", "etl-rainwater",
+                 "config", "--format", "json"],
+                cwd=fixture, env=environ, capture_output=True, text=True, timeout=30,
+            )
+        diagnostics = result.stderr.replace(password, "[REDACTED]") if password else result.stderr
+        self.assertEqual(result.returncode, 0, diagnostics)
         services = json.loads(result.stdout)["services"]
         return [
             services["postgis"]["environment"]["POSTGRES_PASSWORD"],
