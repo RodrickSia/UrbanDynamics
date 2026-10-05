@@ -10,10 +10,10 @@
 | `etl/src/pipelines/land_price/` | Đọc phụ lục giá đất An Khánh, xuất hàng cần duyệt, đổi nghìn đồng sang VND/m², chỉ công bố hình học đoạn đường đã duyệt. |
 | `etl/src/shared/` | Download có retry/checksum, kiểm tra không gian, snapshot và giao dịch PostGIS. |
 | `backend/app/routers/`, `backend/app/services/` | API lớp dữ liệu, lọc không gian/thời gian và kịch bản mưa. |
-| `infra/warehouse/migrations/001_khoi_layers.sql` | Bảng snapshot, feature và chỉ mục không gian. |
+| `infra/warehouse/migrations/001_khoi_layers.sql` (tên migration lịch sử; không đổi sau khi đã áp dụng) | Migration cho bảng snapshot, feature và chỉ mục không gian trong kho PostGIS dùng chung. |
 | `scripts/` | Chuẩn bị dữ liệu thật, lấy ứng viên đường OSM và chạy kiểm thử local. |
 
-Đây là cảnh báo theo quy tắc có bằng chứng. Chưa phải mô hình học máy dự đoán độ sâu hoặc ranh giới ngập. Dịch vụ AI Club và giao diện bản đồ thuộc các phần khác của kế hoạch.
+Đây là cảnh báo theo quy tắc có bằng chứng, không phải mô hình học máy dự đoán độ sâu hoặc ranh giới ngập. Dữ liệu vector được lưu trong hai bảng dùng chung `public.layer_snapshots` và `public.layer_features`; population raster vẫn ở `population.population_raster`.
 
 ## Chạy local trên Windows
 
@@ -22,55 +22,48 @@ Python và Docker Desktop đã được thêm vào User PATH. Mở terminal mớ
 ```powershell
 python -m venv .venv
 & .venv/Scripts/python.exe -m pip install -r requirements-dev.txt
-$khoiPasswordInput = Read-Host 'Nhap mat khau database local' -AsSecureString
-$env:POSTGRES_PASSWORD = [System.Net.NetworkCredential]::new('', $khoiPasswordInput).Password
+$warehousePasswordInput = Read-Host 'Nhap mat khau database local' -AsSecureString
+$env:WAREHOUSE_PASSWORD = [System.Net.NetworkCredential]::new('', $warehousePasswordInput).Password
 & .venv/Scripts/python.exe scripts/test-khoi-local.py
 ```
 
-Kiểm tra trước khi push, gồm Python 3.12/Linux và build các image:
+Script kiểm thử tự dựng stack tạm, chạy migrations hai lần, test ETL/API trong mạng Compose rồi xóa volume thử nghiệm. Nó không tải nguồn dữ liệu trực tiếp.
+
+Để chuẩn bị ranh giới và dữ liệu mưa trong thư mục dùng chung `etl/data/`:
 
 ```powershell
-& .venv/Scripts/python.exe scripts/test-khoi-local.py --linux-checks
+$env:DATA_DIR = 'etl/data'
+& .venv/Scripts/python.exe scripts/prepare-khoi-data.py all
 ```
 
-Script dùng project Docker `khoi-local`, PostGIS `127.0.0.1:55432`, backend `http://127.0.0.1:8001`; không triển khai lên máy 156. Không có password mặc định: đặt `POSTGRES_PASSWORD` trong môi trường, khớp với database đã khởi tạo. Lệnh phía trên nhập ẩn password trên PowerShell. Đổi biến môi trường không tự đổi password của database trong volume đã tồn tại. Dữ liệu nằm ở `data/`, log và kết quả ở `test-results/`; các thư mục này không được commit.
+Script dùng project cô lập `khoi-local` từ `compose.yaml`, cùng PostGIS 17 và migration của kho chính. Database và backend không publish port lên host; bài kiểm tra kết nối qua mạng Compose. Không có password mặc định: đặt `WAREHOUSE_PASSWORD` trong môi trường. Lệnh phía trên nhập ẩn password trên PowerShell. Đổi biến môi trường không tự đổi password của database trong volume đã tồn tại. ETL dùng `etl/data/`; log và kết quả ở `test-results/`; các thư mục này không được commit.
 
-Trên máy phát triển hiện tại, password local đã được đổi và lưu trong `.runtime/khoi-local.env` (Git bỏ qua). Nạp vào terminal mới mà không in password:
+Tạo ứng viên hình học đường giá đất từ OSM (cần chạy pipeline để tạo `land_price_rows.json` trước):
 
 ```powershell
-$env:POSTGRES_PASSWORD = ((Get-Content .runtime/khoi-local.env -Raw).Trim() -split '=', 2)[1]
-& .venv/Scripts/python.exe scripts/test-khoi-local.py
+& .venv/Scripts/python.exe scripts/prepare-land-road-review.py
 ```
 
-Tệp này chỉ có trên máy đã cấu hình; người clone repo mới cần tự đặt password cho database của mình.
-
-Lần đầu cần mạng để tải ảnh Docker và dữ liệu nguồn. Các lựa chọn:
+Các pipeline dùng cấu hình `WAREHOUSE_*` của Compose. Database phải được khởi động và migrations đã áp dụng:
 
 ```powershell
-& .venv/Scripts/python.exe scripts/test-khoi-local.py --refresh-weather --process-satellite --road-candidates
+docker compose --profile etl-flood-history run --rm etl-flood-history run --stage all --boundary /app/data/inputs/thu_duc_boundary.geojson
+docker compose --profile etl-flood-risk run --rm etl-flood-risk run --stage all
+docker compose --profile etl-flood-satellite run --rm etl-flood-satellite run --stage all --boundary /app/data/inputs/thu_duc_boundary.geojson --limit 1
+docker compose --profile etl-land-price run --rm etl-land-price run --stage all --segments /app/data/review/land_price_reviewed.geojson
 ```
 
-`--refresh-weather` cập nhật mẫu mưa riêng để thử phần Khôi; `--process-satellite` xử lý ảnh GFM mới; `--road-candidates` lấy ứng viên OSM. Có thể chạy từng pipeline với `PYTHONPATH=etl`, `DATA_DIR=data` và `DATABASE_URL` của PostGIS:
-
-```powershell
-$env:PYTHONPATH = 'etl'
-& .venv/Scripts/python.exe -m src.main flood_history --boundary data/inputs/thu_duc_boundary.geojson
-& .venv/Scripts/python.exe -m src.main flood_risk
-& .venv/Scripts/python.exe -m src.main flood_satellite --boundary data/inputs/thu_duc_boundary.geojson --limit 1
-& .venv/Scripts/python.exe -m src.main land_price
-```
-
-Không đặt `DATABASE_URL` thì pipeline dùng snapshot tệp. Backend phải dùng cùng thư mục dữ liệu hoặc cùng database.
+Mọi ETL service kết nối tới `postgis:5432` trong mạng Compose. Khi chạy local mà chưa cấu hình `WAREHOUSE_PASSWORD`, pipeline lưu snapshot GeoJSON trong `etl/data/layers/` để kiểm tra ngoại tuyến.
 
 ## Hợp đồng dữ liệu mưa với Duy
 
-Hai tệp `data/inputs/rainwater_forecast.json` và `rainwater_history.json` có `source_url`, `stations`; dự báo có thêm `issued_at`. Mỗi station gồm `id`, `longitude`, `latitude`, `hourly: [{time, precipitation_mm}]`. Thời gian ISO 8601 phải có múi giờ; station ID phải khớp giữa lịch sử và dự báo. Chỉ dùng lịch sử trước thời điểm phát hành dự báo.
+Hai tệp `etl/data/inputs/rainwater_forecast.json` và `rainwater_history.json` có `source_url`, `stations`; dự báo có thêm `issued_at`. Mỗi station gồm `id`, `longitude`, `latitude`, `hourly: [{time, precipitation_mm}]`. Thời gian ISO 8601 phải có múi giờ; station ID phải khớp giữa lịch sử và dự báo. Chỉ dùng lịch sử trước thời điểm phát hành dự báo.
 
 Mẫu local hiện chỉ có một điểm lưới Open-Meteo và lịch sử 2016–2025. Cần bàn giao lưới đầy đủ từ Duy trước khi dùng cảnh báo toàn Thủ Đức. API trả khoảng cách đến station, nguồn, ngưỡng và `stale` khi dự báo hết hạn.
 
 ## API cho frontend
 
-Swagger: `http://127.0.0.1:8001/docs`.
+Backend chỉ truy cập qua mạng Compose; giao diện gọi API cùng origin qua frontend proxy tại `/api/`.
 
 | Endpoint | Nội dung |
 |---|---|
@@ -87,10 +80,10 @@ Swagger: `http://127.0.0.1:8001/docs`.
 
 ## Duyệt giá đất
 
-1. Đối chiếu từng hàng trong `data/review/land_price_rows.json` với trang PDF gốc. Parser hiện hỗ trợ An Khánh, có lỗi tiềm tàng ở tên đường xuống dòng và mép trang.
-2. Kiểm tra ứng viên `data/review/land_price_candidates.geojson` bằng OSM và hai đầu đoạn ghi trong phụ lục; cắt đúng đoạn, loại nhánh và đường trùng tên.
-3. Lưu FeatureCollection ở `data/review/land_price_reviewed.geojson`; mỗi LineString/MultiLineString có `price_record_id`, `reviewed: true`, `price_values_reviewed: true` sau khi đã kiểm chứng cả giá và hình học. Nên ghi người duyệt, nguồn và ngày duyệt.
-4. Chạy `land_price --segments data/review/land_price_reviewed.geojson`. Hàng chưa ghép nằm trong `land_price_pending.json`.
+1. Đối chiếu từng hàng trong `etl/data/review/land_price_rows.json` với trang PDF gốc. Parser hiện hỗ trợ An Khánh, có lỗi tiềm tàng ở tên đường xuống dòng và mép trang.
+2. Kiểm tra ứng viên `etl/data/review/land_price_candidates.geojson` bằng OSM và hai đầu đoạn ghi trong phụ lục; cắt đúng đoạn, loại nhánh và đường trùng tên.
+3. Lưu FeatureCollection ở `etl/data/review/land_price_reviewed.geojson`; mỗi LineString/MultiLineString có `price_record_id`, `reviewed: true`, `price_values_reviewed: true` sau khi đã kiểm chứng cả giá và hình học. Nên ghi người duyệt, nguồn và ngày duyệt.
+4. Chạy `docker compose --profile etl-land-price run --rm etl-land-price run --stage all --segments /app/data/review/land_price_reviewed.geojson`. Hàng chưa ghép nằm trong `land_price_pending.json`.
 
 Parser đã chuyển sang đọc đường kẻ của bảng scan, hỗ trợ hàng qua trang và “trọn đường”. Bản nguồn hiện tạo **195 hàng ứng viên**, vẫn phải duyệt OCR; **118** hàng có ứng viên OSM.
 
@@ -104,7 +97,7 @@ Repo có mẫu nhỏ `docs/samples/land-price-tran-nao-reviewed.geojson`: hai ph
 & .venv/Scripts/python.exe scripts/test-khoi-local.py
 ```
 
-Script demo kiểm tra giá và tọa độ OSM so với mẫu đã duyệt; nguồn thay đổi sẽ yêu cầu duyệt lại. Nếu đã có OSM trong cache, dùng `prepare-land-road-review.py --cached`. Dữ liệu mẫu trong repo có attribution OSM/ODbL; dữ liệu gốc lớn vẫn nằm trong `data/` và không commit.
+Script demo kiểm tra giá và tọa độ OSM so với mẫu đã duyệt; nguồn thay đổi sẽ yêu cầu duyệt lại. Nếu đã có OSM trong cache, dùng `prepare-land-road-review.py --cached`. Dữ liệu mẫu trong repo có attribution OSM/ODbL; dữ liệu gốc lớn vẫn nằm trong `etl/data/` và không commit.
 
 Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải giá giao dịch thị trường. Chưa đạt mục tiêu 25 đoạn đã duyệt của kế hoạch.
 
@@ -116,4 +109,4 @@ Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải gi�
 - OpenStreetMap qua Overpass: giữ attribution OSM/ODbL khi dùng hình học đường.
 - Ranh giới demo: hợp ba quận cũ Thủ Đức, 9, 2 từ bộ dữ liệu nguồn; không phải ranh giới phường hành chính hiện tại.
 
-Workflow `.github/workflows/khoi-checks.yaml` sinh password ngẫu nhiên mỗi lần chạy, che password trong log, khởi động PostGIS tạm, chạy pytest và dọn container. Không cần password CI cố định. Scheduler và workflow deploy máy 156 chưa triển khai trong phạm vi Khôi: bàn giao lịch mưa mỗi giờ, GFM mỗi 6 giờ, nguồn ngập/giá đất kiểm tra phiên bản mỗi tháng theo kế hoạch.
+Workflow `.github/workflows/integration-tests.yaml` sinh password ngẫu nhiên mỗi lần chạy, khởi động image PostGIS và migration chính qua Compose mà không publish port, chạy pytest trong cùng mạng rồi dọn volume kiểm thử. Không cần password CI cố định. Pipeline chạy thủ công qua `.github/workflows/etl.yaml` với lựa chọn pipeline và stage `all` hoặc `extract`; database deployment tiếp tục dùng workflow migration riêng.

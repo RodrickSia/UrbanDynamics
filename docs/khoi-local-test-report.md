@@ -1,12 +1,14 @@
 # Báo cáo kiểm thử local phần Khôi
 
+> Báo cáo này là ảnh chụp kiểm thử local ngày 04/10/2026, trước khi tích hợp nhánh vào kho PostGIS chính. Kết quả dưới đây chỉ ghi lại trạng thái tại thời điểm đó, không phải kiểm thử mới nhất. Hiện trạng dùng `compose.yaml`, PostGIS 17, migrations chung và chỉ frontend publish host port. Chạy `scripts/test-khoi-local.py` để kiểm tra hiện trạng.
+
 Đợt rà soát trước khi push bắt đầu **04/10/2026 23:14:37 (UTC+7)**. Kết quả tổng hợp **PASS**. Kết quả và thời gian từng bước nằm trong `test-results/khoi-local-report.json`. Đây chưa phải nghiệm thu đủ mọi tính năng MVP trong `plan.md`.
 
 ## Môi trường
 
 - Windows, Python 3.13.15 trong `.venv`; Python và Docker đã thêm vào User PATH.
 - Docker Desktop 4.93.0, Docker CLI 29.8.1, Compose 5.5.1; engine WSL2 đã chạy được container.
-- Stack riêng `khoi-local`: PostGIS 16/3.5 tại `127.0.0.1:55432`, FastAPI tại `127.0.0.1:8001`.
+- Lúc tạo báo cáo, kiểm thử dùng stack `khoi-local` riêng với PostGIS 16/3.5 và các port host. Stack đó đã được thay bằng `compose.yaml`: PostGIS 17, migrations dùng chung, và không publish port database/backend.
 - Backend được build lại từ mã hiện tại. ETL chạy Python local và ghi vào PostGIS thật; kiểm tra HTTP gọi backend trong Docker.
 
 ## Kết quả
@@ -53,21 +55,19 @@ Cả 9 lượt smoke test HTTP ở đợt kiểm tra dữ liệu thật đều t
 
 ## Xem lại kết quả
 
-- Swagger đang chạy: `http://127.0.0.1:8001/docs`.
+- API được kiểm tra qua mạng Compose; frontend là service duy nhất publish host port.
 - Kết quả máy đọc: `test-results/khoi-local-report.json`.
 - JUnit: `test-results/khoi-local.xml`, `test-results/khoi-linux.xml`; log: `test-results/pytest.log`, `test-results/linux-pytest.log` và log từng pipeline.
 - Hướng dẫn chạy lại, nguồn và hợp đồng bàn giao: [khoi-implementation.md](khoi-implementation.md).
 
-Dữ liệu gốc, geometry OSM lớn và snapshot nằm trong `data/`; `.env`, `.venv`, `test-results` cũng được Git bỏ qua. Mẫu geometry đã duyệt nhỏ trong `docs/samples/land-price-tran-nao-reviewed.geojson` được đưa vào repo cùng attribution để nhóm tái tạo demo.
+Dữ liệu gốc, geometry OSM lớn và snapshot nằm trong `etl/data/`; `.env`, `.venv`, `test-results` cũng được Git bỏ qua. Mẫu geometry đã duyệt nhỏ trong `docs/samples/land-price-tran-nao-reviewed.geojson` được đưa vào repo cùng attribution để nhóm tái tạo demo.
 
 ## Đưa lên GitHub
 
-Branch bàn giao: `feat/khoi-flood-land-price`. Đã ghép cập nhật `origin/main` về các service ETL dân số/mưa và cấu hình uv; thêm dependencies Khôi vào `pyproject.toml`/`uv.lock`, giữ `requirements.txt` cho Docker và bộ test pip. Các thay đổi dùng chung cần review: `compose.yaml`, Dockerfile backend/ETL, requirements và `.github/workflows/ci.yaml`. Không có bước deploy tự động được thêm vào workflow mới. Kiểm thử trong báo cáo là kiểm thử local; chưa deploy máy 156.
+Tại thời điểm báo cáo, các thay đổi đang ở nhánh `feat/khoi-flood-land-price`; kiểm thử trong tài liệu là local và chưa xác nhận lần chạy GitHub Actions. Đây là ghi chú lịch sử, không phải hướng dẫn triển khai hiện tại. Xem README và các workflow trong `.github/workflows/` để biết cấu hình hiện hành.
 
-## Sửa cấu hình password — 05/10/2026
+## Ghi chú bảo mật tại thời điểm báo cáo — 05/10/2026
 
-- Bỏ password mặc định trong script local; thiếu `POSTGRES_PASSWORD` thì dừng trước khi gọi Docker.
+- Bỏ password mặc định trong script local; thiếu `WAREHOUSE_PASSWORD` thì dừng trước khi gọi Docker.
 - CI sinh password ngẫu nhiên bằng OpenSSL, che trong log và dùng cùng giá trị cho PostGIS/chuỗi kết nối; container được dọn sau test.
 - Đã chạy chính shell khởi động database của workflow trên máy và đạt 36/36 test với database tạm. Đây là kiểm thử local, không phải kết quả GitHub Actions.
-- Đã đổi password của database test local, lưu riêng trong `.runtime/khoi-local.env` được Git bỏ qua; harness và cả 9 lượt kiểm tra API đều đạt với password mới.
-- Commit cũ vẫn có giá trị test trước đây trong lịch sử; không force-push hoặc sửa lịch sử branch nhóm. Cảnh báo GitGuardian ở commit cũ cần được người có quyền xử lý riêng.

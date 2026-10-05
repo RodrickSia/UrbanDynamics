@@ -1,6 +1,6 @@
 """Download real research inputs. Does not modify Duy's rainwater pipeline.
 
-Run from repo root with .venv Python; data/ is gitignored.
+Run from repo root with .venv Python; set DATA_DIR=etl/data to use the Compose ETL data mount.
 """
 import argparse
 import json

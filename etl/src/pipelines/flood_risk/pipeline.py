@@ -1,3 +1,5 @@
-from . import extract, transform, load
+from . import extract, load, transform
+
+
 def run(weather_input=None, history_input=None, **kwargs):
     return load.run(transform.run(*extract.run(weather_input, history_input)))

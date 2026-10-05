@@ -1,62 +1,55 @@
-# GitHub Actions deployment
+# Server deployment
 
-Run `Deploy` on `feature/frontend-map-workspace`. The Linux self-hosted runner needs
-Docker Compose with `up --wait`, Python 3 and curl. Runner `gpu156` already has the
-`self-hosted` and `Linux` labels; its name is not a scheduling label.
+GitHub Actions provides three manual workflows:
 
-The workflow creates a mode-0600 `.env` before Compose reads it, using repository
-Actions secrets (never printed by the generator):
+- `Deploy database` starts PostGIS if needed and applies pending migrations.
+- `Deploy` deploys the backend and frontend in separate jobs.
+- `Run ETL pipelines` runs a selected pipeline and stage.
 
-| Actions secret | Application variable | Use |
-| --- | --- | --- |
-| `MLAI_FRONTEND_GOONG` | `VITE_GOONG_MAPTILES_KEY` | Browser map tiles key, embedded in the frontend build |
-| `MLAI_BACKEND_GOONG` | `GOONG_API_KEY` | Backend-only REST credential, available to future backend integrations |
+The deployment jobs target a self-hosted Linux runner with Docker Compose, Python
+3, and curl. The runner must have `self-hosted` and `linux` labels. Protect the
+GitHub `production` environment with required reviewers.
 
-The backend currently implements only `/health`; providing its key does not add
-geocoding/data endpoints. Restrict the frontend browser key at the provider. The
-backend key is never passed as a frontend build argument. The generated `.env` is
-removed at job completion; manual Compose commands need it recreated securely.
+## GitHub configuration
 
-Default host ports are **51873** (frontend) and **51874** (backend), both bound to
-`127.0.0.1` for SSH access. Container ports remain 80 and 8000. Override with
-repository Actions **variables** `FRONTEND_PORT` / `BACKEND_PORT` (numeric values,
-1024–65535, distinct). High ports reduce common collisions but cannot guarantee a
-free port on a shared server; Docker will fail if another service owns the port.
+Set these secrets in the `production` environment:
 
-The workflow validates configuration, starts only frontend/backend, waits for
-backend health and checks both HTTP responses. ETL stays behind its opt-in profile.
-Deploys are serialized so two runs cannot overwrite the runner's `.env` concurrently.
-Do not run this workflow simultaneously from another checkout outside Actions.
+| Secret | Used for |
+| --- | --- |
+| `WAREHOUSE_PASSWORD` | Connecting the backend, migration runner, and ETL to PostGIS |
+| `MLAI_FRONTEND_GOONG` | Goong Map Tiles key embedded in the frontend build |
+| `MLAI_BACKEND_GOONG` | Backend-only Goong REST credential |
 
-```powershell
-gh workflow run deploy.yaml --repo RodrickSia/UrbanDynamics --ref feature/frontend-map-workspace
+Optional Actions variables are `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and
+`FRONTEND_PORT`. The defaults are `urbandynamics`, `urbandynamics`, and
+`51873`. The frontend is the only service that publishes a host port. PostGIS,
+backend, and ETL remain on the internal Compose network; backend health checks
+run from inside its container.
+
+The workflow generates a mode-restricted `.env` from the environment settings
+and removes it after the job. Deployments are serialized on the runner. Do not
+run another deployment from a separate checkout on the same host at the same
+time.
+
+## Trigger a workflow
+
+```sh
+gh workflow run deploy.yaml --repo RodrickSia/UrbanDynamics --ref main
 gh run watch --repo RodrickSia/UrbanDynamics
 ```
 
-On your own computer, replace `SSH_USER`, `SERVER_HOST` and SSH port `22`:
+Run `database-deploy.yaml` before deploying code that needs new migrations. The
+ETL workflow requires PostGIS to be running and migrations already applied.
 
-```powershell
-ssh -N -T -p 22 -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:51873:127.0.0.1:51873 -L 127.0.0.1:51874:127.0.0.1:51874 SSH_USER@SERVER_HOST
-```
+## Verify the frontend
 
-Open http://127.0.0.1:51873 for the map and http://127.0.0.1:51874/health for backend
-health. Keep SSH running. When overriding ports, change both sides of the relevant
-forward so the frontend's build-time API URL remains consistent.
-
-Nginx explicitly permits `https://tiles.mapterhorn.com` in CSP `connect-src` so
-MapLibre can load terrain metadata and DEM tiles. With the SSH tunnel open, verify
-the actual deployed headers and terrain requests in Chromium from `frontend/`:
+The frontend job checks the page and Content Security Policy. To run the browser
+deployment checks locally, set `DEPLOY_BASE_URL` to the frontend URL and run
+from `frontend/`:
 
 ```sh
 npx playwright test --config playwright.deploy.config.ts
 ```
 
-Set `DEPLOY_BASE_URL` to test a different deployment URL. HTTP health checks alone
-do not verify map rendering. Geolocation is still disabled by Permissions-Policy,
-and browser API integration will need routing/CORS.
-
-Verify the environment generator locally without real keys:
-
-```sh
-python -m unittest discover -s scripts -p 'test_*.py'
-```
+This verifies browser map behavior in addition to HTTP availability. Keep all
+backend-only credentials out of frontend build variables and source files.

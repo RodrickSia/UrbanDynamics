@@ -8,6 +8,7 @@ WORKDIR /app
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app/ ./app/
+COPY etl/src/shared/ ./etl/src/shared/
 COPY etl/src/pipelines/flood_risk/ ./etl/src/pipelines/flood_risk/
 COPY etl/src/__init__.py ./etl/src/__init__.py
 COPY etl/src/pipelines/__init__.py ./etl/src/pipelines/__init__.py

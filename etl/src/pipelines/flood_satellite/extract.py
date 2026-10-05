@@ -1,10 +1,16 @@
 import re
+
 from src.shared.data_io import data_dir, download, session
-from .config import STAC_URL, FLOOD_ASSET, MASK_ASSET, MAX_ITEMS
+
+from .config import FLOOD_ASSET, MASK_ASSET, MAX_ITEMS, STAC_URL
+
 
 def run(boundary, catalog_only=False, limit=MAX_ITEMS):
-    response = session().get(STAC_URL, params={"bbox": ",".join(map(str, boundary.bounds)),
-                                              "limit": limit}, timeout=(20, 90))
+    response = session().get(
+        STAC_URL,
+        params={"bbox": ",".join(map(str, boundary.bounds)), "limit": limit},
+        timeout=(20, 90),
+    )
     response.raise_for_status()
     items = response.json()["features"]
     results = []
@@ -16,8 +22,12 @@ def run(boundary, catalog_only=False, limit=MAX_ITEMS):
                 if key not in item.get("assets", {}):
                     if key == MASK_ASSET:
                         continue
-                    raise ValueError(f"Missing {key}; cannot verify observed flood pixels")
-                path = data_dir() / "raw" / "flood_satellite" / identifier / f"{key}.tif"
+                    raise ValueError(
+                        f"Missing {key}; cannot verify observed flood pixels"
+                    )
+                path = (
+                    data_dir() / "raw" / "flood_satellite" / identifier / f"{key}.tif"
+                )
                 provenance.append(download(item["assets"][key]["href"], path))
                 paths[key] = path
         results.append({"item": item, "paths": paths, "provenance": provenance})

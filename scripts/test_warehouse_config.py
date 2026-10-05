@@ -26,6 +26,8 @@ class WarehouseConfigurationTests(unittest.TestCase):
                 ["docker", "compose", "--project-name", "warehouse-config-test",
                  "--env-file", str(fixture / ".env"),
                  "--profile", "etl-population-hcmc", "--profile", "etl-rainwater",
+                 "--profile", "etl-flood-history", "--profile", "etl-flood-satellite",
+                 "--profile", "etl-flood-risk", "--profile", "etl-land-price",
                  "config", "--format", "json"],
                 cwd=fixture, env=environ, capture_output=True, text=True, timeout=30,
             )
@@ -36,6 +38,10 @@ class WarehouseConfigurationTests(unittest.TestCase):
             services["postgis"]["environment"]["POSTGRES_PASSWORD"],
             services["etl-population-hcmc"]["environment"]["WAREHOUSE_PASSWORD"],
             services["etl-rainwater"]["environment"]["WAREHOUSE_PASSWORD"],
+            services["etl-flood-history"]["environment"]["WAREHOUSE_PASSWORD"],
+            services["etl-flood-satellite"]["environment"]["WAREHOUSE_PASSWORD"],
+            services["etl-flood-risk"]["environment"]["WAREHOUSE_PASSWORD"],
+            services["etl-land-price"]["environment"]["WAREHOUSE_PASSWORD"],
         ]
 
     def test_missing_password_does_not_select_a_shared_default(self):
@@ -46,6 +52,29 @@ class WarehouseConfigurationTests(unittest.TestCase):
         password = secrets.token_hex(24)
         self.assertTrue(all(value == password for value in self.warehouse_passwords(password)),
                         "Database and ETL must use the supplied password")
+
+    def test_frontend_is_the_only_service_publishing_a_host_port(self):
+        services = self.compose_config()
+        exposed = {name for name, service in services.items() if service.get("ports")}
+        self.assertEqual(exposed, {"frontend"})
+
+    def compose_config(self):
+        password = secrets.token_hex(24)
+        environ = {**os.environ, "WAREHOUSE_PASSWORD": password}
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory)
+            shutil.copyfile(ROOT / "compose.yaml", fixture / "compose.yaml")
+            shutil.copyfile(ROOT / ".env.example", fixture / ".env")
+            result = subprocess.run(
+                ["docker", "compose", "--project-name", "warehouse-config-test",
+                 "--env-file", str(fixture / ".env"), "--profile", "etl-population-hcmc",
+                 "--profile", "etl-rainwater", "--profile", "etl-flood-history",
+                 "--profile", "etl-flood-satellite", "--profile", "etl-flood-risk",
+                 "--profile", "etl-land-price", "config", "--format", "json"],
+                cwd=fixture, env=environ, capture_output=True, text=True, timeout=30,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr.replace(password, "[REDACTED]"))
+        return json.loads(result.stdout)["services"]
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@ x-etl: &etl
   image: urbandynamics-etl:latest
   env_file:
     - .env
+  volumes:
+    - ./etl/data:/app/data
 
 x-warehouse-env: &warehouse-env
   WAREHOUSE_HOST: postgis
@@ -36,6 +38,10 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env
+    environment:
+      <<: *warehouse-env
+    volumes:
+      - ./etl/data:/data:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
@@ -64,8 +70,6 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
-    volumes:
-      - ./etl/data:/app/data
 
   etl-rainwater:
     <<: *etl
@@ -74,6 +78,69 @@ services:
       <<: *warehouse-env
       ETL_PIPELINE: rainwater
     command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-flood-history:
+    <<: *etl
+    profiles: ["etl-flood-history"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: flood_history
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-flood-satellite:
+    <<: *etl
+    profiles: ["etl-flood-satellite"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: flood_satellite
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-flood-risk:
+    <<: *etl
+    profiles: ["etl-flood-risk"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: flood_risk
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-land-price:
+    <<: *etl
+    profiles: ["etl-land-price"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: land_price
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  khoi-checks:
+    build:
+      context: .
+      dockerfile: infra/testing/Dockerfile
+    image: urbandynamics-khoi-checks:latest
+    profiles: ["checks"]
+    environment:
+      <<: *warehouse-env
+      POSTGIS_TESTS: "1"
+    volumes:
+      - ./test-results:/app/test-results
     depends_on:
       postgis:
         condition: service_healthy

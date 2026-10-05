@@ -1,22 +1,47 @@
 # UrbanDynamics
 
-UrbanDynamics is organized as a monorepo with separate frontend, backend, and ETL services.
+UrbanDynamics is a monorepo for an urban map application and its data pipelines.
 
 ## Services
 
-- `frontend/` contains the React/TypeScript urban map workspace built with Vite, MapLibre GL JS, and Goong Map Tiles.
-- `backend/` contains the FastAPI application and APIs used by the frontend.
-- `etl/` contains the data pipelines that load source data into the warehouse.
-- `infra/warehouse/` contains the PostGIS image, initialization scripts, and versioned SQL migrations.
+- `frontend/`: React, TypeScript, Vite, and MapLibre map workspace.
+- `backend/`: FastAPI API used by the frontend; reads shared layers from PostGIS.
+- `etl/`: population, flood, rainwater, and land-price pipeline code.
+- `infra/warehouse/`: PostGIS 17 image, initialization, and versioned migrations.
+- `compose.yaml`: local services and one opt-in Compose profile per ETL pipeline.
 
-## Local development
+## Local setup
 
-Copy `.env.example` to `.env`, then start the services with `docker compose up --build`. Run ETL pipelines explicitly with their Compose profiles.
+Copy `.env.example` to `.env`, set a unique `WAREHOUSE_PASSWORD`, and set the
+frontend Goong Map Tiles key if you want to render the map. Start the application
+and warehouse with:
 
-See [docs/architecture.md](docs/architecture.md) for the initial service boundaries and [docs/development.md](docs/development.md) for repository conventions.
+```sh
+docker compose up --build
+```
 
-Khôi's flood and land-price implementation has a separate local PostGIS stack. See [the implementation guide](docs/khoi-implementation.md) and [local test report](docs/khoi-local-test-report.md). Run `.venv/Scripts/python.exe scripts/test-khoi-local.py`; API documentation is served at `http://127.0.0.1:8001/docs`.
+Only the frontend publishes a host port. Backend, PostGIS, and ETL communicate
+over the Compose network; the database hostname is `postgis` on port `5432`.
+See [ETL usage](etl/README.md) to run a pipeline and
+[warehouse operations](infra/warehouse/README.md) for migrations.
 
-## CI/CD
+## Documentation
 
-GitHub Actions CI builds and validates the database, backend, and frontend independently. Application deployment updates the backend and frontend together; database migrations use a separate manual workflow against the running PostGIS service. Configure the GitHub `production` environment with required reviewers and a `WAREHOUSE_PASSWORD` secret before using either deployment workflow.
+- [Architecture](docs/architecture.md)
+- [Development](docs/development.md)
+- [Flood and land-price ETL guide](docs/khoi-implementation.md)
+- [Frontend/backend API handoff](docs/frontend-backend-handoff.md)
+- [Historical local integration test report](docs/khoi-local-test-report.md)
+
+## GitHub Actions
+
+- `CI` validates the database, backend, and frontend.
+- `Integration tests` runs flood, land-price, and API checks against an isolated
+  PostGIS database.
+- `Run ETL pipelines` is manually triggered and lets you choose a pipeline and
+  either the full pipeline or extraction stage.
+- `Deploy database` applies pending migrations. `Deploy` updates backend and
+  frontend in separate jobs.
+
+Deployment workflows use the protected `production` environment. Configure its
+`WAREHOUSE_PASSWORD` secret to match the production database.

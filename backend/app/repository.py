@@ -1,9 +1,10 @@
-"""One read interface for local snapshots and PostGIS."""
+"""One read interface for local snapshots and the shared PostGIS warehouse."""
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from shapely.geometry import shape, box
+from src.shared.database import connect_to_warehouse, warehouse_configured
 
 LAYERS = ("flood_history", "flood_satellite", "flood_satellite_catalog", "flood_risk", "land_price")
 
@@ -18,10 +19,8 @@ def instant(value):
     return result.replace(tzinfo=timezone.utc) if result.tzinfo is None else result.astimezone(timezone.utc)
 
 def metadata(layer):
-    url = os.getenv("DATABASE_URL")
-    if url:
-        import psycopg
-        with psycopg.connect(url) as connection:
+    if warehouse_configured():
+        with connect_to_warehouse() as connection:
             row = connection.execute("SELECT metadata FROM layer_snapshots WHERE layer=%s", (layer,)).fetchone()
             if row is None:
                 raise LayerUnavailable(layer)
@@ -38,10 +37,7 @@ def freshness(info):
     return info
 
 def features(layer, bounds=None, start=None, end=None, limit=5000):
-    info = metadata(layer)
-    url = os.getenv("DATABASE_URL")
-    if url:
-        import psycopg
+    if warehouse_configured():
         clauses, arguments = ["layer=%s"], [layer]
         if bounds:
             clauses.append("ST_Intersects(geom,ST_MakeEnvelope(%s,%s,%s,%s,4326))")
@@ -53,11 +49,19 @@ def features(layer, bounds=None, start=None, end=None, limit=5000):
             clauses.append("observed_at < %s")
             arguments.append(end)
         arguments.append(limit+1)
-        with psycopg.connect(url) as connection:
+        with connect_to_warehouse() as connection:
+            connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            snapshot = connection.execute(
+                "SELECT metadata FROM layer_snapshots WHERE layer=%s", (layer,)
+            ).fetchone()
+            if snapshot is None:
+                raise LayerUnavailable(layer)
+            info = freshness(snapshot[0])
             rows = connection.execute("SELECT feature_id,ST_AsGeoJSON(geom),properties FROM layer_features WHERE "
                                       + " AND ".join(clauses) + " ORDER BY feature_id LIMIT %s", arguments).fetchall()
         matches = [{"type": "Feature", "id": row[0], "geometry": json.loads(row[1]), "properties": row[2]} for row in rows]
     else:
+        info = metadata(layer)
         document = json.loads((directory() / "layers" / f"{layer}.geojson").read_text(encoding="utf-8"))
         matches = []
         viewport = box(*bounds) if bounds else None
@@ -74,9 +78,8 @@ def features(layer, bounds=None, start=None, end=None, limit=5000):
             "metadata": {**info, "truncated": len(matches) > limit, "returned": min(len(matches), limit)}}
 
 def readiness():
-    if os.getenv("DATABASE_URL"):
-        import psycopg
-        with psycopg.connect(os.environ["DATABASE_URL"]) as connection:
+    if warehouse_configured():
+        with connect_to_warehouse() as connection:
             connection.execute("SELECT 1")
             count = connection.execute("SELECT count(*) FROM layer_snapshots").fetchone()[0]
         return {"storage": "postgis", "loaded_layers": count}

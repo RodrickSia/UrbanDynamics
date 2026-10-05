@@ -20,12 +20,16 @@ class DeploymentEnvironmentTests(unittest.TestCase):
         self.secrets = {
             "MLAI_FRONTEND_GOONG": "test-public-key",
             "MLAI_BACKEND_GOONG": "test-private-key",
+            "WAREHOUSE_PASSWORD": "test-warehouse-password",
         }
 
     def test_maps_secrets_and_uses_frontend_host_port_only(self):
         values = deploy_env.deployment_values(self.secrets)
         self.assertEqual(values["VITE_GOONG_MAPTILES_KEY"], "test-public-key")
         self.assertEqual(values["GOONG_API_KEY"], "test-private-key")
+        self.assertEqual(values["WAREHOUSE_PASSWORD"], "test-warehouse-password")
+        self.assertEqual(values["WAREHOUSE_DATABASE"], "urbandynamics")
+        self.assertEqual(values["WAREHOUSE_USER"], "urbandynamics")
         self.assertNotIn("test-private-key", str({k: v for k, v in values.items() if k.startswith("VITE_")}))
         self.assertEqual(values["FRONTEND_PORT"], "127.0.0.1:51873")
         self.assertNotIn("BACKEND_PORT", values)

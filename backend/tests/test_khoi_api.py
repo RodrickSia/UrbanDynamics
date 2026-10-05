@@ -7,11 +7,14 @@ from src.pipelines.flood_history.transform import transform_frame
 import geopandas as gpd
 from shapely.geometry import Point
 from datetime import datetime,timedelta,timezone
+import os
+import uuid
+from src.shared.database import connect_to_warehouse, publish
 
 @pytest.fixture
 def client(tmp_path,monkeypatch):
     monkeypatch.setenv("DATA_DIR",str(tmp_path))
-    monkeypatch.delenv("DATABASE_URL",raising=False)
+    monkeypatch.delenv("WAREHOUSE_PASSWORD",raising=False)
     frame = gpd.GeoDataFrame({"Obs_id":["one","two"],"Date":["14/09/2019","01/10/2020"],
                              "Location name":["One","Two"]},geometry=[Point(106.76,10.82),Point(107,11)],crs=4326)
     publish("flood_history",transform_frame(frame))
@@ -75,3 +78,31 @@ def test_scenario_validates_and_preserves_historical_layer(client):
 
 def test_scenario_without_weather_is_unavailable(client):
     assert client[0].post("/api/v1/scenarios/rain",json={"rain_3h_mm":60}).status_code == 503
+
+def test_api_reads_the_shared_postgis_layer():
+    if os.getenv("POSTGIS_TESTS") != "1":
+        pytest.skip("PostGIS integration checks are not enabled")
+    from src.shared.database import read_layer_document
+    layer = "flood_history"
+    try:
+        previous = read_layer_document(layer)
+    except FileNotFoundError:
+        previous = None
+    document = {"type":"FeatureCollection", "metadata":{"layer":layer}, "features":[
+        {"type":"Feature", "id":"api-"+uuid.uuid4().hex,
+         "geometry":{"type":"Point", "coordinates":[106.76,10.82]},
+         "properties":{"observed_at":"2024-01-01T00:00:00Z", "location":"Shared warehouse"}}
+    ]}
+    try:
+        publish(layer, document)
+        response = TestClient(app).get("/api/v1/floods/history")
+        assert response.status_code == 200
+        assert any(feature["properties"].get("location") == "Shared warehouse"
+                   for feature in response.json()["features"])
+    finally:
+        if previous is not None:
+            publish(layer, previous)
+        else:
+            with connect_to_warehouse() as connection:
+                connection.execute("DELETE FROM layer_features WHERE layer=%s", (layer,))
+                connection.execute("DELETE FROM layer_snapshots WHERE layer=%s", (layer,))
