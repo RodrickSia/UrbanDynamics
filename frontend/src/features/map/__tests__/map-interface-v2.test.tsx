@@ -66,7 +66,8 @@ describe('map-first workspace', () => {
     await user.click(screen.getByRole('button', { name: 'Open data layers' }));
     expect(screen.getByRole('region', { name: 'Data layers' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Measure distance' }));
+    await user.click(screen.getByRole('button', { name: 'Measurement tools' }));
+    await user.click(await screen.findByRole('button', { name: 'Measure distance' }));
     expect(screen.queryByRole('region', { name: 'Data layers' })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Distance measurement' })).toHaveClass('measurement-toolbar');
     expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled();

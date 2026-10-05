@@ -13,6 +13,8 @@ import {
 } from '../utils/measurement';
 import { localProjectionMatrix, MeasurementProjection, type Position3 } from '../utils/measurementProjection';
 import { HeightGuide } from './heightGuide';
+import { AreaFill } from './areaFill';
+import { createAreaRenderGeometry } from '../utils/measurementAreaRender';
 
 export const MEASUREMENT_LAYER_ID = 'urban-distance-measurement';
 export const MEASUREMENT_SURFACE_OFFSET_METERS = 0;
@@ -22,6 +24,7 @@ export const MEASUREMENT_COLORS = {
   horizontal: [0.98, 0.68, 0.12, 1],
   vertical: [0.95, 0.36, 0.14, 1],
   'edge-highlight': [1, 0.32, 0.06, 0.9],
+  'area-boundary': [1, 0.47, 0.06, 1],
 } as const;
 export const FLOATS_PER_LINE_VERTEX = 12;
 
@@ -55,11 +58,15 @@ export function createMeasurementLayer(
   let lineVertexArray: WebGLVertexArrayObject | null = null;
   let pointVertexArray: WebGLVertexArrayObject | null = null;
   let lineVertices: Float32Array<ArrayBufferLike> = new Float32Array();
-  let highlightVertices: Float32Array<ArrayBufferLike> = new Float32Array();
-  let helperVertices: Float32Array<ArrayBufferLike> = new Float32Array();
+  let lineRanges: { first: number; count: number; width: number; segmented: boolean }[] = [];
+  let geometryDirty = true;
   let pointVertices = new Float32Array();
   let heightGuide: HeightGuide | null = null;
   let guideHeight: { position: Position3; units: number } | null = null;
+  let guideActive = false;
+  let areaFill: AreaFill | null = null;
+  let fillVertices = new Float32Array();
+  let fillCell = 1;
 
   const rebuildGeometry = (measurement: MeasurementState, mode: MapMode) => {
     const renderPoints = measurement.status === 'active' && measurement.preview
@@ -67,10 +74,33 @@ export function createMeasurementLayer(
       : measurement.points;
     const first = renderPoints[0];
     origin = first ? projectedPosition(MercatorCoordinateClass, [first.longitude, first.latitude], 0) : [0, 0, 0];
-    const segments = createMeasurementSegments(renderPoints, mode, measurement.showComponents);
-    highlightVertices = buildMeasurementLineVertices(MercatorCoordinateClass, createSnapHighlights(measurement, mode), origin);
-    helperVertices = buildMeasurementLineVertices(MercatorCoordinateClass, segments.filter(s => s.kind !== 'distance'), origin);
+    const isArea = measurement.kind === 'area';
+    const areaGeometry = isArea ? createAreaRenderGeometry(renderPoints,mode) : null;
+    const segments = isArea ? [] : createMeasurementSegments(renderPoints, mode, measurement.showComponents);
+    const groups = [
+      { segments: createSnapHighlights(measurement, mode), width: 2.5, segmented: false },
+      { segments: areaGeometry?.guides ?? [], width: 1, segmented: true },
+      { segments: areaGeometry?.boundary ?? [], width: 3.5, segmented: false },
+      { segments: segments.filter(s => s.kind !== 'distance'), width: 1.5, segmented: false },
+      { segments: segments.filter(s => s.kind === 'distance'), width: MEASUREMENT_LINE_WIDTH_PIXELS, segmented: true },
+    ];
+    let firstVertex = 0;
+    lineRanges = groups.map(group => {
+      const count = group.segments.length * LINE_CORNERS.length;
+      const range = { first: firstVertex, count, width: group.width, segmented: group.segmented };
+      firstVertex += count;
+      return range;
+    });
+    lineVertices = buildMeasurementLineVertices(MercatorCoordinateClass, groups.flatMap(g => g.segments), origin);
+    fillVertices = new Float32Array(areaGeometry?.area.valid ? areaGeometry.area.triangles.flatMap(index => {
+      const p = areaGeometry.area.vertices[index];
+      const position = projectedPosition(MercatorCoordinateClass,[p.longitude,p.latitude], mode === '3d' ? p.elevationMeters : 0);
+      return [...position.map((value,i) => value-origin[i]), ...areaGeometry.area.coordinates[index]];
+    }) : []);
+    fillCell = areaGeometry?.cellMeters ?? 1;
+    geometryDirty = true;
     guideHeight = null;
+    guideActive = mode === '3d' && measurement.status === 'active';
     // A world-height reference, independent of distance components, anchors
     // and snap kind. It must also work while hovering before the first click.
     if (mode === '3d' && measurement.status === 'active' && measurement.preview?.elevationAvailable) {
@@ -79,18 +109,13 @@ export function createMeasurementLayer(
       guideHeight = { position: [position.x - origin[0], position.y - origin[1], position.z - origin[2]],
         units: position.meterInMercatorCoordinateUnits() };
     }
-    lineVertices = buildMeasurementLineVertices(
-      MercatorCoordinateClass,
-      segments.filter(s => s.kind === 'distance'),
-      origin,
-    );
     pointVertices = new Float32Array(renderPoints.flatMap((point, index) => {
       const isPreview = index === renderPoints.length - 1 && measurement.preview === point;
       return pointVertex(
         MercatorCoordinateClass,
         [point.longitude, point.latitude],
         (mode === '3d' ? point.elevationMeters : 0) + MEASUREMENT_SURFACE_OFFSET_METERS,
-        isPreview ? [1, 0.3, 0.1, 0.9] : [0.98, 0.99, 0.98, 1],
+        isPreview ? [1, 0.3, 0.1, 0.9] : isArea ? [1, 0.47, 0.06, 1] : [0.98, 0.99, 0.98, 1],
         origin,
       );
     }));
@@ -107,7 +132,6 @@ export function createMeasurementLayer(
       map = addedMap;
       lineProgram = createLineProgram(gl);
       pointProgram = createPointProgram(gl);
-      heightGuide = new HeightGuide(gl, createProgram);
       lineBuffer = gl.createBuffer();
       pointBuffer = gl.createBuffer();
       lineVertexArray = gl.createVertexArray();
@@ -117,6 +141,8 @@ export function createMeasurementLayer(
       }
       configureLineVertexArray(gl, lineVertexArray, lineBuffer);
       configurePointVertexArray(gl, pointVertexArray, pointBuffer);
+      // A style reload allocates new buffers, even when anchors are unchanged.
+      geometryDirty = true;
     },
     render(gl, options: CustomRenderMethodInput) {
       if (
@@ -126,6 +152,10 @@ export function createMeasurementLayer(
 
       projection.update(options.defaultProjectionData.mainMatrix);
       const matrix = localProjectionMatrix(options.defaultProjectionData.mainMatrix, origin);
+      // The viewport-sized depth texture is only needed during active 3D measuring.
+      // Keep it across clicks to avoid allocation churn between consecutive segments.
+      if (!guideActive && heightGuide) { heightGuide.dispose(); heightGuide = null; }
+      if (guideHeight && !heightGuide) heightGuide = new HeightGuide(gl, createProgram);
       if (guideHeight) heightGuide?.render(matrix, guideHeight.position, guideHeight.units, map?.getPixelRatio() ?? 1);
       gl.enable(gl.BLEND);
       gl.blendFuncSeparate(
@@ -140,6 +170,11 @@ export function createMeasurementLayer(
       gl.disable(gl.STENCIL_TEST);
       gl.depthMask(false);
 
+      if (fillVertices.length) {
+        if (!areaFill) areaFill = new AreaFill(gl,createProgram);
+        areaFill.render(matrix,fillVertices,fillCell,geometryDirty);
+      } else if (areaFill) { areaFill.dispose(); areaFill = null; }
+
       gl.useProgram(lineProgram);
       gl.uniformMatrix4fv(gl.getUniformLocation(lineProgram, 'u_matrix'), false, matrix);
       gl.uniform2f(
@@ -149,15 +184,12 @@ export function createMeasurementLayer(
       );
       gl.bindVertexArray(lineVertexArray);
       gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
-      for (const [vertices, width, segmented] of [
-        [highlightVertices, 2.5, false], [helperVertices, 1.5, false],
-        [lineVertices, MEASUREMENT_LINE_WIDTH_PIXELS, true],
-      ] as const) {
+      if (geometryDirty) gl.bufferData(gl.ARRAY_BUFFER, lineVertices, gl.DYNAMIC_DRAW);
+      for (const { first, count, width, segmented } of lineRanges) {
         gl.uniform1f(gl.getUniformLocation(lineProgram, 'u_line_width'), width * (map?.getPixelRatio() ?? 1));
         gl.uniform1i(gl.getUniformLocation(lineProgram, 'u_segmented'), segmented ? 1 : 0);
         gl.uniform1f(gl.getUniformLocation(lineProgram, 'u_pixel_ratio'), map?.getPixelRatio() ?? 1);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
-        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / FLOATS_PER_LINE_VERTEX);
+        gl.drawArrays(gl.TRIANGLES, first, count);
       }
 
       gl.useProgram(pointProgram);
@@ -165,8 +197,9 @@ export function createMeasurementLayer(
       gl.uniform1f(gl.getUniformLocation(pointProgram, 'u_point_size'), 12 * (map?.getPixelRatio() ?? 1));
       gl.bindVertexArray(pointVertexArray);
       gl.bindBuffer(gl.ARRAY_BUFFER, pointBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, pointVertices, gl.DYNAMIC_DRAW);
+      if (geometryDirty) gl.bufferData(gl.ARRAY_BUFFER, pointVertices, gl.DYNAMIC_DRAW);
       gl.drawArrays(gl.POINTS, 0, pointVertices.length / FLOATS_PER_POINT_VERTEX);
+      geometryDirty = false;
 
       gl.bindVertexArray(null);
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
@@ -175,6 +208,8 @@ export function createMeasurementLayer(
       gl.depthMask(true);
     },
     onRemove(_removedMap, gl) {
+      areaFill?.dispose();
+      areaFill = null;
       heightGuide?.dispose();
       heightGuide = null;
       if (lineVertexArray) gl.deleteVertexArray(lineVertexArray);

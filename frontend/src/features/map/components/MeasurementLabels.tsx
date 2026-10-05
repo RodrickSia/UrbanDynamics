@@ -9,6 +9,8 @@ import {
   type MeasurementDistanceLabel,
 } from '../utils/measurement';
 import type { MeasurementProjection, Position3 } from '../utils/measurementProjection';
+import { AreaMeasurementLabels } from './AreaMeasurementLabels';
+import { formatLength, type MeasurementUnits } from '../utils/measurementUnits';
 
 interface MeasurementLabelsProps {
   map: MapLibreMap | null;
@@ -17,7 +19,11 @@ interface MeasurementLabelsProps {
   mode: MapMode;
 }
 
-export function MeasurementLabels({ map, projection, measurement, mode }: MeasurementLabelsProps) {
+export function MeasurementLabels(props: MeasurementLabelsProps) {
+  return props.measurement.kind === 'area' ? <AreaMeasurementLabels {...props} /> : <DistanceLabels {...props} />;
+}
+
+function DistanceLabels({ map, projection, measurement, mode }: MeasurementLabelsProps) {
   const labels = useMemo(
     () => createMeasurementDistanceLabels(measurement, mode),
     [measurement, mode],
@@ -84,6 +90,7 @@ export function MeasurementLabels({ map, projection, measurement, mode }: Measur
         <MeasurementDistancePill
           key={label.id}
           label={label}
+          units={measurement.units ?? 'metric'}
           register={(element) => {
             if (element) elementsRef.current.set(label.id, element);
             else elementsRef.current.delete(label.id);
@@ -97,9 +104,11 @@ export function MeasurementLabels({ map, projection, measurement, mode }: Measur
 function MeasurementDistancePill({
   label,
   register,
+  units,
 }: {
   label: MeasurementDistanceLabel;
   register: (element: HTMLDivElement | null) => void;
+  units: MeasurementUnits;
 }) {
   const pillRef = useRef<HTMLSpanElement>(null);
   useGSAP(() => {
@@ -126,7 +135,7 @@ function MeasurementDistancePill({
         >
           {label.distanceMeters == null
             ? 'Elevation unavailable'
-            : `${label.component ? `${label.component} ` : ''}${formatMeasurementDistance(label.distanceMeters)}`}
+            : `${label.component ? `${label.component} ` : ''}${units === 'imperial' ? formatLength(label.distanceMeters,units) : formatMeasurementDistance(label.distanceMeters)}`}
         </span>
       </span>
     </div>

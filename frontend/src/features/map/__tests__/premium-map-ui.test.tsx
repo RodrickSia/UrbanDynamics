@@ -50,7 +50,8 @@ describe('premium map workspace', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Measure distance' }));
+    await user.click(screen.getByRole('button', { name: 'Measurement tools' }));
+    await user.click(await screen.findByRole('button', { name: 'Measure distance' }));
 
     expect(screen.getByRole('region', { name: 'Distance measurement' })).toBeInTheDocument();
     expect(screen.getByTestId('navigation-cluster')).toHaveAttribute('data-right-panel-open', 'false');
@@ -76,7 +77,8 @@ describe('premium map workspace', () => {
 
     await user.click(screen.getByRole('button', { name: 'Choose basemap' }));
 
-    const picker = screen.getByRole('region', { name: 'Basemap' });
+    // Wait for the GSAP entrance to make the panel accessible, not an arbitrary frame.
+    const picker = await screen.findByRole('region', { name: 'Basemap' });
     expect(within(picker).getByRole('button', { name: 'Default' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(picker).getByRole('button', { name: 'Satellite' })).toBeEnabled();
     expect(within(picker).getByRole('button', { name: 'Planning' })).toBeDisabled();

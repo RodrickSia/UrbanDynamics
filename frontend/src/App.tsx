@@ -90,6 +90,8 @@ export default function App() {
           onMapStyleChange={workspace.setMapStyle}
           onTimeRangeChange={workspace.setTimeRange}
           onStartMeasurement={workspace.startMeasurement}
+          onMeasurementUnitsChange={workspace.changeMeasurementUnits}
+          onUndoMeasurementPoint={workspace.undoMeasurementPoint}
           onCancelMeasurement={workspace.cancelMeasurement}
           onCompleteMeasurement={workspace.completeMeasurement}
           onClearSelection={workspace.clearSelection}

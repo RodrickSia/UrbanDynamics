@@ -42,6 +42,7 @@ vi.mock('../components/UrbanMap', () => ({
       {measurement.points.length}
       <button type="button" onClick={() => onMeasurementPoint(pointOne)}>Add first point</button>
       <button type="button" onClick={() => onMeasurementPoint(pointTwo)}>Add second point</button>
+      <button type="button" onClick={() => onMeasurementPoint({ ...pointOne, id:'third', latitude:10.8005 })}>Add third point</button>
       <button type="button" onClick={() => onMeasurementPoint(pointWithoutElevation)}>Add unavailable point</button>
     </div>
   ),
@@ -60,7 +61,8 @@ describe('distance measurement workflow', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Measure distance' }));
+    await user.click(screen.getByRole('button', { name: 'Measurement tools' }));
+    await user.click(await screen.findByRole('button', { name: 'Measure distance' }));
     await user.click(screen.getByRole('button', { name: 'Add first point' }));
     await user.click(screen.getByRole('button', { name: 'Add second point' }));
 
@@ -89,5 +91,35 @@ describe('distance measurement workflow', () => {
     await user.click(screen.getByRole('button', { name: 'Add first point' }));
     await user.click(screen.getByRole('button', { name: 'Add unavailable point' }));
     expect(within(toolbar).getByText('Elevation unavailable')).toBeInTheDocument();
+  });
+
+  it('chooses area, requires a valid polygon, switches units and preserves it across map modes', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Measurement tools' }));
+    await user.click(await screen.findByRole('button', { name: 'Measure area' }));
+    const toolbar = await screen.findByRole('region', { name: 'Area measurement' });
+    const done = within(toolbar).getByRole('button', { name:'Done' });
+    expect(done).toBeDisabled();
+    await user.click(screen.getByRole('button', { name:'Add first point' }));
+    await user.click(screen.getByRole('button', { name:'Add second point' }));
+    expect(done).toBeDisabled();
+    await user.click(screen.getByRole('button', { name:'Add third point' }));
+    expect(done).toBeEnabled();
+    expect(within(toolbar).getByText('Horizontal projection')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name:'Switch to 3D' }));
+    expect(within(toolbar).getByText('3D plane')).toBeInTheDocument();
+    await user.selectOptions(within(toolbar).getByRole('combobox', { name:'Measurement units' }), 'imperial');
+    expect(within(toolbar).getByText(/ft²|acre/)).toBeInTheDocument();
+    expect(within(toolbar).getByText(/Perimeter .* ft/)).toBeInTheDocument();
+    await user.click(done);
+    expect(done).toBeDisabled();
+    await user.click(screen.getByRole('button', { name:'Switch to 2D' }));
+    expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('3');
+    await user.click(within(toolbar).getByRole('button', { name:'New measurement' }));
+    expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('0');
+    expect(within(toolbar).getByRole('combobox')).toHaveValue('imperial');
+    await user.click(within(toolbar).getByRole('button', { name:'Clear measurement' }));
+    expect(screen.queryByRole('region', { name:'Area measurement' })).not.toBeInTheDocument();
   });
 });

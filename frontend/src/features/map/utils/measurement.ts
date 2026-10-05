@@ -17,7 +17,7 @@ export interface MeasurementSummary {
 }
 
 export interface MeasurementRenderSegment {
-  kind: 'distance' | 'horizontal' | 'vertical' | 'edge-highlight';
+  kind: 'distance' | 'horizontal' | 'vertical' | 'edge-highlight' | 'area-boundary';
   start: [number, number];
   end: [number, number];
   startElevation: number;

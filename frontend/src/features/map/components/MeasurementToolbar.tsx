@@ -1,9 +1,10 @@
-import { Check, RotateCcw, Ruler, TriangleRight } from 'lucide-react';
+import { Check, RotateCcw, Ruler, TriangleRight, X } from 'lucide-react';
 import { useRef } from 'react';
 
 import { gsap, motionDuration, useGSAP } from '../motion';
 import type { MapMode, MeasurementState } from '../types/map';
 import { calculateMeasurementSummary, formatMeasurementDistance, measurementPhase } from '../utils/measurement';
+import { formatLength, type MeasurementUnits } from '../utils/measurementUnits';
 
 interface MeasurementToolbarProps {
   measurement: MeasurementState;
@@ -11,9 +12,11 @@ interface MeasurementToolbarProps {
   onToggleComponents: () => void;
   onNew: () => void;
   onDone: () => void;
+  onClear: () => void;
+  onUnitsChange: (units: MeasurementUnits) => void;
 }
 
-export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNew, onDone }: MeasurementToolbarProps) {
+export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNew, onDone, onClear, onUnitsChange }: MeasurementToolbarProps) {
   const toolbarRef = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -49,12 +52,16 @@ export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNe
         <div>
           <strong>{status}</strong>
           {measurement.points.length > 0 && (
-            <span>{mode === '3d' && !summary.elevationAvailable ? 'Elevation unavailable' : `Total ${formatMeasurementDistance(total)}`}</span>
+            <span>{mode === '3d' && !summary.elevationAvailable ? 'Elevation unavailable' : `Total ${measurement.units === 'imperial' ? formatLength(total,'imperial') : formatMeasurementDistance(total)}`}</span>
           )}
           {measurement.status === 'active' && snap && <span className="sr-only">{snap} snap</span>}
         </div>
       </div>
       <div className="measurement-actions">
+        <select className="measurement-unit-select" aria-label="Measurement units" value={measurement.units ?? 'metric'}
+          onChange={event => onUnitsChange(event.target.value as MeasurementUnits)}>
+          <option value="metric">Metric</option><option value="imperial">Imperial</option>
+        </select>
         {mode === '3d' && (
           <button type="button" className="secondary-button" onClick={onToggleComponents}
             aria-label="Show distance components" aria-pressed={!!measurement.showComponents}
@@ -73,6 +80,9 @@ export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNe
           aria-label="Done"
         >
           <Check aria-hidden="true" size={16} /> Done
+        </button>
+        <button type="button" className="secondary-button measurement-icon-action" onClick={onClear} aria-label="Clear measurement" title="Clear measurement">
+          <X aria-hidden="true" size={16} />
         </button>
       </div>
     </aside>

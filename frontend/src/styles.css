@@ -750,6 +750,52 @@ input:focus-visible {
   gap: 0.35rem;
 }
 
+.measurement-module { position: relative; }
+.measurement-picker {
+  position: absolute;
+  right: calc(100% + 0.55rem);
+  bottom: 0;
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  border-radius: 1rem;
+  transform-origin: right center;
+}
+.measurement-picker .corner-action { border-radius: 0.7rem; background: transparent; box-shadow: none; }
+.measurement-picker [aria-pressed="true"] { background: rgba(0, 103, 118, 0.12); color: var(--accent-strong); }
+.measurement-unit-select {
+  min-height: 2.25rem;
+  max-width: 6.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.65rem;
+  color: var(--text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.area-toolbar .measurement-heading { min-width: 10rem; }
+.area-toolbar .area-mode { font-size: 0.6rem; color: var(--accent-strong); }
+.measurement-toolbar .measurement-icon-action { padding: 0; min-width: 2.25rem; }
+.measurement-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+.area-label-area .measurement-label-position { transform: translate(-50%, -50%); }
+.area-label-perimeter .measurement-label-position { transform: translate(-50%, calc(-100% - 1.4rem)); }
+.area-label-perimeter::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -0.5px;
+  height: 1.4rem;
+  width: 1px;
+  background: rgba(10, 15, 17, 0.7);
+}
+@media (max-width: 900px) {
+  .measurement-toolbar { grid-template-columns: 1fr; gap: 0.4rem; }
+  .measurement-toolbar .measurement-actions { flex-wrap: wrap; }
+  .area-toolbar .measurement-heading strong, .area-toolbar .measurement-heading span { white-space: normal; }
+}
+
 .measurement-label-layer {
   position: absolute;
   z-index: 46;
@@ -1124,8 +1170,12 @@ input:focus-visible {
 
   .measurement-toolbar {
     bottom: 0.75rem;
+    left: 0.75rem;
+    translate: 0;
     grid-template-columns: 1fr;
-    min-width: calc(100vw - 5.5rem);
+    min-width: 0;
+    width: calc(100vw - 5.25rem);
+    max-width: calc(100vw - 5.25rem);
     gap: 0.5rem;
   }
 
@@ -1134,6 +1184,8 @@ input:focus-visible {
     overflow: hidden;
     padding: 0;
     color: transparent;
+    font-size: 0;
+    gap: 0;
   }
 
   .measurement-actions .secondary-button svg {

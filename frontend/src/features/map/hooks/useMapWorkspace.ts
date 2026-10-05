@@ -16,6 +16,7 @@ import type {
   MapMode,
   MapSelection,
   MeasurementPoint,
+  MeasurementKind,
   MeasurementState,
   PlaceDetails,
   PointSelection,
@@ -23,6 +24,8 @@ import type {
   UrbanLayerDefinition,
   UserLocation,
 } from '../types/map';
+import { calculateAreaMeasurement } from '../utils/measurementArea';
+import type { MeasurementUnits } from '../utils/measurementUnits';
 
 export type RightPanel = 'layers' | null;
 
@@ -66,12 +69,13 @@ export function useMapWorkspace() {
     [handleModeChange, mode],
   );
 
-  const startMeasurement = useCallback(() => {
+  const startMeasurement = useCallback((kind?: MeasurementKind) => {
     setIsSearchOpen(false);
     setSelectedPlace(null);
     setSelection(null);
     setRightPanel(null);
-    setMeasurement({ status: 'active', points: [], preview: null });
+    setMeasurement(current => ({ status: 'active', points: [], preview: null,
+      kind: kind ?? current.kind ?? 'distance', units: current.units ?? 'metric' }));
   }, []);
 
   const cancelMeasurement = useCallback(() => {
@@ -82,17 +86,25 @@ export function useMapWorkspace() {
     setMeasurement(current => ({ ...current, showComponents: !current.showComponents }));
   }, []);
 
+  const changeMeasurementUnits = useCallback((units: MeasurementUnits) => {
+    setMeasurement(current => ({ ...current, units }));
+  }, []);
+
+  const undoMeasurementPoint = useCallback(() => {
+    setMeasurement(current => ({ ...current, status:'active', points:current.points.slice(0,-1), preview:null }));
+  }, []);
+
   const completeMeasurement = useCallback(() => {
     setMeasurement((current) => (
-      current.points.length < 2
+      (current.kind === 'area' ? !calculateAreaMeasurement(current.points,mode).valid : current.points.length < 2)
         ? current
         : { ...current, status: 'complete', preview: null }
     ));
-  }, []);
+  }, [mode]);
 
   const handleMeasurementPoint = useCallback((point: MeasurementPoint) => {
     setMeasurement((current) => (
-      current.status !== 'active'
+      current.status !== 'active' || (current.kind === 'area' && current.points.length >= 256)
         ? current
         : { ...current, points: [...current.points, point], preview: null }
     ));
@@ -235,6 +247,8 @@ export function useMapWorkspace() {
     cancelMeasurement,
     completeMeasurement,
     toggleMeasurementComponents,
+    changeMeasurementUnits,
+    undoMeasurementPoint,
     handleMeasurementPoint,
     handleMeasurementPreview,
     handleMeasurementPointsChange,
