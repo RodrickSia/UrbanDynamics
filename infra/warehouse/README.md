@@ -1,37 +1,45 @@
 # PostGIS warehouse
 
-Compose builds the database image from this directory. It uses the PostGIS
-PostgreSQL 17 image, enables the `postgis` and `postgis_raster` extensions on
-first initialization, and stores database files in the persistent `postgis_data`
-volume. Versioned SQL migrations are recorded in `public.schema_migrations`.
+Compose builds the warehouse image from this directory. It uses PostgreSQL 17
+with PostGIS and PostGIS Raster extensions. Database files live in the
+persistent `postgis_data` volume. Compose does not publish a host port for the
+database; containers connect to `postgis:5432` on the internal network.
 
-Configure `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` in
-`.env` (see `.env.example`). PostGIS is available only to containers on the
-Compose network at host `postgis`, port `5432`; Compose does not publish the
-database port to the host.
+## Data model
 
-There is no shared default password. Set a unique `WAREHOUSE_PASSWORD` in your
-untracked `.env` before initializing PostGIS; an empty password is rejected by
-the database image for a fresh data directory. Frontend/backend-only builds do
-not require a warehouse password. CI creates an ephemeral random password.
-Changing `.env` does not rotate the password in an existing database volume:
-coordinate database credential rotation with its administrator and update the
-GitHub `production` environment secret to match. Never delete the volume to
-change a password. If the former committed default was used on a real server,
-treat it as exposed and rotate it before deploying again.
+- Population rasters: `population.population_raster`.
+- Flood and land-price vector snapshots: `public.layer_snapshots` and
+  `public.layer_features`.
+- Applied migrations: `public.schema_migrations`.
 
-The extension setup in `init/` and versioned migrations in `migrations/` run
-automatically when PostgreSQL initializes an empty data directory. For an
-existing database, start the PostGIS service and run
-`WAREHOUSE_MIGRATION_TARGET=compose sh infra/warehouse/scripts/migrate.sh`.
-The script applies each numbered migration once and records it in the migration
-ledger. The `Deploy database` GitHub Actions workflow starts the PostGIS Compose
-service if needed, then runs the same migration script. It does not force an
-image rebuild; existing database files stay in the persistent `postgis_data`
-volume. Configure the GitHub `production` environment
-with required reviewers and a `WAREHOUSE_PASSWORD` secret to gate this workflow.
-Set `WAREHOUSE_DATABASE` and `WAREHOUSE_USER` as environment variables if their
-names differ from the defaults. Keep each migration transactional; the runner
-applies each SQL file and its ledger entry in one transaction.
-Database CI builds a fresh PostGIS image, starts an empty database, and checks
-that the extensions, population raster table, and migration ledger are present.
+Schema changes are numbered SQL files in `migrations/`. Empty database
+initialization runs the migrations automatically. For an existing database,
+start PostGIS and apply pending migrations with:
+
+```sh
+WAREHOUSE_MIGRATION_TARGET=compose sh infra/warehouse/scripts/migrate.sh
+```
+
+The runner applies each migration and its ledger entry in one transaction, and
+skips versions already recorded. The manual `Deploy database` workflow invokes
+the same runner against the production Compose warehouse without replacing its
+database volume.
+
+## Configuration and credentials
+
+Copy `.env.example` to `.env` and set a unique `WAREHOUSE_PASSWORD` before the
+first PostGIS initialization. `WAREHOUSE_DATABASE` and `WAREHOUSE_USER` can
+override their documented defaults. An empty password cannot initialize a new
+database, and changing `.env` does not rotate credentials in an existing
+volume. Coordinate password rotation with the database administrator and
+update the GitHub `production` environment secret to match. Never remove the
+database volume as a password-rotation method.
+
+Frontend-only and backend-only image builds do not need the warehouse password.
+CI uses an ephemeral password for its isolated database. Production database
+and application workflows use the protected GitHub `production` environment;
+configure its `WAREHOUSE_PASSWORD` secret and required reviewers.
+
+Database CI starts a fresh PostGIS image and checks the extensions, tables, and
+migration ledger. The separate integration workflow runs the flood, land-price,
+and API tests against an isolated database on the Compose network.

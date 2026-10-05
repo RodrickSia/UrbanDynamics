@@ -1,11 +1,52 @@
 # ETL
 
-This service owns extraction, transformation, and loading into the warehouse. Each data domain has an independent pipeline under `src/pipelines/`; keep its source handling, transformations, models, and loading logic together. Put only genuinely shared infrastructure under `src/shared/`.
+Each data domain has a pipeline under `src/pipelines/`. Pipeline-specific
+configuration, models, extraction, transformation, and loading stay together;
+shared warehouse and spatial helpers live in `src/shared/`.
 
-The CLI uses `run` with an optional pipeline name and stage. Run all stages with `python -m src.main run population_hcmc`, or run extraction only with `python -m src.main run population_hcmc --stage extract`. In Compose, each service sets `ETL_PIPELINE`, so use `docker compose --profile etl-population-hcmc run --rm etl-population-hcmc run --stage extract`.
+## Run with Compose
 
-The downloaded rasters are stored in `etl/data/population_hcmc/worldpop` on the host. The `Run ETL pipelines` GitHub Actions workflow currently has a manual `HCMC population` job that runs all population stages against the configured warehouse. It uses a self-hosted Linux runner and preserves ignored workspace files between checkouts so later runs can reuse the downloaded rasters. Apply database migrations with the separate database workflow before running ETL. Configure the same `WAREHOUSE_PASSWORD` secret in the GitHub `production` environment.
+Copy `.env.example` to `.env`, set `WAREHOUSE_PASSWORD`, and start PostGIS. Apply
+pending database migrations before publishing data. Each pipeline has its own
+Compose profile and service; all use the shared ETL image and mount `etl/data/`
+at `/app/data`.
 
-The rainwater pipeline has its own `etl-rainwater` Compose service and profile; add a separate ETL workflow job when that pipeline is ready to run.
+For example, run the population pipeline:
 
-Scheduling remains separate from pipeline logic so each pipeline can later receive its own cadence or scheduler configuration.
+```sh
+docker compose --profile etl-population-hcmc run --rm etl-population-hcmc run --stage all
+```
+
+Run flood history with a prepared WGS84 boundary:
+
+```sh
+docker compose --profile etl-flood-history run --rm etl-flood-history \
+  run --stage all --boundary /app/data/inputs/thu_duc_boundary.geojson
+```
+
+Compose passes the selected pipeline through `ETL_PIPELINE`. From the ETL
+directory, the CLI can also be invoked directly, for example:
+
+```sh
+python -m src.main run flood_history --stage all \
+  --boundary /app/data/inputs/thu_duc_boundary.geojson
+```
+
+The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
+stage choices. `transform` and `load` are not yet supported as independent CLI
+stages; run the full pipeline to execute those steps.
+
+## Warehouse and data
+
+ETL containers connect to the main PostGIS warehouse at `postgis:5432` using
+`WAREHOUSE_*` settings. They do not publish host ports or create database
+tables. Population TIFFs load into `population.population_raster`; flood and
+land-price GeoJSON features publish as atomic full-layer snapshots in
+`public.layer_snapshots` and `public.layer_features`.
+
+All pipeline services share the ignored host directory `etl/data/`. Flood risk
+reads a previously published `flood_history` layer and forecast/history JSON
+from `etl/data/inputs/`. Land-price publication requires reviewed road-segment
+geometry in `etl/data/review/land_price_reviewed.geojson`.
+
+Flood-risk requires forecast and history rainfall files under `etl/data/inputs/`; the repository does not provide a standalone rainfall pipeline.

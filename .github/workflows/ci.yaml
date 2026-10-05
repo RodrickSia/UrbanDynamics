@@ -22,7 +22,12 @@ jobs:
         run: |
           cp .env.example .env
           trap 'rm -f .env' EXIT
-          docker compose build
+          docker compose \
+            --profile etl-population-hcmc \
+            --profile etl-flood-history --profile etl-flood-satellite \
+            --profile etl-flood-risk --profile etl-land-price \
+            build backend frontend etl-population-hcmc \
+            etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price
 
   database:
     runs-on: ubuntu-latest
@@ -61,8 +66,14 @@ jobs:
             IF to_regclass('population.population_raster') IS NULL THEN
               RAISE EXCEPTION 'population raster table is missing';
             END IF;
+            IF to_regclass('public.layer_snapshots') IS NULL OR to_regclass('public.layer_features') IS NULL THEN
+              RAISE EXCEPTION 'vector layer tables are missing';
+            END IF;
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '02-population-raster.sql') <> 1 THEN
               RAISE EXCEPTION 'population migration was not tracked exactly once';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '001_khoi_layers.sql') <> 1 THEN
+              RAISE EXCEPTION 'vector layer migration was not tracked exactly once';
             END IF;
           END
           $$;

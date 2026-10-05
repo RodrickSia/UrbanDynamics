@@ -18,6 +18,13 @@ def deployment_values(environ):
             raise ValueError(f"{secret} must contain a non-empty, single-line API key")
         values[target] = value
 
+    warehouse_password = environ.get("WAREHOUSE_PASSWORD", "")
+    if not warehouse_password.strip() or any(char in warehouse_password for char in "\r\n\x00"):
+        raise ValueError("WAREHOUSE_PASSWORD must contain a non-empty, single-line password")
+    values["WAREHOUSE_DATABASE"] = environ.get("WAREHOUSE_DATABASE", "urbandynamics")
+    values["WAREHOUSE_USER"] = environ.get("WAREHOUSE_USER", "urbandynamics")
+    values["WAREHOUSE_PASSWORD"] = warehouse_password
+
     value = environ.get("FRONTEND_PORT", "51873")
     if not value.isascii() or not value.isdecimal() or not 1024 <= int(value) <= 65535:
         raise ValueError("FRONTEND_PORT must be a port between 1024 and 65535")

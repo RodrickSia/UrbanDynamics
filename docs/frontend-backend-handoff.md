@@ -37,7 +37,12 @@ Chi tiết dữ liệu, thông số, kiểm thử và giới hạn: [Map renderi
 
 ## 1. Trạng thái hiện tại
 
-Backend hiện chỉ có `GET /health`. Frontend đã hoàn thiện lớp giao diện và tương tác cho:
+Backend hiện có health/readiness endpoints, API danh mục và truy vấn layer,
+API flood history/satellite/risk, land prices, và rain scenario. Contract chi
+tiết hiện hành cho các API này nằm trong
+[`khoi-implementation.md`](khoi-implementation.md). Các endpoint đề xuất ở
+phần dưới chưa được triển khai trừ khi ghi rõ trạng thái khác. Frontend đã có
+giao diện và tương tác cho:
 
 - bản đồ toàn Việt Nam, mặc định 2D;
 - chuyển đổi rõ ràng giữa 2D và 3D;
@@ -180,7 +185,13 @@ Backend phải kiểm tra `lng` trong `[-180, 180]`, `lat` trong `[-90, 90]`.
 
 Khi endpoint này hoạt động, frontend sẽ thay thẻ dữ liệu mẫu bằng dữ liệu theo tâm bản đồ hoặc địa điểm đang chọn. Backend nên cache theo ô tọa độ và thời gian để tránh gọi nhà cung cấp quá mức.
 
-## 5. API lớp dữ liệu đô thị
+## 5. API lớp dữ liệu đô thị — đề xuất
+
+Các endpoint trong bảng dưới là mục tiêu tích hợp frontend, không phải danh
+sách API đã được triển khai. Hiện backend cung cấp `/api/v1/layers`,
+`/api/v1/layers/{layer}/features`, `/api/v1/floods/{history,satellite,risk}`,
+`/api/v1/land-prices`, `/api/v1/land-prices/rows`, và
+`/api/v1/scenarios/rain`.
 
 Các endpoint frontend đã dành sẵn:
 
