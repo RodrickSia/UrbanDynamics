@@ -70,7 +70,9 @@ export function pickBuildingSurface(
       }));
       surfaces.push({ ground, baseZ, roofZ, rings });
     }
-    cache.set(feature, surfaces);
+    // A loading placeholder is not stable geometry. Retry it after the DEM
+    // arrives even if its source event preceded the final terrain upload.
+    if (surfaces.every(surface => surface.ground != null)) cache.set(feature, surfaces);
   }
   for (const [part, { ground, baseZ, roofZ, rings }] of surfaces.entries()) {
     const consider = (t: number, faceId: string) => {

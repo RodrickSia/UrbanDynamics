@@ -16,6 +16,7 @@ export function createMapInteractionHandlers(
   projection?: MeasurementProjection,
 ) {
   let previewFrame = 0;
+  let sceneNeedsSettlement = true;
   let committedPointer: { x: number; y: number; pointId: string } | null = null;
 
   return {
@@ -91,12 +92,19 @@ export function createMapInteractionHandlers(
       getCurrent().onMeasurementPreview(null);
     },
     movestart() {
+      sceneNeedsSettlement = true;
       committedPointer = null;
       invalidateMeasurementPicking(map);
       cancelAnimationFrame(previewFrame);
       getCurrent().onMeasurementPreview(null);
     },
     idle() {
+      // Source events can precede the GPU's final tile/terrain render. Retire
+      // that intermediate snapshot once the scene settles, not every frame.
+      if (sceneNeedsSettlement) {
+        invalidateMeasurementPicking(map);
+        sceneNeedsSettlement = false;
+      }
       const current = getCurrent();
       if (current.mode !== '3d' || current.measurement.points.length === 0) return;
       const points = current.measurement.points.map((point) => (
@@ -107,6 +115,7 @@ export function createMapInteractionHandlers(
       }
     },
     scenechange() {
+      sceneNeedsSettlement = true;
       invalidateMeasurementPicking(map);
     },
     dispose() {

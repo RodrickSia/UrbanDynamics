@@ -72,7 +72,10 @@ export function resolveMeasurementPoint(
         const height = readBuildingHeight(candidate.properties);
         if (height == null) return [];
         let geometry = geometryCache.get(candidate);
-        if (!geometry) { geometry = prepareSnapGeometry(map, candidate, projection, height); geometryCache.set(candidate, geometry); }
+        if (!geometry) {
+          geometry = prepareSnapGeometry(map, candidate, projection, height);
+          if (geometry.vertices.length) geometryCache.set(candidate, geometry);
+        }
         return snapCandidates(geometry, screenPoint, projection, canvas.clientWidth, canvas.clientHeight);
       }).sort((a, b) => a.priority - b.priority || a.distance - b.distance);
       for (const snap of snaps) {

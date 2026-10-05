@@ -4,6 +4,8 @@ import { MeasurementProjection } from '../utils/measurementProjection';
 import { resolveMeasurementPoint } from '../utils/measurementElevation';
 import { prepareSnapGeometry, snapCandidates, type SnapGeometry } from '../utils/measurementSnap';
 import { pickBuildingSurface } from '../utils/measurementPicking';
+import { createMapInteractionHandlers } from '../utils/mapInteractions';
+import type { UrbanMapProps } from '../components/UrbanMap.types';
 
 const ring = [[106.7, 10.8], [106.701, 10.8], [106.701, 10.801], [106.7, 10.801], [106.7, 10.8]];
 const building = (id: string, height = 20) => ({
@@ -23,6 +25,40 @@ const camera = () => {
 };
 
 describe('world raycast and geometry snapping', () => {
+  it('retries a surface whose ground elevation was unavailable when first cached', () => {
+    const feature = building('delayed-dem');
+    const map = mapFor([feature]); const projection = camera();
+    map.queryTerrainElevation = () => null;
+    expect(pickBuildingSurface(map, feature, [300,200], projection, 20)?.groundElevation).toBeNull();
+    map.queryTerrainElevation = () => 8;
+    const hit = pickBuildingSurface(map, feature, [300,200], projection, 20);
+    expect(hit?.groundElevation).toBe(8);
+    expect(hit?.elevation).toBeCloseTo(28, 3);
+  });
+  it('refreshes visible candidates after the final terrain/tile render becomes idle', () => {
+    const map = mapFor([]); const projection = camera();
+    expect(resolveMeasurementPoint(map,106.7002,10.8002,'3d',[300,200],undefined,projection)?.surface).not.toBe('building');
+    map.queryRenderedFeatures = (() => [building('newly-rendered')]) as MapLibreMap['queryRenderedFeatures'];
+    const handlers = createMapInteractionHandlers(map, () => ({ mode: '3d',
+      measurement: { status: 'active', points: [], preview: null },
+    } as unknown as UrbanMapProps), projection);
+    handlers.idle();
+    expect(resolveMeasurementPoint(map,106.7002,10.8002,'3d',[300,200],undefined,projection))
+      .toMatchObject({ surface: 'building', elevationAvailable: true });
+  });
+  it('keeps settled geometry cached across overlay-only idle frames', () => {
+    const map = mapFor([building('settled')]); const projection = camera();
+    const query = vi.spyOn(map,'queryRenderedFeatures');
+    const handlers = createMapInteractionHandlers(map, () => ({ mode:'3d',
+      measurement:{ status:'active', points:[], preview:null },
+    } as unknown as UrbanMapProps), projection);
+    handlers.idle();
+    const pick = () => resolveMeasurementPoint(map,106.7002,10.8002,'3d',[300,200],undefined,projection);
+    pick(); handlers.idle(); pick(); handlers.idle(); pick();
+    expect(query).toHaveBeenCalledTimes(1);
+    handlers.scenechange(); handlers.idle(); pick();
+    expect(query).toHaveBeenCalledTimes(2);
+  });
   it('chooses the nearest building independently of feature order', () => {
     for (const features of [[building('low'), building('high', 40)], [building('high', 40), building('low')]]) {
       const point = resolveMeasurementPoint(mapFor(features),106.7002,10.8002,'3d',[300,200],undefined,camera());
