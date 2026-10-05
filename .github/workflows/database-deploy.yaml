@@ -1,4 +1,4 @@
-name: Deploy database migrations
+name: Deploy database
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ jobs:
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-      - name: Apply pending database migrations
+      - name: Start PostGIS and apply pending migrations
         env:
           WAREHOUSE_MIGRATION_TARGET: compose
         run: |
@@ -29,14 +29,9 @@ jobs:
           test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
           created_env=false
           if [ ! -f .env ]; then
-            umask 077
-            printf 'BACKEND_PORT=8000\nFRONTEND_PORT=8080\nWAREHOUSE_DATABASE=%s\nWAREHOUSE_USER=%s\nWAREHOUSE_PASSWORD=%s\nWAREHOUSE_FORWARD_PORT=5432\n' \
-              "$WAREHOUSE_DATABASE" "$WAREHOUSE_USER" "$WAREHOUSE_PASSWORD" > .env
+            cp .env.example .env
             created_env=true
           fi
           trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
-          if ! docker compose ps --status running --services | grep -Fxq postgis; then
-            echo "The PostGIS service must already be running. Deploy the Compose stack first." >&2
-            exit 1
-          fi
+          docker compose up -d --wait --wait-timeout 180 postgis
           sh infra/warehouse/scripts/migrate.sh

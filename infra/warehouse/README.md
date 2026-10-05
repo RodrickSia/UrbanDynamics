@@ -24,9 +24,10 @@ automatically when PostgreSQL initializes an empty data directory. For an
 existing database, start the PostGIS service and run
 `WAREHOUSE_MIGRATION_TARGET=compose sh infra/warehouse/scripts/migrate.sh`.
 The script applies each numbered migration once and records it in the migration
-ledger. The `Deploy database migrations` GitHub Actions workflow runs the same
-script against the already-running Compose database without rebuilding or
-restarting the database container. Configure the GitHub `production` environment
+ledger. The `Deploy database` GitHub Actions workflow starts the PostGIS Compose
+service if needed, then runs the same migration script. It does not force an
+image rebuild; existing database files stay in the persistent `postgis_data`
+volume. Configure the GitHub `production` environment
 with required reviewers and a `WAREHOUSE_PASSWORD` secret to gate this workflow.
 Set `WAREHOUSE_DATABASE` and `WAREHOUSE_USER` as environment variables if their
 names differ from the defaults. Keep each migration transactional; the runner

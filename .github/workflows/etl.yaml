@@ -31,9 +31,7 @@ jobs:
           test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
           created_env=false
           if [ ! -f .env ]; then
-            umask 077
-            printf 'BACKEND_PORT=8000\nFRONTEND_PORT=8080\nWAREHOUSE_DATABASE=%s\nWAREHOUSE_USER=%s\nWAREHOUSE_PASSWORD=%s\nWAREHOUSE_FORWARD_PORT=5432\n' \
-              "$WAREHOUSE_DATABASE" "$WAREHOUSE_USER" "$WAREHOUSE_PASSWORD" > .env
+            cp .env.example .env
             created_env=true
           fi
           trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
