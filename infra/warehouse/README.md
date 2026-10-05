@@ -9,5 +9,7 @@ Configure `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` in
 `.env` (see `.env.example`). Containers connect to host `postgis` on port `5432`;
 host tools connect to `localhost` using `WAREHOUSE_FORWARD_PORT`.
 
-The SQL scripts in `init/` run only when PostgreSQL initializes an empty data
-directory. Use versioned migrations for schema changes after initialization.
+The extension setup in `init/` and SQL files in `migrations/` run automatically
+when PostgreSQL initializes an empty data directory. PostgreSQL does not replay
+those files for an existing `postgis_data` volume; apply new versioned migrations
+to existing databases with `psql` before running loaders that depend on them.

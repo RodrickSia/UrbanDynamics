@@ -1,7 +1,7 @@
 """Shared connection settings for the PostGIS warehouse."""
 
-from dataclasses import dataclass, field
 import os
+from dataclasses import dataclass, field
 
 import psycopg
 from psycopg import Connection
