@@ -110,3 +110,5 @@ Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải gi�
 - Ranh giới demo: hợp ba quận cũ Thủ Đức, 9, 2 từ bộ dữ liệu nguồn; không phải ranh giới phường hành chính hiện tại.
 
 Workflow `.github/workflows/integration-tests.yaml` sinh password ngẫu nhiên mỗi lần chạy, khởi động image PostGIS và migration chính qua Compose mà không publish port, chạy pytest trong cùng mạng rồi dọn volume kiểm thử. Không cần password CI cố định. Pipeline chạy thủ công qua `.github/workflows/etl.yaml` với lựa chọn pipeline và stage `all` hoặc `extract`; database deployment tiếp tục dùng workflow migration riêng.
+
+Workflow ETL tự tạo `thu_duc_boundary.geojson` từ dataset boundary DataSuds nếu thiếu file trong `etl/data/inputs/`. Chạy local thì chuẩn bị trước bằng `python scripts/prepare-khoi-data.py boundary` từ thư mục gốc.

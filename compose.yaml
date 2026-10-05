@@ -6,6 +6,7 @@ x-etl: &etl
     - .env
   volumes:
     - ./etl/data:/app/data
+    - ./scripts:/app/scripts:ro
 
 x-warehouse-env: &warehouse-env
   WAREHOUSE_HOST: postgis

@@ -24,6 +24,11 @@ docker compose --profile etl-flood-history run --rm etl-flood-history \
   run --stage all --boundary /app/data/inputs/thu_duc_boundary.geojson
 ```
 
+The manual GitHub workflow prepares this boundary from the published DataSuds
+boundary dataset when it is missing. For local runs, prepare it once with
+`scripts/prepare-khoi-data.py boundary` and store it under
+`etl/data/inputs/thu_duc_boundary.geojson`.
+
 Compose passes the selected pipeline through `ETL_PIPELINE`. From the ETL
 directory, the CLI can also be invoked directly, for example:
 

@@ -67,11 +67,17 @@ jobs:
           docker compose --profile "$profile" build "$service"
           case "$ETL_PIPELINE" in
             flood_history)
-              test -s etl/data/inputs/thu_duc_boundary.geojson || { echo "Prepare etl/data/inputs/thu_duc_boundary.geojson before running flood_history." >&2; exit 1; }
+              if [ ! -s etl/data/inputs/thu_duc_boundary.geojson ]; then
+                echo "Preparing the Thu Duc boundary from the published DataSuds boundary dataset."
+                docker compose --profile "$profile" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
+              fi
               set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
               ;;
             flood_satellite)
-              test -s etl/data/inputs/thu_duc_boundary.geojson || { echo "Prepare etl/data/inputs/thu_duc_boundary.geojson before running flood_satellite." >&2; exit 1; }
+              if [ ! -s etl/data/inputs/thu_duc_boundary.geojson ]; then
+                echo "Preparing the Thu Duc boundary from the published DataSuds boundary dataset."
+                docker compose --profile "$profile" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
+              fi
               set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
               ;;
             flood_risk)

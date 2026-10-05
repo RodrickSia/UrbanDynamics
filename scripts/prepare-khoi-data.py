@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "etl"))
+ETL_SOURCE = ROOT / "etl"
+if not ETL_SOURCE.is_dir():
+    ETL_SOURCE = ROOT
+sys.path.insert(0, str(ETL_SOURCE))
 from shapely.geometry import mapping
 from src.pipelines.flood_history.transform import normalize
 from src.shared.data_io import data_dir, download, session, write_json
