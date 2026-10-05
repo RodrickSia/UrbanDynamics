@@ -38,6 +38,7 @@ test('application loads the configured basemap and measurement UI in 3D', async 
   await page.getByRole('button', { name: 'Close place details' }).click();
   await page.getByRole('button', { name: 'Zoom in', exact: true }).click({ clickCount: 3, delay: 400 });
   await page.getByRole('button', { name: 'Switch to 3D' }).click();
+  await page.getByRole('button', { name: 'Measurement tools', exact: true }).click();
   await page.getByRole('button', { name: 'Measure distance', exact: true }).click();
   await page.mouse.move(550, 350);
   await expect(page.getByRole('region', { name: 'Distance measurement' })).toBeVisible();

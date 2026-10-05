@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { DEFAULT_VIEWPORT, getMapStyle } from '../config/mapConfig';
 import { configureMapLibreWorker } from '../config/maplibreWorker';
+import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
 import { setBuildings3d } from '../layers/buildings3d';
@@ -12,6 +13,7 @@ import {
   type MeasurementLayer,
 } from '../layers/measurementLayer';
 import { setTerrain } from '../layers/terrain';
+import { installMetricRoadWidths } from '../layers/metricRoadWidths';
 import { createMapInteractionHandlers } from '../utils/mapInteractions';
 import { MeasurementLabels } from './MeasurementLabels';
 import type { UrbanMapProps } from './UrbanMap.types';
@@ -37,6 +39,8 @@ export function UrbanMap(props: UrbanMapProps) {
   const measurementLayerRef = useRef<MeasurementLayer | null>(null);
   const propsRef = useRef(props);
   const styleRef = useRef(mapStyle);
+  const styleReadyRef = useRef(false);
+  const cameraModeRef = useRef('2d');
   const [mapRevision, setMapRevision] = useState(0);
   propsRef.current = props;
 
@@ -55,6 +59,8 @@ export function UrbanMap(props: UrbanMapProps) {
     let disposed = false;
     let mountedMap: MapLibreMap | null = null;
     let disposeInteractions: () => void = () => undefined;
+    let disposeRoadWidths: () => void = () => undefined;
+    styleReadyRef.current = false;
 
     void import('maplibre-gl')
       .then((maplibregl) => {
@@ -63,6 +69,7 @@ export function UrbanMap(props: UrbanMapProps) {
         const initialStyle = propsRef.current.mapStyle;
         styleRef.current = initialStyle;
         const map = new maplibregl.Map({
+          ...MAP_CACHE_BUDGET,
           container: containerRef.current,
           style: getMapStyle(mapKey, initialStyle),
           center: DEFAULT_VIEWPORT.center,
@@ -73,6 +80,7 @@ export function UrbanMap(props: UrbanMapProps) {
           attributionControl: false,
         });
         mountedMap = map;
+        cameraModeRef.current = '2d';
         mapRef.current = map;
         markerConstructorRef.current = maplibregl.Marker;
         const measurementLayer = createMeasurementLayer(maplibregl.MercatorCoordinate);
@@ -101,17 +109,24 @@ export function UrbanMap(props: UrbanMapProps) {
             buildingsAvailable = false;
           }
           current.onBuildingsAvailabilityChange(buildingsAvailable);
-          map.easeTo({ pitch: in3d ? 60 : 0, bearing: 0, duration: 600 });
         };
 
         const handleStyleLoad = () => {
+          disposeRoadWidths();
+          styleReadyRef.current = true;
+          configureSceneLod(map);
+          disposeRoadWidths = installMetricRoadWidths(map);
           applyMode();
           if (!map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
+          // Custom layers survive style diffing but newly added raster/style
+          // layers are appended above them. Always restore the overlay order.
+          map.moveLayer(MEASUREMENT_LAYER_ID);
           measurementLayer.setMeasurement(
             propsRef.current.measurement,
             propsRef.current.mode,
           );
           propsRef.current.onStatusChange(true, 'Goong map is ready');
+          setMapRevision((revision) => revision + 1);
         };
 
         const interactions = createMapInteractionHandlers(map, () => propsRef.current, measurementLayer.projection);
@@ -134,6 +149,8 @@ export function UrbanMap(props: UrbanMapProps) {
     return () => {
       disposed = true;
       disposeInteractions();
+      disposeRoadWidths();
+      styleReadyRef.current = false;
       markerConstructorRef.current = null;
       measurementLayerRef.current = null;
       mountedMap?.remove();
@@ -145,6 +162,7 @@ export function UrbanMap(props: UrbanMapProps) {
     const map = mapRef.current;
     if (!map || !configuration.ok || styleRef.current === mapStyle) return;
     styleRef.current = mapStyle;
+    styleReadyRef.current = false;
     onStatusChange(false, 'Changing basemap…');
     map.setStyle(getMapStyle(configuration.mapKey, mapStyle));
   }, [configuration, mapStyle, onStatusChange]);
@@ -153,7 +171,7 @@ export function UrbanMap(props: UrbanMapProps) {
     const map = mapRef.current;
     // isStyleLoaded also becomes false while tiles load during camera movement.
     // Style metadata is enough to apply a user's mode change.
-    if (!map || !map.getStyle() || !configuration.ok) return;
+    if (!map || !styleReadyRef.current || !configuration.ok) return;
     const in3d = mode === '3d';
     try {
       setTerrain(map, in3d);
@@ -166,15 +184,30 @@ export function UrbanMap(props: UrbanMapProps) {
     } catch {
       onBuildingsAvailabilityChange(false);
     }
-    map.easeTo({ pitch: in3d ? 60 : 0, bearing: 0, duration: 600 });
+    if (map.getLayer(MEASUREMENT_LAYER_ID)) map.moveLayer(MEASUREMENT_LAYER_ID);
   }, [
     buildingsEnabled,
     buildingsOpacity,
     configuration,
     mode,
+    mapRevision,
     onBuildingsAvailabilityChange,
     onStatusChange,
   ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current || cameraModeRef.current === mode) return;
+    // Allow the new terrain/extrusion pipeline to render before beginning the
+    // flight. Opacity, tile loading and basemap changes must not restart it.
+    const fly = () => {
+      cameraModeRef.current = mode;
+      map.easeTo({ pitch: mode === '3d' ? 60 : 0, duration: 800 });
+    };
+    map.once('render', fly);
+    map.triggerRepaint();
+    return () => { map.off('render', fly); };
+  }, [mode, mapRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -182,7 +215,8 @@ export function UrbanMap(props: UrbanMapProps) {
     if (!map || !measurementLayer) return;
     // Retain every state update even while terrain/vector tiles are loading.
     measurementLayer.setMeasurement(measurement, mode);
-    if (map.getStyle() && !map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
+    // Layer creation/order belongs to style.load; adding while a style swap
+    // is in progress can attach to the outgoing style instead.
     map.getCanvas().classList.toggle('is-measuring', measurement.status === 'active');
   }, [measurement, mode]);
 

@@ -12,15 +12,25 @@ import { createMapInteractionHandlers } from '../../src/features/map/utils/mapIn
 import type { MeasurementState, MapMode } from '../../src/features/map/types/map';
 import type { UrbanMapProps } from '../../src/features/map/components/UrbanMap.types';
 import { MeasurementLabels } from '../../src/features/map/components/MeasurementLabels';
+import { configureSceneLod, MAP_CACHE_BUDGET } from '../../src/features/map/config/renderBudget';
+import { installMetricRoadWidths } from '../../src/features/map/layers/metricRoadWidths';
+import { calculateAreaMeasurement } from '../../src/features/map/utils/measurementArea';
 
 configureMapLibreWorker(maplibregl);
 const isLive = new URLSearchParams(location.search).has('live');
 const isGoong = new URLSearchParams(location.search).has('goong');
 const fixtureHeight = new URLSearchParams(location.search).get('height') === '0' ? 0 : 80;
 const map = new maplibregl.Map({
+  ...MAP_CACHE_BUDGET,
   container: 'map', center: [106.7, 10.8], zoom: 17, pitch: 60,
   canvasContextAttributes: { preserveDrawingBuffer: true, antialias: true },
-  style: isGoong ? getMapStyle(import.meta.env.VITE_GOONG_MAPTILES_KEY) : { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#233440' } }] },
+  style: isGoong ? getMapStyle(import.meta.env.VITE_GOONG_MAPTILES_KEY) : {
+    version: 8,
+    sources: {},
+    layers: [
+      { id: 'background', type: 'background', paint: { 'background-color': '#233440' } },
+    ],
+  },
 });
 const layer = createMeasurementLayer(maplibregl.MercatorCoordinate);
 const labelsRoot = createRoot(document.getElementById('labels')!);
@@ -57,6 +67,34 @@ function project(lng: number, lat: number, elevation: number) {
 // Only this dedicated test page exposes its map. The application has no test globals.
 Object.assign(window, { harness: {
   map, project,
+  tool: (kind: 'distance' | 'area') => { measurement = { kind, status:'active', points:[], preview:null }; sync(); },
+  units: (units: 'metric' | 'imperial') => { measurement = { ...measurement, units }; sync(); },
+  area: () => calculateAreaMeasurement(measurement.points,mode),
+  profileMeasurementUploads: async () => {
+    const gl = map.getCanvas().getContext('webgl2')!;
+    const originalUpload = gl.bufferData.bind(gl);
+    const originalRender = layer.render!;
+    let insideMeasurement = false;
+    let uploads = 0;
+    gl.bufferData = ((...args: Parameters<typeof gl.bufferData>) => {
+      if (insideMeasurement) uploads++;
+      originalUpload(...args);
+    }) as typeof gl.bufferData;
+    layer.render = (...args) => {
+      insideMeasurement = true;
+      try { originalRender(...args); } finally { insideMeasurement = false; }
+    };
+    try {
+      for (let i = 0; i < 5; i++) await new Promise<void>(resolve => {
+        map.once('render', () => resolve());
+        map.triggerRepaint();
+      });
+      return uploads;
+    } finally {
+      layer.render = originalRender;
+      gl.bufferData = originalUpload;
+    }
+  },
   state: () => structuredClone(measurement),
   components: (showComponents: boolean) => { measurement = { ...measurement, showComponents }; sync(); },
   reset: () => { measurement = { status: 'active', points: [], preview: null }; sync(); },
@@ -103,7 +141,12 @@ Object.assign(window, { harness: {
 
 map.on('load', () => {
   setTerrain(map, true);
-  if (isGoong) { map.jumpTo({ center: [106.703, 10.776], zoom: 17 }); setBuildings3d(map, true, 1); }
+  if (isGoong) {
+    installMetricRoadWidths(map);
+    map.jumpTo({ center: [106.703, 10.776], zoom: 17 });
+    configureSceneLod(map);
+    setBuildings3d(map, true, 1);
+  }
   if (!isLive && !isGoong) {
     map.addSource('test-buildings', { type: 'geojson', data: {
       type: 'FeatureCollection', features: [{ type: 'Feature', properties: { max_height: fixtureHeight }, geometry: {

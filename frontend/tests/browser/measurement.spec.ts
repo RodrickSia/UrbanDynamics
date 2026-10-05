@@ -103,6 +103,8 @@ test('laser, roof selection and world anchors survive camera and mode changes', 
   expect(initialLabelStyle.backgroundColor).toContain('0.84');
   await page.evaluate('window.harness.done()');
   const fixed = await page.evaluate('window.harness.state().points');
+  await page.evaluate(`new Promise(resolve => { window.harness.map.once('idle', resolve); window.harness.map.triggerRepaint(); })`);
+  expect(await page.evaluate('window.harness.profileMeasurementUploads()')).toBe(0);
   for (const camera of [{ zoom: 17.5, bearing: 90, pitch: 65 }, { zoom: 16, bearing: 180, pitch: 35 }, { zoom: 17, bearing: -90, pitch: 60 }]) {
     await page.evaluate((camera) => {
       const h = (window as unknown as { harness: { map: { jumpTo: (camera: object) => void } } }).harness;
@@ -118,6 +120,14 @@ test('laser, roof selection and world anchors survive camera and mode changes', 
     });
     expect(Math.abs(size.width - initialLabelStyle.width)).toBeLessThan(1);
     expect(Math.abs(size.height - initialLabelStyle.height)).toBeLessThan(1);
+    const anchorError = await page.evaluate(`(() => {
+      const [a,b] = window.harness.state().points;
+      const p = window.harness.project((a.longitude+b.longitude)/2, (a.latitude+b.latitude)/2, (a.elevationMeters+b.elevationMeters)/2);
+      const el = document.querySelector('.measurement-label-anchor');
+      const m = new DOMMatrix(getComputedStyle(el).transform);
+      return Math.hypot(m.m41-p.x,m.m42-p.y);
+    })()`);
+    expect(anchorError).toBeLessThan(1);
   }
   await page.evaluate('window.harness.mode("2d")');
   await page.waitForFunction('window.harness.map.getPitch() === 0');
@@ -277,4 +287,73 @@ test('partial vertical edge measurements stay on the facade and hidden vertices 
   expect(points[1].elevationMeters - points[0].elevationMeters).toBeGreaterThan(29);
   expect(points[1].elevationMeters - points[0].elevationMeters).toBeLessThan(31);
   await page.screenshot({ path: 'test-results/measurement-vertical-edge.png' });
+});
+
+test('area roof polygon has a world-anchored checker fill, two labels and no camera-time uploads', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/tests/browser/measurement.html');
+  await page.waitForFunction('window.harness?.map.isStyleLoaded() && window.harness.map.queryTerrainElevation([106.7,10.8]) === 80');
+  await page.evaluate('window.harness.tool("area")');
+  // Three clicks + hover give a live polygon; fourth click fixes its corner.
+  for (const [index,[lng,lat]] of [[106.6998,10.7998],[106.7002,10.7998],[106.7002,10.8002],[106.6998,10.8002]].entries()) {
+    const p = await page.evaluate(([lng,lat]) => {
+      return (window as unknown as { harness: { project(x:number,y:number,z:number): {x:number;y:number} } }).harness.project(lng,lat,160);
+    }, [lng,lat]);
+    await page.mouse.move(p.x,p.y);
+    if (index === 0) await expect(page.locator('[data-area-label]')).toHaveCount(0);
+    if (index === 2) await expect(page.locator('[data-area-label]')).toHaveCount(2);
+    await page.mouse.click(p.x,p.y);
+  }
+  await page.evaluate('window.harness.done()');
+  const fixed = await page.evaluate('window.harness.state().points');
+  const metrics = await page.evaluate('window.harness.area()') as { valid:boolean; areaSquareMeters:number; perimeterMeters:number; calculationMode:string };
+  expect(metrics.valid).toBe(true);
+  expect(metrics.calculationMode).toBe('planar');
+  expect(metrics.areaSquareMeters).toBeGreaterThan(1900);
+  expect(metrics.areaSquareMeters).toBeLessThan(2000);
+  const labels = page.locator('[data-area-label] .measurement-distance-pill');
+  await expect(labels).toHaveCount(2);
+  await expect(labels.first()).toBeVisible();
+  await expect(labels.first()).toHaveCSS('transform','none');
+  await page.screenshot({path:'test-results/area-roof-checker.png'});
+  // Interior contains many orange and white cells, not only an outline/DOM label.
+  const checker = await page.evaluate(`(() => {
+    const gl = window.harness.map.getCanvas().getContext('webgl2');
+    const data = new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);
+    gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,data);
+    let orange=0, white=0;
+    for(let i=0;i<data.length;i+=4) {
+      if(data[i]>200 && data[i+1]>100 && data[i+1]<180 && data[i+2]<130) orange++;
+      if(data[i]>200 && data[i+1]>200 && data[i+2]>200) white++;
+    }
+    return {orange,white,error:gl.getError()};
+  })()` ) as {orange:number;white:number;error:number};
+  expect(checker.orange).toBeGreaterThan(500);
+  expect(checker.white).toBeGreaterThan(500);
+  expect(checker.error).toBe(0);
+  const text = await labels.allTextContents();
+  await page.evaluate(`new Promise(resolve => { window.harness.map.once('idle',resolve); window.harness.map.triggerRepaint(); })`);
+  expect(await page.evaluate('window.harness.profileMeasurementUploads()')).toBe(0);
+  for (const camera of [{zoom:17.6,pitch:70,bearing:65},{zoom:16.8,pitch:30,bearing:-45}]) {
+    await page.evaluate(camera => (window as unknown as {harness:{map:{jumpTo(value:object):void}}}).harness.map.jumpTo(camera),camera);
+    await expect(labels.first()).toBeVisible();
+    expect(await labels.allTextContents()).toEqual(text);
+    expect(await page.evaluate('window.harness.state().points')).toEqual(fixed);
+    await expect.poll(() => page.evaluate(`(() => {
+      const a=window.harness.area().areaAnchor;
+      const p=window.harness.project(a.longitude,a.latitude,a.elevationMeters);
+      const m=new DOMMatrix(getComputedStyle(document.querySelector('[data-area-label="area"]')).transform);
+      return Math.hypot(m.m41-p.x,m.m42-p.y);
+    })()`)).toBeLessThan(1);
+  }
+  await page.evaluate('window.harness.units("imperial")');
+  await expect(labels.first()).toContainText('ft²');
+  await expect(labels.nth(1)).toContainText(' ft');
+  await page.evaluate('window.harness.mode("2d")');
+  await expect(labels.first()).toBeVisible();
+  await page.evaluate('window.harness.mode("3d")');
+  expect(await page.evaluate('window.harness.state().points')).toEqual(fixed);
+  expect(errors).toEqual([]);
 });

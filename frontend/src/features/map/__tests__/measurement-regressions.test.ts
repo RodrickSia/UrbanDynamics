@@ -19,6 +19,15 @@ import { createMeasurementSegments } from '../utils/measurement';
 import { readTerrainElevation } from '../utils/terrainElevation';
 
 describe('3D measurement regressions', () => {
+  it('does not recreate active terrain when unrelated scene settings change', () => {
+    const map = {
+      getTerrain: () => ({ source: 'urban-terrain-dem', exaggeration: 1 }),
+      getSource: () => ({}), getLayer: () => ({}), setTerrain: vi.fn(),
+    } as unknown as MapLibreMap;
+    setTerrain(map, true);
+    setTerrain(map, true);
+    expect(map.setTerrain).not.toHaveBeenCalled();
+  });
   it('keeps local acquired DEM data usable while distant terrain tiles load', () => {
     const map = { getTerrain: () => ({source:'dem'}), isSourceLoaded: () => false,
       queryTerrainElevation: () => 12 } as unknown as MapLibreMap;

@@ -7,7 +7,7 @@ export const TERRAIN_TILEJSON_URL = 'https://tiles.mapterhorn.com/tilejson.json'
 
 export function setTerrain(map: MapLibreMap, enabled: boolean): void {
   if (!enabled) {
-    map.setTerrain(null);
+    if (map.getTerrain?.()) map.setTerrain(null);
     if (map.getLayer(HILLSHADE_LAYER_ID)) map.removeLayer(HILLSHADE_LAYER_ID);
     if (map.getSource(HILLSHADE_SOURCE_ID)) map.removeSource(HILLSHADE_SOURCE_ID);
     if (map.getSource(DEM_SOURCE_ID)) map.removeSource(DEM_SOURCE_ID);
@@ -48,5 +48,8 @@ export function setTerrain(map: MapLibreMap, enabled: boolean): void {
   }
 
   // Keep real-world elevation so buildings and measurement heights share one scale.
-  map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1 });
+  const terrain = map.getTerrain?.();
+  if (terrain?.source !== DEM_SOURCE_ID || terrain.exaggeration !== 1) {
+    map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1 });
+  }
 }
