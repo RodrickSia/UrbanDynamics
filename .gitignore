@@ -4,6 +4,7 @@
 !.env.example
 *.key
 *.pem
+etl/data/
 
 # Python
 __pycache__/
