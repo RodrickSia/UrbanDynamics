@@ -19,6 +19,7 @@ export interface UserLocation {
 
 export type MeasurementSurface = 'terrain' | 'building' | 'ground';
 export type MeasurementStatus = 'idle' | 'active' | 'complete';
+export type MeasurementKind = 'distance' | 'area';
 
 /** Geographic positions, altitude in metres; never screen coordinates. */
 export interface MeasurementEdge {
@@ -48,6 +49,9 @@ export interface MeasurementPoint {
 }
 
 export interface MeasurementState {
+  /** Omitted by older callers: distance, metric. */
+  kind?: MeasurementKind;
+  units?: 'metric' | 'imperial';
   status: MeasurementStatus;
   points: MeasurementPoint[];
   preview: MeasurementPoint | null;
