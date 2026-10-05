@@ -94,11 +94,124 @@ def download_population_raster(url: str, destination: Path) -> Path:
     return destination
 
 
-def run(settings: PopulationHCMCConfig = config) -> dict[int, Path]:
-    """Download all configured years and return paths keyed by year."""
+def _sql_string(value: str) -> str:
+    """Quote a string literal for the fixed DuckDB query templates below."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def fetch_overture_buildings(settings: PopulationHCMCConfig) -> Path:
+    """Query the pinned Overture release and save buildings inside HCMC."""
+    import duckdb
+
+    source = settings.overture
+    destination = source.buildings_output_path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists() and destination.stat().st_size > 0:
+        logger.info("Using existing Overture extract: %s", destination)
+        return destination
+
+    west, south, east, north = source.search_bbox
+    boundary_path = _sql_string(source.division_areas_path)
+    buildings_path = _sql_string(source.buildings_path)
+    city_name = _sql_string(source.city_name)
+    country_code = _sql_string(source.country_code)
+    boundary_filter = f"""
+        country = {country_code}
+        AND subtype = 'region'
+        AND names.primary = {city_name}
+        AND is_land = TRUE
+        AND bbox.xmin <= {east}
+        AND bbox.xmax >= {west}
+        AND bbox.ymin <= {north}
+        AND bbox.ymax >= {south}
+    """
+
+    logger.info(
+        "Finding the %s boundary in Overture release %s",
+        source.city_name,
+        source.release,
+    )
+    connection = duckdb.connect()
+    try:
+        connection.execute("LOAD httpfs")
+        connection.execute("LOAD spatial")
+        connection.execute("SET s3_region = 'us-west-2'")
+        connection.execute("SET enable_geoparquet_conversion = true")
+
+        boundary_count = connection.execute(
+            f"""
+            SELECT count(*)
+            FROM read_parquet({boundary_path}, hive_partitioning = true)
+            WHERE {boundary_filter}
+            """
+        ).fetchone()[0]
+        if not boundary_count:
+            raise RuntimeError(
+                f"No land boundary found for {source.city_name!r} "
+                f"in Overture release {source.release}"
+            )
+
+        temporary_path = destination.with_suffix(destination.suffix + ".part")
+        temporary_path.unlink(missing_ok=True)
+        logger.info(
+            "Querying Overture buildings in bbox %.4f,%.4f,%.4f,%.4f; "
+            "the city polygon applies the exact boundary filter",
+            west,
+            south,
+            east,
+            north,
+        )
+        connection.execute(
+            f"""
+            COPY (
+                WITH hcmc AS (
+                    SELECT ST_Union_Agg(geometry) AS geometry
+                    FROM read_parquet({boundary_path}, hive_partitioning = true)
+                    WHERE {boundary_filter}
+                ),
+                candidate_buildings AS (
+                    SELECT *
+                    FROM read_parquet(
+                        {buildings_path},
+                        hive_partitioning = true,
+                        union_by_name = true
+                    )
+                    WHERE bbox.xmin <= {east}
+                      AND bbox.xmax >= {west}
+                      AND bbox.ymin <= {north}
+                      AND bbox.ymax >= {south}
+                )
+                SELECT buildings.*
+                FROM candidate_buildings AS buildings
+                CROSS JOIN hcmc
+                WHERE ST_Intersects(buildings.geometry, hcmc.geometry)
+            ) TO {_sql_string(str(temporary_path))}
+            (FORMAT PARQUET, COMPRESSION ZSTD)
+            """
+        )
+        if not temporary_path.exists() or temporary_path.stat().st_size == 0:
+            raise RuntimeError("DuckDB did not produce an Overture buildings extract")
+        temporary_path.replace(destination)
+    except Exception:
+        logger.exception("Overture buildings extraction failed")
+        raise
+    finally:
+        connection.close()
+
+    logger.info(
+        "Saved HCMC Overture buildings to %s (%.1f MiB)",
+        destination,
+        destination.stat().st_size / (1024 * 1024),
+    )
+    return destination
+
+
+def run(settings: PopulationHCMCConfig = config) -> dict[str, object]:
+    """Download WorldPop rasters and the Overture HCMC buildings extract."""
     downloaded: dict[int, Path] = {}
     for year, source_url in sorted(settings.worldpop.population_paths.items()):
         destination = settings.download_dir / f"worldpop_hcmc_{year}.tif"
         logger.info("Processing WorldPop year %s", year)
         downloaded[year] = download_population_raster(str(source_url), destination)
-    return downloaded
+    overture_buildings = fetch_overture_buildings(settings)
+    return {"worldpop": downloaded, "overture_buildings": overture_buildings}

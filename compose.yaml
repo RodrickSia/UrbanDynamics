@@ -31,11 +31,15 @@ services:
   etl-population-hcmc:
     <<: *etl
     profiles: ["etl-population-hcmc"]
-    command: ["python", "-m", "src.main", "population_hcmc"]
+    environment:
+      ETL_PIPELINE: population_hcmc
+    command: ["run"]
     volumes:
       - ./etl/data:/app/data
 
   etl-rainwater:
     <<: *etl
     profiles: ["etl-rainwater"]
-    command: ["python", "-m", "src.main", "rainwater"]
+    environment:
+      ETL_PIPELINE: rainwater
+    command: ["run"]
