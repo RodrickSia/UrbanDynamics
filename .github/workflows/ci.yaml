@@ -80,3 +80,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build frontend image
         run: docker build --tag urbandynamics-frontend:ci ./frontend
+      - name: Verify frontend image contains the built application
+        run: |
+          docker run --rm --entrypoint sh urbandynamics-frontend:ci -ec '
+            test -s /usr/share/nginx/html/index.html
+            grep -q "/assets/" /usr/share/nginx/html/index.html
+            test -n "$(find /usr/share/nginx/html/assets -name "*.js" -print -quit)"
+            nginx -t
+          '
