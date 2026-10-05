@@ -81,12 +81,6 @@ jobs:
             docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
           }
 
-          require_all_inputs() {
-            test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
-            test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
-            test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before selecting all pipelines." >&2; exit 1; }
-          }
-
           run_pipeline() {
             local pipeline="$1"
             local service="etl-${pipeline//_/-}"
@@ -116,11 +110,24 @@ jobs:
               echo "::error::The all pipeline selection runs the complete ETL only; select stage all." >&2
               exit 1
             fi
-            require_all_inputs
             prepare_boundary
+            skipped=()
             for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
+              if [ "$pipeline" = flood_risk ] && { [ ! -s etl/data/inputs/rainfall_forecast.json ] || [ ! -s etl/data/inputs/rainfall_history.json ]; }; then
+                echo "::warning::Skipping flood_risk: rainfall forecast/history inputs are missing."
+                skipped+=(flood_risk)
+                continue
+              fi
+              if [ "$pipeline" = land_price ] && [ ! -s etl/data/review/land_price_reviewed.geojson ]; then
+                echo "::warning::Skipping land_price: reviewed land-price segments are missing."
+                skipped+=(land_price)
+                continue
+              fi
               run_pipeline "$pipeline"
             done
+            if [ "${#skipped[@]}" -gt 0 ]; then
+              printf 'Skipped pipelines due to missing inputs: %s\n' "${skipped[*]}" >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             service="etl-${ETL_PIPELINE//_/-}"
             docker compose --profile "$service" build "$service"
