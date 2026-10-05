@@ -5,6 +5,23 @@ on:
   pull_request:
 
 jobs:
+  deployment-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deployment environment generation
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+  compose-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build service images
+        run: |
+          cp .env.example .env
+          trap 'rm -f .env' EXIT
+          docker compose build
+
   database:
     runs-on: ubuntu-latest
     steps:
