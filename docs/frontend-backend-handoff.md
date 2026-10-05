@@ -2,6 +2,12 @@
 
 Tài liệu này ghi lại trạng thái frontend sau đợt cải tiến giao diện bản đồ và hợp đồng dữ liệu mà backend cần cung cấp. Mục tiêu là để backend có thể tích hợp từng nguồn dữ liệu mà không phải suy đoán hành vi của UI.
 
+## Map rendering and measurement maintenance — 2026-10-05
+
+Chỉ gỡ texture nhựa đường và vạch kẻ tùy chỉnh; giữ bề rộng ước lượng theo mét trong 2D/3D, với màu đường mặc định. Bề rộng giữ tỷ lệ theo zoom từ mức 16, không phải ranh giới khảo sát. Giữ LOD công trình xa, giới hạn cache tile và tối ưu upload hình học đo. Lớp đo được đưa lên trên basemap sau mỗi lần đổi style; đổi basemap/opacity không khởi động lại camera. Nhà thiếu chiều cao thật vẫn báo `Elevation unavailable`, không dùng chiều cao dựng minh họa để đo.
+
+Chi tiết dữ liệu, thông số, kiểm thử và giới hạn: [Map rendering and measurement](map-rendering-and-measurement.md). Không thay đổi API backend hoặc cấu hình triển khai.
+
 ## Context-aware 3D measurement — 2026-10-03
 
 - Sửa lỗi tại Bến Tre: `max_height = 0` được xử lý như thiếu chiều cao, tiếp tục tìm trường chiều cao dương khác; nếu không có thì dùng fallback hiển thị 12 m đã có. Đây chỉ là khối minh họa, không phải chiều cao thật. Picking vẫn trả `Elevation unavailable` và neo ở mặt đất khi thiếu chiều cao; không thay đổi terrain/exaggeration hoặc building có chiều cao hợp lệ.
@@ -301,3 +307,7 @@ Khi tích hợp, frontend cần thêm trạng thái loading/empty/error, hủy r
 - `frontend/src/features/map/motion.ts`: đăng ký GSAP React và chính sách reduced motion.
 
 Sau khi backend triển khai một endpoint, chỉ bật control tương ứng khi frontend đã xử lý đủ loading, empty, error và cleanup source/layer.
+
+## Area measurement update — 2026-10-05
+
+The frontend now includes a world-anchored Area tool alongside Distance. See [area-measurement.md](area-measurement.md) for calculation rules, units, state/rendering lifecycle, limitations and verification. No new endpoint is required. Building height/DEM availability remains the key data dependency; visual fallback heights are not valid measurements. The picking cache now retries missing elevation and refreshes candidates after the scene settles without expanding the tile cache/LOD budget.
