@@ -9,6 +9,16 @@ Configure `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` in
 `.env` (see `.env.example`). Containers connect to host `postgis` on port `5432`;
 host tools connect to `localhost` using `WAREHOUSE_FORWARD_PORT`.
 
+There is no shared default password. Set a unique `WAREHOUSE_PASSWORD` in your
+untracked `.env` before initializing PostGIS; an empty password is rejected by
+the database image for a fresh data directory. Frontend/backend-only builds do
+not require a warehouse password. CI creates an ephemeral random password.
+Changing `.env` does not rotate the password in an existing database volume:
+coordinate database credential rotation with its administrator and update the
+GitHub `production` environment secret to match. Never delete the volume to
+change a password. If the former committed default was used on a real server,
+treat it as exposed and rotate it before deploying again.
+
 The extension setup in `init/` and versioned migrations in `migrations/` run
 automatically when PostgreSQL initializes an empty data directory. For an
 existing database, start the PostGIS service and run
