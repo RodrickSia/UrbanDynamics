@@ -1,10 +1,15 @@
 import hashlib
+import logging
 import re
 from pathlib import Path
+
 import pdfplumber
 import numpy as np
+
 from src.shared.data_io import data_dir, download, read_json, file_provenance
-from .config import PDF_URL, EFFECTIVE_FROM
+from .config import EFFECTIVE_FROM, PDF_URL, PDF_URLS
+
+logger = logging.getLogger(__name__)
 
 def row_id(record):
     key = "|".join(str(record.get(k, "")).strip().upper() for k in ("ward", "road", "from", "to"))
@@ -40,7 +45,7 @@ def text_rows(page):
             output.append(cells)
     return output
 
-def parse_pdf(path):
+def parse_pdf(path, source_url=PDF_URL):
     records, rejected = [], []
     # Continue this ward across pages, stopping at the next explicitly titled ward.
     with pdfplumber.open(path) as pdf:
@@ -98,7 +103,7 @@ def parse_pdf(path):
     # Such rows remain explicitly review-required rather than asserted correct.
     if not records:
         raise ValueError("No supported An Khanh table extracted; use --source with reviewed JSON rows")
-    return {"source_url": PDF_URL, "effective_from": EFFECTIVE_FROM, "published_unit": "1000 VND/m2",
+    return {"source_url": source_url, "effective_from": EFFECTIVE_FROM, "published_unit": "1000 VND/m2",
             "records": records, "rejected": rejected}
 
 def run(source=None):
@@ -107,5 +112,20 @@ def run(source=None):
         rows = read_json(path) if path.suffix.lower() == ".json" else parse_pdf(path)
         return rows, [file_provenance(path,rows["source_url"])]
     path = data_dir() / "raw" / "land_price" / "official-annex-2026.pdf"
-    provenance = download(PDF_URL, path)
-    return parse_pdf(path), [provenance]
+    failures = []
+    for url in PDF_URLS:
+        try:
+            provenance = download(url, path)
+            return parse_pdf(path, url), [provenance]
+        except Exception as error:
+            failures.append(f"{url}: {error}")
+            if url != PDF_URLS[-1]:
+                logger.warning(
+                    "Land-price PDF download failed from %s; trying the next official source: %s",
+                    url,
+                    error,
+                )
+    raise RuntimeError(
+        "Could not download the 2026 HCMC land-price resolution from any official source. "
+        + " | ".join(failures)
+    )
