@@ -81,6 +81,31 @@ jobs:
             docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
           }
 
+          prepare_rainfall_inputs() {
+            local service=etl-flood-risk
+            echo "Refreshing the Open-Meteo rainfall forecast and creating history input if it is not cached."
+            docker compose --profile "$service" build "$service" || return 1
+            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py weather || return 1
+            [ -s etl/data/inputs/rainfall_forecast.json ] && [ -s etl/data/inputs/rainfall_history.json ]
+          }
+
+          prepare_land_price_candidates() {
+            if [ -s etl/data/review/land_price_reviewed.geojson ]; then
+              return 0
+            fi
+            local service=etl-land-price
+            docker compose --profile "$service" build "$service" || return 1
+            if [ ! -s etl/data/review/land_price_rows.json ]; then
+              echo "Downloading the official land-price annex and extracting candidate rows."
+              docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
+            fi
+            if [ ! -s etl/data/review/land_price_candidates.geojson ]; then
+              echo "Downloading OSM roads and creating unreviewed land-price segment candidates."
+              docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-land-road-review.py || return 1
+            fi
+            echo "Land-price candidates are in etl/data/review/land_price_candidates.geojson; human verification is required before publishing."
+          }
+
           run_pipeline() {
             local pipeline="$1"
             local service="etl-${pipeline//_/-}"
@@ -90,13 +115,13 @@ jobs:
                 prepare_boundary
                 arguments=(--boundary /app/data/inputs/thu_duc_boundary.geojson)
                 ;;
-              flood_risk)
-                test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
-                test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
+            flood_risk)
+                prepare_rainfall_inputs || { echo "Could not prepare rainfall inputs for flood_risk." >&2; exit 1; }
                 arguments=(--weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json)
                 ;;
               land_price)
-                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
+                prepare_land_price_candidates || { echo "Could not prepare land-price candidates." >&2; exit 1; }
+                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review etl/data/review/land_price_candidates.geojson, save approved segments as land_price_reviewed.geojson, then retry." >&2; exit 1; }
                 arguments=(--segments /app/data/review/land_price_reviewed.geojson)
                 ;;
             esac
@@ -111,15 +136,25 @@ jobs:
               exit 1
             fi
             prepare_boundary
+            rainfall_ready=true
+            if ! prepare_rainfall_inputs; then
+              rainfall_ready=false
+              echo "::warning::Could not fetch rainfall inputs; flood_risk will be skipped."
+            fi
+            land_price_review_ready=true
+            if ! prepare_land_price_candidates; then
+              land_price_review_ready=false
+              echo "::warning::Could not download/extract land-price candidates; land_price will be skipped."
+            fi
             skipped=()
             for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
-              if [ "$pipeline" = flood_risk ] && { [ ! -s etl/data/inputs/rainfall_forecast.json ] || [ ! -s etl/data/inputs/rainfall_history.json ]; }; then
-                echo "::warning::Skipping flood_risk: rainfall forecast/history inputs are missing."
+              if [ "$pipeline" = flood_risk ] && [ "$rainfall_ready" != true ]; then
+                echo "::warning::Skipping flood_risk: forecast/history inputs could not be prepared."
                 skipped+=(flood_risk)
                 continue
               fi
-              if [ "$pipeline" = land_price ] && [ ! -s etl/data/review/land_price_reviewed.geojson ]; then
-                echo "::warning::Skipping land_price: reviewed land-price segments are missing."
+              if [ "$pipeline" = land_price ] && { [ "$land_price_review_ready" != true ] || [ ! -s etl/data/review/land_price_reviewed.geojson ]; }; then
+                echo "::warning::Skipping land_price: reviewed segments are not available. Candidates are prepared for human review."
                 skipped+=(land_price)
                 continue
               fi
@@ -137,12 +172,12 @@ jobs:
                 set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
                 ;;
               flood_risk)
-                test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
-                test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
+                prepare_rainfall_inputs || { echo "Could not prepare rainfall inputs for flood_risk." >&2; exit 1; }
                 set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
                 ;;
               land_price)
-                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
+                prepare_land_price_candidates || { echo "Could not prepare land-price candidates." >&2; exit 1; }
+                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review etl/data/review/land_price_candidates.geojson, save approved segments as land_price_reviewed.geojson, then retry." >&2; exit 1; }
                 set -- --segments /app/data/review/land_price_reviewed.geojson
                 ;;
               *) set -- ;;

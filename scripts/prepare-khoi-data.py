@@ -15,7 +15,7 @@ if not ETL_SOURCE.is_dir():
 sys.path.insert(0, str(ETL_SOURCE))
 from shapely.geometry import mapping
 from src.pipelines.flood_history.transform import normalize
-from src.shared.data_io import data_dir, download, session, write_json
+from src.shared.data_io import data_dir, download, read_json, session, write_json
 from src.shared.spatial import geographic_frame
 
 
@@ -108,6 +108,21 @@ def weather():
             {"start_date": "2016-01-01", "end_date": "2025-12-31"},
         ),
     ):
+        output_path = data_dir() / "inputs" / f"rainfall_{kind}.json"
+        if kind == "history" and output_path.is_file():
+            try:
+                cached = read_json(output_path)
+                if cached.get("stations") and all(
+                    station.get("id") and station.get("hourly")
+                    for station in cached["stations"]
+                ):
+                    print(
+                        "history hours cached:",
+                        sum(len(station["hourly"]) for station in cached["stations"]),
+                    )
+                    continue
+            except (OSError, ValueError, TypeError, KeyError):
+                pass
         response = client.get(
             endpoint,
             params={
@@ -144,7 +159,7 @@ def weather():
             ],
             "limitations": "One weather grid point for local integration; Duy supplies production grid.",
         }
-        write_json(data_dir() / "inputs" / f"rainfall_{kind}.json", document)
+        write_json(output_path, document)
         print(kind, "hours:", len(hours))
 
 

@@ -46,7 +46,12 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         elif pipeline_name == "flood_risk":
             extractor.run(options.weather_input, options.history_input)
         elif pipeline_name == "land_price":
-            extractor.run(options.source)
+            from src.shared.data_io import data_dir, write_json
+
+            rows, _provenance = extractor.run(options.source)
+            output = data_dir() / "review" / "land_price_rows.json"
+            write_json(output, rows)
+            logging.getLogger(__name__).info("Extracted land-price rows to %s", output)
         else:
             extractor.run()
         return
