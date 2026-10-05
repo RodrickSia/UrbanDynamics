@@ -5,6 +5,13 @@ on:
   pull_request:
 
 jobs:
+  deployment-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deployment environment generation
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
   compose-build:
     runs-on: ubuntu-latest
     steps:
@@ -12,4 +19,64 @@ jobs:
       - name: Test deployment environment generation
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Build service images
-        run: docker compose build
+        run: |
+          cp .env.example .env
+          trap 'rm -f .env' EXIT
+          docker compose build
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build PostGIS image
+        run: docker build --tag urbandynamics-postgis-ci --file infra/warehouse/Dockerfile infra/warehouse
+      - name: Start a fresh database
+        run: docker run --detach --name postgis-ci --env POSTGRES_DB=urbandynamics_ci --env POSTGRES_USER=ci --env POSTGRES_PASSWORD=ci-only urbandynamics-postgis-ci
+      - name: Wait for database initialization
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker exec postgis-ci pg_isready --host 127.0.0.1 --username ci --dbname urbandynamics_ci; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs postgis-ci
+          exit 1
+      - name: Verify migrations are tracked and repeatable
+        run: |
+          docker exec postgis-ci /usr/local/bin/migrate-warehouse
+          docker exec postgis-ci psql --username ci --dbname urbandynamics_ci --set ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+              RAISE EXCEPTION 'postgis extension is missing';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis_raster') THEN
+              RAISE EXCEPTION 'postgis_raster extension is missing';
+            END IF;
+            IF to_regclass('population.population_raster') IS NULL THEN
+              RAISE EXCEPTION 'population raster table is missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '02-population-raster.sql') <> 1 THEN
+              RAISE EXCEPTION 'population migration was not tracked exactly once';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Remove test database container
+        if: always()
+        run: docker rm --force postgis-ci || true
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build --tag urbandynamics-backend:ci ./backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend image
+        run: docker build --tag urbandynamics-frontend:ci ./frontend

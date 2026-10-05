@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  backend:
     # Matches gpu156's self-hosted and Linux labels (not its runner name).
     runs-on: [self-hosted, linux]
     timeout-minutes: 20
@@ -26,15 +26,41 @@ jobs:
         run: python3 scripts/create-deploy-env.py
       - name: Validate Compose configuration
         run: docker compose --env-file .env config --quiet
-      - name: Deploy Compose stack
-        run: docker compose --env-file .env up -d --build --wait --wait-timeout 180 backend frontend
-      - name: Verify service responses
+      - name: Deploy backend
+        run: docker compose --env-file .env up -d --build --wait --wait-timeout 180 backend
+      - name: Verify backend response
         shell: bash
         env:
-          FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
           BACKEND_PORT: ${{ vars.BACKEND_PORT || '51874' }}
         run: |
           curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 "http://127.0.0.1:${BACKEND_PORT}/health"
+      - name: Remove generated secret file
+        if: always()
+        run: python3 -c "from pathlib import Path; Path('.env').unlink(missing_ok=True)"
+
+  frontend:
+    needs: backend
+    # Matches gpu156's self-hosted and Linux labels (not its runner name).
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create deployment environment from Actions secrets
+        env:
+          MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}
+          MLAI_BACKEND_GOONG: ${{ secrets.MLAI_BACKEND_GOONG }}
+          FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
+          BACKEND_PORT: ${{ vars.BACKEND_PORT || '51874' }}
+        run: python3 scripts/create-deploy-env.py
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env config --quiet
+      - name: Deploy frontend
+        run: docker compose --env-file .env up -d --build --wait --wait-timeout 180 frontend
+      - name: Verify frontend response and policy
+        shell: bash
+        env:
+          FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
+        run: |
           curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 --output /dev/null "http://127.0.0.1:${FRONTEND_PORT}/"
           curl --fail --silent --show-error --max-time 10 --head "http://127.0.0.1:${FRONTEND_PORT}/" | grep -iE '^content-security-policy:.*connect-src[^;]*https://tiles[.]mapterhorn[.]com([ ;]|$)' > /dev/null
       - name: Remove generated secret file

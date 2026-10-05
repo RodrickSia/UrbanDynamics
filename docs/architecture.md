@@ -7,4 +7,4 @@ Frontend  ──HTTP──>  Backend  ──read──>  Warehouse
                                   ETL  ──write──>
 ```
 
-The warehouse engine, ETL framework, and scheduling mechanism are open decisions. Keep their configuration behind environment variables and service boundaries so they can be selected without moving application code.
+PostGIS is the warehouse. It stores relational data and tiled raster data. Database schema changes live in versioned SQL migrations under `infra/warehouse/migrations/`, while the ETL service loads population rasters into the warehouse. CI validates database, backend, and frontend builds independently; database migration deployment is separate from application deployment because it changes persistent data.
