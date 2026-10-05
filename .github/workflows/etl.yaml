@@ -1,0 +1,43 @@
+name: Run ETL pipelines
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: etl-population-hcmc
+  cancel-in-progress: false
+
+jobs:
+  population_hcmc:
+    name: HCMC population
+    environment: production
+    env:
+      WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}
+      WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
+      WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
+    # This runner needs Docker, database access, and persistent space for WorldPop files.
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Keep ignored etl/data rasters so subsequent runs can reuse downloads.
+          clean: false
+      - name: Run population pipeline
+        run: |
+          set -eu
+          test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
+          created_env=false
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            created_env=true
+          fi
+          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
+          if ! docker compose ps --status running --services | grep -Fxq postgis; then
+            echo "The PostGIS service must be running and migrated before running ETL." >&2
+            exit 1
+          fi
+          docker compose --profile etl-population-hcmc build etl-population-hcmc
+          docker compose --profile etl-population-hcmc run --rm etl-population-hcmc run --stage all

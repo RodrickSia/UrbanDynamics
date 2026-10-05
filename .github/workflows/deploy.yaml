@@ -3,11 +3,60 @@ name: Deploy
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: urbandynamics-deploy
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    # Configure this label to match the private self-hosted runner.
+  backend:
+    # Matches gpu156's self-hosted and Linux labels (not its runner name).
     runs-on: [self-hosted, linux]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy Compose stack
-        run: docker compose up -d --build
+      - name: Create deployment environment from Actions secrets
+        env:
+          MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}
+          MLAI_BACKEND_GOONG: ${{ secrets.MLAI_BACKEND_GOONG }}
+        run: python3 scripts/create-deploy-env.py
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env config --quiet
+      - name: Deploy backend
+        run: docker compose --env-file .env up -d --build --wait --wait-timeout 180 backend
+      - name: Verify backend response
+        run: |
+          docker compose --env-file .env exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=10)"
+      - name: Remove generated secret file
+        if: always()
+        run: python3 -c "from pathlib import Path; Path('.env').unlink(missing_ok=True)"
+
+  frontend:
+    needs: backend
+    # Matches gpu156's self-hosted and Linux labels (not its runner name).
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create deployment environment from Actions secrets
+        env:
+          MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}
+          MLAI_BACKEND_GOONG: ${{ secrets.MLAI_BACKEND_GOONG }}
+          FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
+        run: python3 scripts/create-deploy-env.py
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env config --quiet
+      - name: Deploy frontend
+        run: docker compose --env-file .env up -d --build --wait --wait-timeout 180 frontend
+      - name: Verify frontend response and policy
+        shell: bash
+        env:
+          FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 --output /dev/null "http://127.0.0.1:${FRONTEND_PORT}/"
+          curl --fail --silent --show-error --max-time 10 --head "http://127.0.0.1:${FRONTEND_PORT}/" | grep -iE '^content-security-policy:.*connect-src[^;]*https://tiles[.]mapterhorn[.]com([ ;]|$)' > /dev/null
+      - name: Remove generated secret file
+        if: always()
+        run: python3 -c "from pathlib import Path; Path('.env').unlink(missing_ok=True)"

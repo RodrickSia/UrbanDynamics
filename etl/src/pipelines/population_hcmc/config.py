@@ -4,7 +4,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, HttpUrl
 
-
 WORLDPOP_YEARS = tuple(range(2015, 2031))
 WORLDPOP_URL_TEMPLATE = (
     "https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/"
@@ -30,6 +29,10 @@ class WorldPop(BaseModel):
 class PopulationHCMCConfig(BaseModel):
     worldpop: WorldPop = Field(default_factory=WorldPop)
     download_dir: Path = Path("data/population_hcmc/worldpop")
+    database_schema: str = "population"
+    raster_table: str = "population_raster"
+    raster_tile_width: int = Field(default=256, gt=0)
+    raster_tile_height: int = Field(default=256, gt=0)
 
 
 config = PopulationHCMCConfig()

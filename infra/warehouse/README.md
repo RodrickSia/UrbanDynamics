@@ -1,3 +1,37 @@
-# Warehouse
+# PostGIS warehouse
 
-Place warehouse schema definitions and migrations here after selecting the warehouse technology. The warehouse is not provisioned by the initial Compose file because that technology has not been chosen.
+Compose builds the database image from this directory. It uses the PostGIS
+PostgreSQL 17 image, enables the `postgis` and `postgis_raster` extensions on
+first initialization, and stores database files in the persistent `postgis_data`
+volume. Versioned SQL migrations are recorded in `public.schema_migrations`.
+
+Configure `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` in
+`.env` (see `.env.example`). PostGIS is available only to containers on the
+Compose network at host `postgis`, port `5432`; Compose does not publish the
+database port to the host.
+
+There is no shared default password. Set a unique `WAREHOUSE_PASSWORD` in your
+untracked `.env` before initializing PostGIS; an empty password is rejected by
+the database image for a fresh data directory. Frontend/backend-only builds do
+not require a warehouse password. CI creates an ephemeral random password.
+Changing `.env` does not rotate the password in an existing database volume:
+coordinate database credential rotation with its administrator and update the
+GitHub `production` environment secret to match. Never delete the volume to
+change a password. If the former committed default was used on a real server,
+treat it as exposed and rotate it before deploying again.
+
+The extension setup in `init/` and versioned migrations in `migrations/` run
+automatically when PostgreSQL initializes an empty data directory. For an
+existing database, start the PostGIS service and run
+`WAREHOUSE_MIGRATION_TARGET=compose sh infra/warehouse/scripts/migrate.sh`.
+The script applies each numbered migration once and records it in the migration
+ledger. The `Deploy database` GitHub Actions workflow starts the PostGIS Compose
+service if needed, then runs the same migration script. It does not force an
+image rebuild; existing database files stay in the persistent `postgis_data`
+volume. Configure the GitHub `production` environment
+with required reviewers and a `WAREHOUSE_PASSWORD` secret to gate this workflow.
+Set `WAREHOUSE_DATABASE` and `WAREHOUSE_USER` as environment variables if their
+names differ from the defaults. Keep each migration transactional; the runner
+applies each SQL file and its ledger entry in one transaction.
+Database CI builds a fresh PostGIS image, starts an empty database, and checks
+that the extensions, population raster table, and migration ledger are present.
