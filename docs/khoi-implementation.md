@@ -55,11 +55,11 @@ docker compose --profile etl-land-price run --rm etl-land-price run --stage all 
 
 Mọi ETL service kết nối tới `postgis:5432` trong mạng Compose. Khi chạy local mà chưa cấu hình `WAREHOUSE_PASSWORD`, pipeline lưu snapshot GeoJSON trong `etl/data/layers/` để kiểm tra ngoại tuyến.
 
-## Hợp đồng dữ liệu mưa với Duy
+## Đầu vào mưa cho flood-risk
 
-Hai tệp `etl/data/inputs/rainwater_forecast.json` và `rainwater_history.json` có `source_url`, `stations`; dự báo có thêm `issued_at`. Mỗi station gồm `id`, `longitude`, `latitude`, `hourly: [{time, precipitation_mm}]`. Thời gian ISO 8601 phải có múi giờ; station ID phải khớp giữa lịch sử và dự báo. Chỉ dùng lịch sử trước thời điểm phát hành dự báo.
+Hai tệp `etl/data/inputs/rainfall_forecast.json` và `rainfall_history.json` có `source_url`, `stations`; dự báo có thêm `issued_at`. Mỗi station gồm `id`, `longitude`, `latitude`, `hourly: [{time, precipitation_mm}]`. Thời gian ISO 8601 phải có múi giờ; station ID phải khớp giữa lịch sử và dự báo. Chỉ dùng lịch sử trước thời điểm phát hành dự báo.
 
-Mẫu local hiện chỉ có một điểm lưới Open-Meteo và lịch sử 2016–2025. Cần bàn giao lưới đầy đủ từ Duy trước khi dùng cảnh báo toàn Thủ Đức. API trả khoảng cách đến station, nguồn, ngưỡng và `stale` khi dự báo hết hạn.
+Mẫu local hiện chỉ có một điểm lưới Open-Meteo và lịch sử 2016–2025. Đầu vào hiện là một điểm lưới và chưa đủ để đại diện toàn Thủ Đức. API trả khoảng cách đến station, nguồn, ngưỡng và `stale` khi dự báo hết hạn.
 
 ## API cho frontend
 

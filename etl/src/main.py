@@ -5,10 +5,8 @@ import importlib
 import logging
 import os
 
-
 PIPELINES = (
     "population_hcmc",
-    "rainwater",
     "flood_history",
     "flood_satellite",
     "flood_risk",
@@ -39,9 +37,12 @@ def _run(pipeline_name: str, stage: str, options) -> None:
             extractor.run(options.source)
         elif pipeline_name == "flood_satellite":
             from src.shared.spatial import read_boundary
+
             if not options.boundary:
                 raise ValueError("flood_satellite extract requires --boundary")
-            extractor.run(read_boundary(options.boundary), options.catalog_only, options.limit)
+            extractor.run(
+                read_boundary(options.boundary), options.catalog_only, options.limit
+            )
         elif pipeline_name == "flood_risk":
             extractor.run(options.weather_input, options.history_input)
         elif pipeline_name == "land_price":
@@ -59,7 +60,9 @@ def _run(pipeline_name: str, stage: str, options) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run an UrbanDynamics ETL pipeline.")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    run_parser = subparsers.add_parser("run", help="Run a pipeline or one of its stages")
+    run_parser = subparsers.add_parser(
+        "run", help="Run a pipeline or one of its stages"
+    )
     run_parser.add_argument(
         "pipeline",
         nargs="?",
@@ -67,13 +70,29 @@ def main() -> None:
         default=os.getenv("ETL_PIPELINE"),
         help="Pipeline name (defaults to ETL_PIPELINE when set)",
     )
-    run_parser.add_argument("--source", help="Optional source file for supported pipelines")
-    run_parser.add_argument("--boundary", help="WGS84 polygon file for spatial flood pipelines")
-    run_parser.add_argument("--segments", help="Reviewed land-price road-segment GeoJSON")
-    run_parser.add_argument("--weather-input", help="Rainfall forecast JSON for flood-risk")
-    run_parser.add_argument("--history-input", help="Rainfall history JSON for flood-risk")
-    run_parser.add_argument("--catalog-only", action="store_true", help="Load satellite catalog footprints only")
-    run_parser.add_argument("--limit", type=int, default=None, help="Maximum satellite items to process")
+    run_parser.add_argument(
+        "--source", help="Optional source file for supported pipelines"
+    )
+    run_parser.add_argument(
+        "--boundary", help="WGS84 polygon file for spatial flood pipelines"
+    )
+    run_parser.add_argument(
+        "--segments", help="Reviewed land-price road-segment GeoJSON"
+    )
+    run_parser.add_argument(
+        "--weather-input", help="Rainfall forecast JSON for flood-risk"
+    )
+    run_parser.add_argument(
+        "--history-input", help="Rainfall history JSON for flood-risk"
+    )
+    run_parser.add_argument(
+        "--catalog-only",
+        action="store_true",
+        help="Load satellite catalog footprints only",
+    )
+    run_parser.add_argument(
+        "--limit", type=int, default=None, help="Maximum satellite items to process"
+    )
     run_parser.add_argument(
         "--stage",
         choices=STAGES,

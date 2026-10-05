@@ -28,10 +28,10 @@ def run(rain_mm, radius_m, polygon=None):
         ]
     directory = repository.directory() / "inputs"
     forecast = json.loads(
-        (directory / "rainwater_forecast.json").read_text(encoding="utf-8")
+        (directory / "rainfall_forecast.json").read_text(encoding="utf-8")
     )
     history = json.loads(
-        (directory / "rainwater_history.json").read_text(encoding="utf-8")
+        (directory / "rainfall_history.json").read_text(encoding="utf-8")
     )
     return {
         "type": "FeatureCollection",

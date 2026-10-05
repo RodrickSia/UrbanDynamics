@@ -71,17 +71,6 @@ services:
       postgis:
         condition: service_healthy
 
-  etl-rainwater:
-    <<: *etl
-    profiles: ["etl-rainwater"]
-    environment:
-      <<: *warehouse-env
-      ETL_PIPELINE: rainwater
-    command: ["run"]
-    depends_on:
-      postgis:
-        condition: service_healthy
-
   etl-flood-history:
     <<: *etl
     profiles: ["etl-flood-history"]

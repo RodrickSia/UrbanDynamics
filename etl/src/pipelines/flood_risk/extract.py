@@ -10,6 +10,6 @@ def run(weather_input=None, history_input=None):
         floods = read_json(directory / "layers" / "flood_history.geojson")
     return (
         floods,
-        read_json(weather_input or directory / "inputs" / "rainwater_forecast.json"),
-        read_json(history_input or directory / "inputs" / "rainwater_history.json"),
+        read_json(weather_input or directory / "inputs" / "rainfall_forecast.json"),
+        read_json(history_input or directory / "inputs" / "rainfall_history.json"),
     )

@@ -23,10 +23,10 @@ jobs:
           cp .env.example .env
           trap 'rm -f .env' EXIT
           docker compose \
-            --profile etl-population-hcmc --profile etl-rainwater \
+            --profile etl-population-hcmc \
             --profile etl-flood-history --profile etl-flood-satellite \
             --profile etl-flood-risk --profile etl-land-price \
-            build backend frontend etl-population-hcmc etl-rainwater \
+            build backend frontend etl-population-hcmc \
             etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price
 
   database:

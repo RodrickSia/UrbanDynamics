@@ -49,5 +49,4 @@ reads a previously published `flood_history` layer and forecast/history JSON
 from `etl/data/inputs/`. Land-price publication requires reviewed road-segment
 geometry in `etl/data/review/land_price_reviewed.geojson`.
 
-Rainwater is listed in the CLI and manual workflow, but that pipeline is still
-unfinished. Do not treat it as a working extraction or warehouse loader yet.
+Flood-risk requires forecast and history rainfall files under `etl/data/inputs/`; the repository does not provide a standalone rainfall pipeline.

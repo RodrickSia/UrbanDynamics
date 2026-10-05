@@ -10,7 +10,6 @@ on:
         default: population_hcmc
         options:
           - population_hcmc
-          - rainwater
           - flood_history
           - flood_satellite
           - flood_risk
@@ -76,9 +75,9 @@ jobs:
               set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
               ;;
             flood_risk)
-              test -s etl/data/inputs/rainwater_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
-              test -s etl/data/inputs/rainwater_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
-              set -- --weather-input /app/data/inputs/rainwater_forecast.json --history-input /app/data/inputs/rainwater_history.json
+              test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
+              test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
+              set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
               ;;
             land_price)
               test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
