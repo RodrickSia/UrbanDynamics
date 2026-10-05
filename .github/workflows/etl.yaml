@@ -62,6 +62,13 @@ jobs:
             echo "The PostGIS service must be running and migrated before running ETL." >&2
             exit 1
           fi
+          migration_query="SELECT to_regclass('public.layer_snapshots') IS NOT NULL AND to_regclass('public.layer_features') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '001_khoi_layers.sql')"
+          if ! docker compose exec -T postgis sh -c \
+            'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"' \
+            sh "$migration_query" | grep -Fxq t; then
+            echo "::error::The vector-layer migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+            exit 1
+          fi
           service="etl-${ETL_PIPELINE//_/-}"
           profile="$service"
           docker compose --profile "$profile" build "$service"
