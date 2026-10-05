@@ -6,8 +6,9 @@ first initialization, and stores database files in the persistent `postgis_data`
 volume. Versioned SQL migrations are recorded in `public.schema_migrations`.
 
 Configure `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` in
-`.env` (see `.env.example`). Containers connect to host `postgis` on port `5432`;
-host tools connect to `localhost` using `WAREHOUSE_FORWARD_PORT`.
+`.env` (see `.env.example`). PostGIS is available only to containers on the
+Compose network at host `postgis`, port `5432`; Compose does not publish the
+database port to the host.
 
 There is no shared default password. Set a unique `WAREHOUSE_PASSWORD` in your
 untracked `.env` before initializing PostGIS; an empty password is rejected by
@@ -32,6 +33,5 @@ with required reviewers and a `WAREHOUSE_PASSWORD` secret to gate this workflow.
 Set `WAREHOUSE_DATABASE` and `WAREHOUSE_USER` as environment variables if their
 names differ from the defaults. Keep each migration transactional; the runner
 applies each SQL file and its ledger entry in one transaction.
-
 Database CI builds a fresh PostGIS image, starts an empty database, and checks
 that the extensions, population raster table, and migration ledger are present.

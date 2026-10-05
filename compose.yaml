@@ -21,8 +21,6 @@ services:
       POSTGRES_DB: ${WAREHOUSE_DATABASE:-urbandynamics}
       POSTGRES_USER: ${WAREHOUSE_USER:-urbandynamics}
       POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD:-}
-    ports:
-      - "127.0.0.1:${WAREHOUSE_FORWARD_PORT:-5432}:5432"
     volumes:
       - postgis_data:/var/lib/postgresql/data
     healthcheck:
@@ -37,8 +35,6 @@ services:
       context: ./backend
     env_file:
       - .env
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
@@ -50,7 +46,7 @@ services:
       context: ./frontend
       args:
         VITE_GOONG_MAPTILES_KEY: ${VITE_GOONG_MAPTILES_KEY:-}
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:

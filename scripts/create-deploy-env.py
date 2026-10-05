@@ -18,16 +18,11 @@ def deployment_values(environ):
             raise ValueError(f"{secret} must contain a non-empty, single-line API key")
         values[target] = value
 
-    ports = {}
-    for name, default in (("FRONTEND_PORT", "51873"), ("BACKEND_PORT", "51874")):
-        value = environ.get(name, default)
-        if not value.isascii() or not value.isdecimal() or not 1024 <= int(value) <= 65535:
-            raise ValueError(f"{name} must be a port between 1024 and 65535")
-        ports[name] = int(value)
-        values[name] = f"127.0.0.1:{int(value)}"
-    if ports["FRONTEND_PORT"] == ports["BACKEND_PORT"]:
-        raise ValueError("Frontend and backend must use different ports")
-    values["VITE_API_BASE_URL"] = f"http://127.0.0.1:{ports['BACKEND_PORT']}"
+    value = environ.get("FRONTEND_PORT", "51873")
+    if not value.isascii() or not value.isdecimal() or not 1024 <= int(value) <= 65535:
+        raise ValueError("FRONTEND_PORT must be a port between 1024 and 65535")
+    values["FRONTEND_PORT"] = f"127.0.0.1:{int(value)}"
+    values["VITE_API_BASE_URL"] = ""
     return values
 
 

@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:8000';
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? '';
 
 export const FUTURE_API_ENDPOINTS = {
   autocomplete: '/api/v1/maps/autocomplete',

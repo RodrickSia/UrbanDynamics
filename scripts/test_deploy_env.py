@@ -22,19 +22,19 @@ class DeploymentEnvironmentTests(unittest.TestCase):
             "MLAI_BACKEND_GOONG": "test-private-key",
         }
 
-    def test_maps_secrets_and_uses_private_high_ports(self):
+    def test_maps_secrets_and_uses_frontend_host_port_only(self):
         values = deploy_env.deployment_values(self.secrets)
         self.assertEqual(values["VITE_GOONG_MAPTILES_KEY"], "test-public-key")
         self.assertEqual(values["GOONG_API_KEY"], "test-private-key")
         self.assertNotIn("test-private-key", str({k: v for k, v in values.items() if k.startswith("VITE_")}))
         self.assertEqual(values["FRONTEND_PORT"], "127.0.0.1:51873")
-        self.assertEqual(values["BACKEND_PORT"], "127.0.0.1:51874")
-        self.assertEqual(values["VITE_API_BASE_URL"], "http://127.0.0.1:51874")
+        self.assertNotIn("BACKEND_PORT", values)
+        self.assertEqual(values["VITE_API_BASE_URL"], "")
 
     def test_accepts_port_overrides(self):
-        values = deploy_env.deployment_values({**self.secrets, "BACKEND_PORT": "52102"})
-        self.assertEqual(values["BACKEND_PORT"], "127.0.0.1:52102")
-        self.assertEqual(values["VITE_API_BASE_URL"], "http://127.0.0.1:52102")
+        values = deploy_env.deployment_values({**self.secrets, "FRONTEND_PORT": "52102"})
+        self.assertEqual(values["FRONTEND_PORT"], "127.0.0.1:52102")
+        self.assertEqual(values["VITE_API_BASE_URL"], "")
 
     def test_rejects_missing_or_multiline_secrets_without_disclosing_them(self):
         for value in ("", "  ", "sensitive\nINJECTED=1", "sensitive\r", "sensitive\x00"):
@@ -43,7 +43,7 @@ class DeploymentEnvironmentTests(unittest.TestCase):
             self.assertNotIn("sensitive", str(caught.exception))
 
     def test_rejects_invalid_or_duplicate_ports(self):
-        for port in ("0", "80", "65536", "51874", "127.0.0.1:51873", "$(command)"):
+        for port in ("0", "80", "65536", "127.0.0.1:51873", "$(command)"):
             with self.subTest(port=port), self.assertRaises(ValueError):
                 deploy_env.deployment_values({**self.secrets, "FRONTEND_PORT": port})
 

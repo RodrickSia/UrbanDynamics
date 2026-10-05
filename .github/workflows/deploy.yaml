@@ -21,19 +21,14 @@ jobs:
         env:
           MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}
           MLAI_BACKEND_GOONG: ${{ secrets.MLAI_BACKEND_GOONG }}
-          FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
-          BACKEND_PORT: ${{ vars.BACKEND_PORT || '51874' }}
         run: python3 scripts/create-deploy-env.py
       - name: Validate Compose configuration
         run: docker compose --env-file .env config --quiet
       - name: Deploy backend
         run: docker compose --env-file .env up -d --build --wait --wait-timeout 180 backend
       - name: Verify backend response
-        shell: bash
-        env:
-          BACKEND_PORT: ${{ vars.BACKEND_PORT || '51874' }}
         run: |
-          curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 "http://127.0.0.1:${BACKEND_PORT}/health"
+          docker compose --env-file .env exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=10)"
       - name: Remove generated secret file
         if: always()
         run: python3 -c "from pathlib import Path; Path('.env').unlink(missing_ok=True)"
@@ -50,7 +45,6 @@ jobs:
           MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}
           MLAI_BACKEND_GOONG: ${{ secrets.MLAI_BACKEND_GOONG }}
           FRONTEND_PORT: ${{ vars.FRONTEND_PORT || '51873' }}
-          BACKEND_PORT: ${{ vars.BACKEND_PORT || '51874' }}
         run: python3 scripts/create-deploy-env.py
       - name: Validate Compose configuration
         run: docker compose --env-file .env config --quiet
