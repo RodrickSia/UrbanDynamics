@@ -31,7 +31,11 @@ jobs:
       - name: Build PostGIS image
         run: docker build --tag urbandynamics-postgis-ci --file infra/warehouse/Dockerfile infra/warehouse
       - name: Start a fresh database
-        run: docker run --detach --name postgis-ci --env POSTGRES_DB=urbandynamics_ci --env POSTGRES_USER=ci --env POSTGRES_PASSWORD=ci-only urbandynamics-postgis-ci
+        run: |
+          POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$POSTGRES_PASSWORD"
+          export POSTGRES_PASSWORD
+          docker run --detach --name postgis-ci --env POSTGRES_DB=urbandynamics_ci --env POSTGRES_USER=ci --env POSTGRES_PASSWORD urbandynamics-postgis-ci
       - name: Wait for database initialization
         run: |
           for attempt in $(seq 1 30); do
