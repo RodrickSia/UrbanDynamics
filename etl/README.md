@@ -38,8 +38,13 @@ python -m src.main run flood_history --stage all \
 ```
 
 The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
-stage choices. `transform` and `load` are not yet supported as independent CLI
-stages; run the full pipeline to execute those steps.
+stage choices. Its **all** pipeline choice runs the full pipelines sequentially
+in this order: population, flood history, flood satellite, flood risk, and land
+price. It requires flood-risk rainfall inputs and reviewed land-price segments
+before starting; the boundary is prepared automatically when it is missing.
+Selecting the all-pipelines option requires stage `all`. `transform` and `load`
+are not supported as independent CLI stages; run the full pipeline to execute
+those steps.
 
 ## Warehouse and data
 

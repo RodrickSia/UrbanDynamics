@@ -9,6 +9,7 @@ on:
         required: true
         default: population_hcmc
         options:
+          - all
           - population_hcmc
           - flood_history
           - flood_satellite
@@ -27,7 +28,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: etl-${{ inputs.pipeline }}
+  group: urbandynamics-etl
   cancel-in-progress: false
 
 jobs:
@@ -69,33 +70,75 @@ jobs:
             echo "::error::The vector-layer migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
             exit 1
           fi
-          service="etl-${ETL_PIPELINE//_/-}"
-          profile="$service"
-          docker compose --profile "$profile" build "$service"
-          case "$ETL_PIPELINE" in
-            flood_history)
-              if [ ! -s etl/data/inputs/thu_duc_boundary.geojson ]; then
-                echo "Preparing the Thu Duc boundary from the published DataSuds boundary dataset."
-                docker compose --profile "$profile" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
-              fi
-              set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
-              ;;
-            flood_satellite)
-              if [ ! -s etl/data/inputs/thu_duc_boundary.geojson ]; then
-                echo "Preparing the Thu Duc boundary from the published DataSuds boundary dataset."
-                docker compose --profile "$profile" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
-              fi
-              set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
-              ;;
-            flood_risk)
-              test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
-              test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
-              set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
-              ;;
-            land_price)
-              test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
-              set -- --segments /app/data/review/land_price_reviewed.geojson
-              ;;
-            *) set -- ;;
-          esac
-          docker compose --profile "$profile" run --rm "$service" run --stage "$ETL_STAGE" "$@"
+
+          prepare_boundary() {
+            if [ -s etl/data/inputs/thu_duc_boundary.geojson ]; then
+              return
+            fi
+            local service=etl-flood-history
+            echo "Preparing the Thu Duc boundary from the published DataSuds boundary dataset."
+            docker compose --profile "$service" build "$service"
+            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
+          }
+
+          require_all_inputs() {
+            test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
+            test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
+            test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before selecting all pipelines." >&2; exit 1; }
+          }
+
+          run_pipeline() {
+            local pipeline="$1"
+            local service="etl-${pipeline//_/-}"
+            local -a arguments=()
+            case "$pipeline" in
+              flood_history|flood_satellite)
+                prepare_boundary
+                arguments=(--boundary /app/data/inputs/thu_duc_boundary.geojson)
+                ;;
+              flood_risk)
+                test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
+                test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
+                arguments=(--weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json)
+                ;;
+              land_price)
+                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
+                arguments=(--segments /app/data/review/land_price_reviewed.geojson)
+                ;;
+            esac
+            docker compose --profile "$service" build "$service"
+            echo "Running pipeline: $pipeline"
+            docker compose --profile "$service" run --rm "$service" run --stage all "${arguments[@]}"
+          }
+
+          if [ "$ETL_PIPELINE" = all ]; then
+            if [ "$ETL_STAGE" != all ]; then
+              echo "::error::The all pipeline selection runs the complete ETL only; select stage all." >&2
+              exit 1
+            fi
+            require_all_inputs
+            prepare_boundary
+            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
+              run_pipeline "$pipeline"
+            done
+          else
+            service="etl-${ETL_PIPELINE//_/-}"
+            docker compose --profile "$service" build "$service"
+            case "$ETL_PIPELINE" in
+              flood_history|flood_satellite)
+                prepare_boundary
+                set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
+                ;;
+              flood_risk)
+                test -s etl/data/inputs/rainfall_forecast.json || { echo "Missing rainfall forecast input." >&2; exit 1; }
+                test -s etl/data/inputs/rainfall_history.json || { echo "Missing rainfall history input." >&2; exit 1; }
+                set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
+                ;;
+              land_price)
+                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
+                set -- --segments /app/data/review/land_price_reviewed.geojson
+                ;;
+              *) set -- ;;
+            esac
+            docker compose --profile "$service" run --rm "$service" run --stage "$ETL_STAGE" "$@"
+          fi
