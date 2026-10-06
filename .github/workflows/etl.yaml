@@ -96,7 +96,11 @@ jobs:
             local service=etl-land-price
             docker compose --profile "$service" build "$service" || return 1
             if [ ! -s etl/data/review/land_price_rows.json ]; then
-              echo "Downloading the official land-price annex and extracting candidate rows."
+              test -s etl/data/raw/land_price/official-annex-2026.pdf || {
+                echo "::error::The checked-in land-price annex PDF is missing." >&2
+                return 1
+              }
+              echo "Extracting candidate rows from the checked-in official land-price annex."
               docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
             fi
             if [ ! -s etl/data/review/land_price_candidates.geojson ]; then
