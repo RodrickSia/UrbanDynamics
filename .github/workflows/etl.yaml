@@ -89,25 +89,23 @@ jobs:
             [ -s etl/data/inputs/rainfall_forecast.json ] && [ -s etl/data/inputs/rainfall_history.json ]
           }
 
-          prepare_land_price_candidates() {
-            if [ -s etl/data/review/land_price_reviewed.geojson ]; then
+          land_price_prepared=false
+          prepare_land_price_segments() {
+            if [ "$land_price_prepared" = true ]; then
               return 0
             fi
             local service=etl-land-price
             docker compose --profile "$service" build "$service" || return 1
-            if [ ! -s etl/data/review/land_price_rows.json ]; then
-              test -s etl/data/raw/land_price/official-annex-2026.pdf || {
-                echo "::error::The checked-in land-price annex PDF is missing." >&2
-                return 1
-              }
-              echo "Extracting candidate rows from the checked-in official land-price annex."
-              docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
-            fi
-            if [ ! -s etl/data/review/land_price_candidates.geojson ]; then
-              echo "Downloading OSM roads and creating unreviewed land-price segment candidates."
-              docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-land-road-review.py || return 1
-            fi
-            echo "Land-price candidates are in etl/data/review/land_price_candidates.geojson; human verification is required before publishing."
+            test -s etl/data/raw/land_price/official-annex-2026.pdf || {
+              echo "::error::The checked-in land-price annex PDF is missing." >&2
+              return 1
+            }
+            echo "Extracting rows from the checked-in official land-price annex."
+            docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
+            echo "Matching land-price rows to OSM roads automatically."
+            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-land-price-segments.py || return 1
+            test -s etl/data/review/land_price_auto_segments.geojson
+            land_price_prepared=true
           }
 
           run_pipeline() {
@@ -124,9 +122,8 @@ jobs:
                 arguments=(--weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json)
                 ;;
               land_price)
-                prepare_land_price_candidates || { echo "Could not prepare land-price candidates." >&2; exit 1; }
-                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review etl/data/review/land_price_candidates.geojson, save approved segments as land_price_reviewed.geojson, then retry." >&2; exit 1; }
-                arguments=(--segments /app/data/review/land_price_reviewed.geojson)
+                prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
+                arguments=(--segments /app/data/review/land_price_auto_segments.geojson)
                 ;;
             esac
             docker compose --profile "$service" build "$service"
@@ -145,10 +142,10 @@ jobs:
               rainfall_ready=false
               echo "::warning::Could not fetch rainfall inputs; flood_risk will be skipped."
             fi
-            land_price_review_ready=true
-            if ! prepare_land_price_candidates; then
-              land_price_review_ready=false
-              echo "::warning::Could not download/extract land-price candidates; land_price will be skipped."
+            land_price_ready=true
+            if ! prepare_land_price_segments; then
+              land_price_ready=false
+              echo "::warning::Could not prepare automatic land-price road matches; land_price will be skipped."
             fi
             skipped=()
             for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
@@ -157,8 +154,8 @@ jobs:
                 skipped+=(flood_risk)
                 continue
               fi
-              if [ "$pipeline" = land_price ] && { [ "$land_price_review_ready" != true ] || [ ! -s etl/data/review/land_price_reviewed.geojson ]; }; then
-                echo "::warning::Skipping land_price: reviewed segments are not available. Candidates are prepared for human review."
+              if [ "$pipeline" = land_price ] && [ "$land_price_ready" != true ]; then
+                echo "::warning::Skipping land_price: automatic OSM road matches are not available."
                 skipped+=(land_price)
                 continue
               fi
@@ -180,9 +177,8 @@ jobs:
                 set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
                 ;;
               land_price)
-                prepare_land_price_candidates || { echo "Could not prepare land-price candidates." >&2; exit 1; }
-                test -s etl/data/review/land_price_reviewed.geojson || { echo "Review etl/data/review/land_price_candidates.geojson, save approved segments as land_price_reviewed.geojson, then retry." >&2; exit 1; }
-                set -- --segments /app/data/review/land_price_reviewed.geojson
+                prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
+                set -- --segments /app/data/review/land_price_auto_segments.geojson
                 ;;
               *) set -- ;;
             esac
