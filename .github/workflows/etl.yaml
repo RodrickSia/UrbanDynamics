@@ -100,10 +100,18 @@ jobs:
               echo "::error::The checked-in land-price annex PDF is missing." >&2
               return 1
             }
-            echo "Extracting rows from the checked-in official land-price annex."
-            docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
+            if [ ! -s etl/data/review/land_price_rows.json ] || \
+              [ etl/data/raw/land_price/official-annex-2026.pdf -nt etl/data/review/land_price_rows.json ]; then
+              echo "Extracting rows from the checked-in official land-price annex."
+              docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
+            fi
             echo "Matching land-price rows to OSM roads automatically."
-            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-land-price-segments.py || return 1
+            local -a osm_args=()
+            if [ -s etl/data/raw/land_price/osm_roads.json ]; then
+              echo "Using the cached OSM road extract."
+              osm_args=(--cached)
+            fi
+            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-land-price-segments.py "${osm_args[@]}" || return 1
             test -s etl/data/review/land_price_auto_segments.geojson
             land_price_prepared=true
           }
@@ -123,7 +131,7 @@ jobs:
                 ;;
               land_price)
                 prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
-                arguments=(--segments /app/data/review/land_price_auto_segments.geojson)
+                arguments=(--source /app/data/review/land_price_rows.json --segments /app/data/review/land_price_auto_segments.geojson)
                 ;;
             esac
             docker compose --profile "$service" build "$service"
@@ -177,8 +185,13 @@ jobs:
                 set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
                 ;;
               land_price)
-                prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
-                set -- --segments /app/data/review/land_price_auto_segments.geojson
+                if [ "$ETL_STAGE" = all ]; then
+                  prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
+                  set -- --source /app/data/review/land_price_rows.json --segments /app/data/review/land_price_auto_segments.geojson
+                else
+                  test -s etl/data/raw/land_price/official-annex-2026.pdf || { echo "::error::The checked-in land-price annex PDF is missing." >&2; exit 1; }
+                  set --
+                fi
                 ;;
               *) set -- ;;
             esac
