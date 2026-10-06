@@ -11,6 +11,7 @@ PIPELINES = (
     "flood_satellite",
     "flood_risk",
     "land_price",
+    "parcels_hcmc",
 )
 STAGES = ("all", "extract", "transform", "load")
 

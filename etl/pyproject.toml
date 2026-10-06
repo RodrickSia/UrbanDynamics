@@ -10,8 +10,6 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.13.5",
     "psycopg[binary]>=3.2.6,<4",
-    "mercantile>=1.2.1",
-    "mapbox-vector-tile>=2.1.0",
 ]
 
 [project.scripts]

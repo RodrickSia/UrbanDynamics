@@ -55,7 +55,11 @@ ETL containers connect to the main PostGIS warehouse at `postgis:5432` using
 `WAREHOUSE_*` settings. They do not publish host ports or create database
 tables. Population TIFFs load into `population.population_raster`; flood and
 land-price GeoJSON features publish as atomic full-layer snapshots in
-`public.layer_snapshots` and `public.layer_features`.
+`public.layer_snapshots` and `public.layer_features`. HCMC cadastral plots
+load into `parcels.land_plot` from public vector tiles under
+`etl/data/parcels_hcmc`. Run that pipeline with
+`docker compose --profile etl-parcels-hcmc run --rm etl-parcels-hcmc`.
+It does not download listing prices.
 
 All pipeline services share the host directory `etl/data/`. Flood risk reads a
 previously published `flood_history` layer and forecast/history JSON from

@@ -75,6 +75,12 @@ jobs:
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '001_khoi_layers.sql') <> 1 THEN
               RAISE EXCEPTION 'vector layer migration was not tracked exactly once';
             END IF;
+            IF to_regclass('parcels.land_plot') IS NULL THEN
+              RAISE EXCEPTION 'parcels land_plot table is missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql') <> 1 THEN
+              RAISE EXCEPTION 'parcels migration was not tracked exactly once';
+            END IF;
           END
           $$;
           SQL
