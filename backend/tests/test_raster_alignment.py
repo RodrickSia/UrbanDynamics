@@ -25,6 +25,10 @@ def test_tile_uses_source_halo_and_one_reference_aligned_bilinear_warp(monkeypat
     assert "ST_Resample" not in connection.sql
     assert "'FIRST'" in connection.sql  # output extent is exactly the XYZ reference
     assert "ST_ScaleX" in connection.sql  # padding follows source resolution, not screen px
+    # Explicit types select the expression overload, not the callback/regprocedure
+    # overload (which parses '[rast2.val]' as a function name in PostGIS 3.5).
+    assert "'[rast2.val]'::text" in connection.sql
+    assert "NULL::text, -9999::double precision" in connection.sql
 
 
 @pytest.mark.skipif(os.getenv('POSTGIS_TESTS') != '1', reason='Requires local test PostGIS')

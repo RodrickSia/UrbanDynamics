@@ -418,8 +418,9 @@ def population_tile(year: int, z: int, x: int, y: int):
                 WHERE m.rast IS NOT NULL
             )
             SELECT ST_DumpValues(
-                       ST_MapAlgebra(ref.rast, 1, w.rast, 1, '[rast2.val]',
-                                     '32BF', 'FIRST', '[rast2.val]', NULL, -9999),
+                       ST_MapAlgebra(ref.rast, 1, w.rast, 1, '[rast2.val]'::text,
+                                     '32BF'::text, 'FIRST'::text, '[rast2.val]'::text,
+                                     NULL::text, -9999::double precision),
                        1,
                        true
                    )
