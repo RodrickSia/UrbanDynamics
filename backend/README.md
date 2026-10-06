@@ -20,7 +20,7 @@ order. Spatial query bboxes use `west,south,east,north`.
 
 | Data | API |
 | --- | --- |
-| Flood, satellite, and reviewed land-price GeoJSON | `/api/v1/layers/{layer}/features?bbox=west,south,east,north&start=...&end=...&limit=...` |
+| Flood, satellite, and land-price GeoJSON | `/api/v1/layers/{layer}/features?bbox=west,south,east,north&start=...&end=...&limit=...` |
 | Mapbox vector tiles | `/api/v1/layers/{layer}/tiles/{z}/{x}/{y}.pbf` |
 | Vector tile metadata | `/api/v1/layers/{layer}/tilejson.json` |
 | Population years and source metadata | `/api/v1/population/years` |
@@ -33,8 +33,14 @@ metadata, and known limitations. Flood history is reported point observations
 with depth and source attributes; satellite polygons mean positive flood
 pixels, not verified dry areas; flood risk polygons are heuristic rain
 indicators around historical events, not simulated flood extent or depth.
-Land-price lines are published only after geometry and extracted values have
-been reviewed.
+Land-price GeoJSON and vector tiles come from the same PostGIS snapshot. The
+land-price layer currently contains official 2026 An Khánh ward reference
+prices matched by normalized road name to OpenStreetMap road geometry.
+Coverage is partial; automatic matches use whole named-road geometry and are
+not clipped to the annex's intersection-to-intersection price segments. These
+are statutory reference prices, not transaction or asking prices. Feature
+properties include the source URL, effective date, unit, matching mode,
+geometry coverage, and annex page where available.
 
 Population values are persons per source raster cell. The service does not
 claim population density per square kilometer. The source rasters are stored

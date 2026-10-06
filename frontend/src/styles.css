@@ -373,6 +373,45 @@ input:focus-visible {
   will-change: transform;
 }
 
+.maplibregl-popup-content .land-price-popup {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 14rem;
+  color: #182326;
+  font: 0.78rem/1.4 system-ui, sans-serif;
+}
+
+.land-price-popup > strong {
+  font-size: 0.95rem;
+}
+
+.land-price-popup p,
+.land-price-popup dl {
+  margin: 0;
+}
+
+.land-price-popup dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.75rem;
+}
+
+.land-price-popup dd {
+  margin: 0;
+  font-weight: 650;
+  text-align: right;
+}
+
+.land-price-popup small {
+  max-width: 19rem;
+  color: #586669;
+}
+
+.land-price-popup a {
+  color: #8a4b00;
+  font-weight: 650;
+}
+
 .drawer-collapse-button {
   position: absolute;
   z-index: 2;

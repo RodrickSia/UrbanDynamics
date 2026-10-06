@@ -95,7 +95,7 @@ WGS84/EPSG:4326 and `[longitude, latitude]` order. Bboxes use
 | Historical floods | `/api/v1/floods/history` |
 | Satellite flood classifications | `/api/v1/floods/satellite` |
 | Rainfall-threshold risk indicators | `/api/v1/floods/risk`, `/api/v1/urban/flood` |
-| Reviewed land-price segments | `/api/v1/land-prices`, `/api/v1/urban/land-price` |
+| Official land-price reference data | `/api/v1/land-prices`, `/api/v1/urban/land-price`, `/api/v1/layers/land_price/tiles/{z}/{x}/{y}.pbf` |
 
 The `population` layer contains persons per source raster cell (nominally
 100 m), not people per square kilometre. Raster PNG tiles support
@@ -110,8 +110,11 @@ Interpret the flood products according to their metadata:
   boundary. It is not a complete flood-depth model.
 - `flood_risk` is a rainfall-threshold indicator around historic flood
   locations, not a simulated flood extent or depth.
-- Land-price geometry/values must be reviewed before publishing. An unavailable
-  layer returns an API error rather than placeholder features.
+- Land-price features currently cover matched roads in An Khánh ward, with
+  official 2026 reference prices matched by road name to OSM geometry. Current
+  automatic matches use whole named-road geometry rather than clipping to the
+  annex endpoints; they do not represent complete city coverage or verified
+  legal price-segment geometry.
 
 ## Frontend integration work remaining
 
@@ -124,9 +127,8 @@ Interpret the flood products according to their metadata:
 3. Add flood history, satellite, and risk as vector-tile sources where possible;
    use GeoJSON endpoints for feature inspection or small filtered views. Give
    each product a legend that matches its meaning and metadata.
-4. Keep land-price UI disabled until reviewed segment data is published. Do not
-   treat the extracted PDF rows or unreviewed full-road OSM candidates as
-   approved segment geometry.
+4. The land-price layer is enabled through PostGIS vector tiles. Keep the
+   geometry-coverage and source limitations visible when presenting prices.
 5. Add UI tests for enabled/disabled layer controls, time/bbox filters, empty
    results, API failures, and source cleanup when switching styles or layers.
 
