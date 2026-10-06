@@ -4,7 +4,14 @@ import { useBackendLayers } from '../datasets/useBackendLayers';
 import type { LayerState } from '../types/map';
 
 afterEach(() => vi.unstubAllGlobals());
-function fixture(options: { populationFails?: boolean; land?: boolean; reviewed?: boolean } = {}) {
+function fixture(
+  options: {
+    populationFails?: boolean;
+    land?: boolean;
+    reviewed?: boolean;
+    automatic?: boolean;
+  } = {},
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string) => {
@@ -18,7 +25,17 @@ function fixture(options: { populationFails?: boolean; land?: boolean; reviewed?
         return new Response(
           JSON.stringify({
             type: 'FeatureCollection',
-            features: options.land ? [{ properties: { geometry_reviewed: options.reviewed } }] : [],
+            features: options.land
+              ? [
+                  {
+                    properties: {
+                      geometry_reviewed: options.reviewed,
+                      publication_match_mode: options.automatic ? 'automatic' : undefined,
+                      geometry_coverage: options.automatic ? 'whole_named_road_proxy' : undefined,
+                    },
+                  },
+                ]
+              : [],
             metadata: {},
           }),
         );
@@ -36,6 +53,12 @@ function fixture(options: { populationFails?: boolean; land?: boolean; reviewed?
   );
 }
 describe('backend layer availability and selections', () => {
+  it('keeps published automatic whole-road matches available without claiming reviewed geometry', async () => {
+    fixture({ land: true, reviewed: false, automatic: true });
+    const { result } = renderHook(() => useBackendLayers({ 'land-price': true }));
+    await waitFor(() => expect(result.current.catalog['land-price']?.available).toBe(true));
+    expect(result.current.selections.map((s) => s.dataset)).toEqual(['land_price']);
+  });
   it('keeps catalog availability separate from user opt-in and defaults to an existing nonfuture year', async () => {
     fixture();
     const { result, rerender } = renderHook(({ layers }) => useBackendLayers(layers), {

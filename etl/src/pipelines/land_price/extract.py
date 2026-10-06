@@ -1,15 +1,12 @@
 import hashlib
-import logging
 import re
 from pathlib import Path
 
 import pdfplumber
 import numpy as np
 
-from src.shared.data_io import data_dir, download, read_json, file_provenance
-from .config import EFFECTIVE_FROM, PDF_URL, PDF_URLS
-
-logger = logging.getLogger(__name__)
+from src.shared.data_io import data_dir, read_json, file_provenance
+from .config import EFFECTIVE_FROM, PDF_URL
 
 def row_id(record):
     key = "|".join(str(record.get(k, "")).strip().upper() for k in ("ward", "road", "from", "to"))
@@ -107,25 +104,11 @@ def parse_pdf(path, source_url=PDF_URL):
             "records": records, "rejected": rejected}
 
 def run(source=None):
-    if source:
-        path = Path(source)
-        rows = read_json(path) if path.suffix.lower() == ".json" else parse_pdf(path)
-        return rows, [file_provenance(path,rows["source_url"])]
-    path = data_dir() / "raw" / "land_price" / "official-annex-2026.pdf"
-    failures = []
-    for url in PDF_URLS:
-        try:
-            provenance = download(url, path)
-            return parse_pdf(path, url), [provenance]
-        except Exception as error:
-            failures.append(f"{url}: {error}")
-            if url != PDF_URLS[-1]:
-                logger.warning(
-                    "Land-price PDF download failed from %s; trying the next official source: %s",
-                    url,
-                    error,
-                )
-    raise RuntimeError(
-        "Could not download the 2026 HCMC land-price resolution from any official source. "
-        + " | ".join(failures)
-    )
+    path = Path(source) if source else data_dir() / "raw" / "land_price" / "official-annex-2026.pdf"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Land-price source PDF not found at {path}. "
+            "The official annex is versioned in etl/data/raw/land_price/official-annex-2026.pdf."
+        )
+    rows = read_json(path) if path.suffix.lower() == ".json" else parse_pdf(path)
+    return rows, [file_provenance(path, rows["source_url"])]

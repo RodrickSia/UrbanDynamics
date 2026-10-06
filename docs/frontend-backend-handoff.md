@@ -96,7 +96,7 @@ WGS84/EPSG:4326 and `[longitude, latitude]` order. Bboxes use
 | Historical floods | `/api/v1/floods/history` |
 | Satellite flood classifications | `/api/v1/floods/satellite` |
 | Rainfall-threshold risk indicators | `/api/v1/floods/risk`, `/api/v1/urban/flood` |
-| Reviewed land-price segments | `/api/v1/land-prices`, `/api/v1/urban/land-price` |
+| Official land-price reference data | `/api/v1/land-prices`, `/api/v1/urban/land-price`, `/api/v1/layers/land_price/tiles/{z}/{x}/{y}.pbf` |
 
 The `population` layer contains persons per source raster cell (nominally
 100 m), not people per square kilometre. Raster PNG tiles support
@@ -111,8 +111,11 @@ Interpret the flood products according to their metadata:
   boundary. It is not a complete flood-depth model.
 - `flood_risk` is a rainfall-threshold indicator around historic flood
   locations, not a simulated flood extent or depth.
-- Land-price geometry/values must be reviewed before publishing. An unavailable
-  layer returns an API error rather than placeholder features.
+- Land-price features currently cover matched roads in An Khánh ward, with
+  official 2026 reference prices matched by road name to OSM geometry. Current
+  automatic matches use whole named-road geometry rather than clipping to the
+  annex endpoints; they do not represent complete city coverage or verified
+  legal price-segment geometry.
 
 ## Frontend dataset integration — 2026-10-06
 
@@ -135,11 +138,12 @@ Interpret the flood products according to their metadata:
 - Flood date controls default to **All dates**; start is inclusive and end is
   exclusive at midnight UTC. The existing map time-range control is not silently
   applied to historic datasets. Land price is not time-filtered by this API.
-- Land price is enabled only if the catalog is available and the first published
-  sample confirms reviewed geometry. Empty/unreviewed snapshots stay disabled;
-  the renderer also filters out features without `geometry_reviewed: true`.
-  This relies on the backend's existing reviewed-publication contract, not raw
-  extracted rows. Prices are official reference VND/m², not transaction prices.
+- Land price accepts reviewed geometry or explicitly published automatic
+  whole-named-road proxies. Empty/unpublished snapshots stay disabled. Automatic
+  matching and geometry-coverage caveats appear in the legend details and feature
+  inspection. Prices are official reference VND/m², not transaction prices.
+  The catalog renderer owns this overlay; the standalone Land price adapter is
+  used only without a backend bridge, avoiding duplicate layers and popups.
 - Raster/MVT sources load only when enabled. Opacity updates do not recreate
   sources. Year/palette/date changes replace the relevant source; style changes
   restore overlays below symbols, buildings and measurement/Viewshed custom

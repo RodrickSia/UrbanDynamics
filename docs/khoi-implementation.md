@@ -41,7 +41,7 @@ Script dùng project cô lập `khoi-local` từ `compose.yaml`, cùng PostGIS 1
 Tạo ứng viên hình học đường giá đất từ OSM (cần chạy pipeline để tạo `land_price_rows.json` trước):
 
 ```powershell
-& .venv/Scripts/python.exe scripts/prepare-land-road-review.py
+& .venv/Scripts/python.exe scripts/prepare-land-price-segments.py
 ```
 
 Các pipeline dùng cấu hình `WAREHOUSE_*` của Compose. Database phải được khởi động và migrations đã áp dụng:
@@ -50,7 +50,7 @@ Các pipeline dùng cấu hình `WAREHOUSE_*` của Compose. Database phải đ�
 docker compose --profile etl-flood-history run --rm etl-flood-history run --stage all --boundary /app/data/inputs/thu_duc_boundary.geojson
 docker compose --profile etl-flood-risk run --rm etl-flood-risk run --stage all
 docker compose --profile etl-flood-satellite run --rm etl-flood-satellite run --stage all --boundary /app/data/inputs/thu_duc_boundary.geojson --limit 1
-docker compose --profile etl-land-price run --rm etl-land-price run --stage all --segments /app/data/review/land_price_reviewed.geojson
+docker compose --profile etl-land-price run --rm etl-land-price run --stage all --segments /app/data/review/land_price_auto_segments.geojson
 ```
 
 Mọi ETL service kết nối tới `postgis:5432` trong mạng Compose. Khi chạy local mà chưa cấu hình `WAREHOUSE_PASSWORD`, pipeline lưu snapshot GeoJSON trong `etl/data/layers/` để kiểm tra ngoại tuyến.
@@ -78,12 +78,11 @@ Backend chỉ truy cập qua mạng Compose; giao diện gọi API cùng origin 
 
 `bbox` dùng `west,south,east,north` WGS84. Kết quả GeoJSON có metadata và cờ truncated. Hết hạn phải hiển thị dữ liệu cũ. Vùng đệm 250 m là phạm vi tìm kiếm, không phải vùng nước ngập. Kịch bản không thay đổi snapshot dự báo.
 
-## Duyệt giá đất
+## Ghép giá đất tự động
 
-1. Đối chiếu từng hàng trong `etl/data/review/land_price_rows.json` với trang PDF gốc. Parser hiện hỗ trợ An Khánh, có lỗi tiềm tàng ở tên đường xuống dòng và mép trang.
-2. Kiểm tra ứng viên `etl/data/review/land_price_candidates.geojson` bằng OSM và hai đầu đoạn ghi trong phụ lục; cắt đúng đoạn, loại nhánh và đường trùng tên.
-3. Lưu FeatureCollection ở `etl/data/review/land_price_reviewed.geojson`; mỗi LineString/MultiLineString có `price_record_id`, `reviewed: true`, `price_values_reviewed: true` sau khi đã kiểm chứng cả giá và hình học. Nên ghi người duyệt, nguồn và ngày duyệt.
-4. Chạy `docker compose --profile etl-land-price run --rm etl-land-price run --stage all --segments /app/data/review/land_price_reviewed.geojson`. Hàng chưa ghép nằm trong `land_price_pending.json`.
+Workflow ETL trích xuất phụ lục PDF đã commit, tải các đường có tên từ OpenStreetMap, rồi ghép bằng tên đường đã chuẩn hóa. Không cần duyệt thủ công. Kết quả lưu ở `etl/data/review/land_price_auto_segments.geojson` và được nạp bằng pipeline `land_price`.
+
+Ghép tự động dùng hình học toàn tuyến OSM; hai đầu mút trong phụ lục chỉ được giữ làm thuộc tính, không dùng để cắt hình học. API đánh dấu `publication_match_mode=automatic`, `geometry_reviewed=false` và `geometry_coverage=whole_named_road_proxy`. Chỉ những tên đường khớp mới được xuất bản; hàng không khớp nằm trong `land_price_pending.json`. Giá là giá tham chiếu chính thức, không phải giá giao dịch hoặc giá chào bán.
 
 Parser đã chuyển sang đọc đường kẻ của bảng scan, hỗ trợ hàng qua trang và “trọn đường”. Bản nguồn hiện tạo **195 hàng ứng viên**, vẫn phải duyệt OCR; **118** hàng có ứng viên OSM.
 
@@ -92,12 +91,12 @@ Repo có mẫu nhỏ `docs/samples/land-price-tran-nao-reviewed.geojson`: hai ph
 Để tái tạo demo trên máy khác, sau khi đã chạy pipeline giá đất:
 
 ```powershell
-& .venv/Scripts/python.exe scripts/prepare-land-road-review.py
+& .venv/Scripts/python.exe scripts/prepare-land-price-segments.py
 & .venv/Scripts/python.exe scripts/prepare-land-price-demo.py
 & .venv/Scripts/python.exe scripts/test-khoi-local.py
 ```
 
-Script demo kiểm tra giá và tọa độ OSM so với mẫu đã duyệt; nguồn thay đổi sẽ yêu cầu duyệt lại. Nếu đã có OSM trong cache, dùng `prepare-land-road-review.py --cached`. Dữ liệu mẫu trong repo có attribution OSM/ODbL; dữ liệu gốc lớn vẫn nằm trong `etl/data/` và không commit.
+Script demo kiểm tra giá và tọa độ OSM so với mẫu đã duyệt. Nếu đã có OSM trong cache, dùng `prepare-land-price-segments.py --cached`. Dữ liệu mẫu trong repo có attribution OSM/ODbL; dữ liệu gốc lớn vẫn nằm trong `etl/data/` và không commit.
 
 Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải giá giao dịch thị trường. Chưa đạt mục tiêu 25 đoạn đã duyệt của kế hoạch.
 
@@ -111,4 +110,4 @@ Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải gi�
 
 Workflow `.github/workflows/integration-tests.yaml` sinh password ngẫu nhiên mỗi lần chạy, khởi động image PostGIS và migration chính qua Compose mà không publish port, chạy pytest trong cùng mạng rồi dọn volume kiểm thử. Không cần password CI cố định. Pipeline chạy thủ công qua `.github/workflows/etl.yaml` với lựa chọn pipeline và stage `all` hoặc `extract`; database deployment tiếp tục dùng workflow migration riêng.
 
-Workflow ETL tự lấy boundary DataSuds khi thiếu; với flood-risk, workflow lấy forecast và history từ Open-Meteo tại một điểm tích hợp. Đây là đầu vào cho risk, không phải một rainfall ETL hay lưới đại diện toàn thành phố. Nếu thiếu dữ liệu giá đất, workflow tải phụ lục chính thức, trích xuất các hàng cần rà soát và tải ứng viên geometry đường từ OpenStreetMap vào `etl/data/review/land_price_candidates.geojson`. Người dùng phải xác minh giá và cắt đúng đoạn theo hai đầu mút trước khi lưu thành `land_price_reviewed.geojson`; pipeline không tự phê duyệt candidates.
+Workflow ETL tự lấy boundary DataSuds khi thiếu; với flood-risk, workflow lấy forecast và history từ Open-Meteo tại một điểm tích hợp. Đây là đầu vào cho risk, không phải một rainfall ETL hay lưới đại diện toàn thành phố. Land-price dùng phụ lục PDF đã commit, trích xuất các hàng và ghép tự động với đường OSM theo tên chuẩn hóa; xem phần “Ghép giá đất tự động” để biết giới hạn hình học toàn tuyến.

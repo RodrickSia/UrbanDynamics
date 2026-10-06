@@ -65,7 +65,7 @@ export function LayerItem({
           <span
             className="layer-availability"
             data-state={status.toLowerCase()}
-            title={layer.id === 'land-price' ? 'No reviewed segments published' : undefined}
+            title={layer.id === 'land-price' ? 'No published road prices available' : undefined}
           >
             {status}
           </span>

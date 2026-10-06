@@ -56,8 +56,22 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
       return {
         ...common,
         type: 'line',
-        filter: ['==', ['get', 'geometry_reviewed'], true],
-        paint: { 'line-color': '#8552c8', 'line-width': 5, 'line-opacity': 0.8 },
+        minzoom: 8,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        filter: [
+          'any',
+          ['==', ['get', 'geometry_reviewed'], true],
+          [
+            'all',
+            ['==', ['get', 'publication_match_mode'], 'automatic'],
+            ['==', ['get', 'geometry_coverage'], 'whole_named_road_proxy'],
+          ],
+        ],
+        paint: {
+          'line-color': '#f59e0b',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 13, 3, 17, 6],
+          'line-opacity': 0.8,
+        },
       };
   }
 }

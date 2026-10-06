@@ -46,7 +46,8 @@ The application opens in 2D at a nationwide Vietnam view. Search and place detai
 - Roof/facade selection uses a terrain-aware camera ray. Acquired world coordinates and elevations are frozen; GPU vertices are relative to a local origin to prevent high-zoom float32 drift.
 - Browser regression tests exercise real MapLibre/WebGL with controlled DEM/building fixtures, check yellow pixels and marker positions after camera changes, and test roof/facade hits. Separate live tests verify Mapterhorn coverage and the configured Goong application. Fixture pages are development-only and are not included in production output.
 - User and selected-place markers are rendered only after geolocation succeeds or a place/map selection is made. Empty-map clicks toggle generic place details; named POIs always open or update the drawer.
-- Population, public facilities, traffic, rain, flood, planning, land price, road density, and green-area layers are disabled UI integration points. No synthetic urban data is shown.
+- The official An Khánh land-price layer is served by the backend's PostGIS vector tiles. Enable it, zoom in, and click a road line to inspect its official price values and geometry-coverage note.
+- Population, public facilities, traffic, rain, flood, planning, road density, and green-area layers remain disabled UI integration points. No synthetic urban data is shown.
 - Search history is local, and area/weather values remain local placeholders until backend integration. Future implementations call the UrbanDynamics backend through `VITE_API_BASE_URL`; they must not call credentialed Goong REST APIs directly.
 - Backend engineers should use [`docs/frontend-backend-handoff.md`](../docs/frontend-backend-handoff.md) as the integration contract and implementation checklist.
 

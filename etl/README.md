@@ -57,9 +57,11 @@ tables. Population TIFFs load into `population.population_raster`; flood and
 land-price GeoJSON features publish as atomic full-layer snapshots in
 `public.layer_snapshots` and `public.layer_features`.
 
-All pipeline services share the ignored host directory `etl/data/`. Flood risk
-reads a previously published `flood_history` layer and forecast/history JSON
-from `etl/data/inputs/`. Land-price publication requires reviewed road-segment
-geometry in `etl/data/review/land_price_reviewed.geojson`.
+All pipeline services share the host directory `etl/data/`. Flood risk reads a
+previously published `flood_history` layer and forecast/history JSON from
+`etl/data/inputs/`. Land-price publication automatically matches extracted rows
+to OSM roads by normalized name using
+`etl/data/review/land_price_auto_segments.geojson`. These geometries represent
+whole named roads; they are not clipped to the official price table endpoints.
 
 Flood-risk requires forecast and history rainfall files under `etl/data/inputs/`; the repository does not provide a standalone rainfall pipeline.

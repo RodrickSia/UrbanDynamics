@@ -99,8 +99,11 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
       )}
       {id === 'land-price' && (
         <>
-          <Legend color="#8552c8" label="Reviewed road segment" />
-          <DatasetNote>Official reference · VND/m² · not transaction prices</DatasetNote>
+          <Legend color="#f59e0b" label="Official road reference" />
+          <DatasetNote>
+            Official reference · VND/m² · not transaction prices. Automatic matches cover whole
+            named roads, not verified price-segment boundaries.
+          </DatasetNote>
         </>
       )}
       {data.catalog[id]?.stale && (

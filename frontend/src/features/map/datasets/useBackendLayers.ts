@@ -59,7 +59,7 @@ export function useBackendLayers(layers: LayerState) {
             stale: entry?.stale,
           };
         }
-        // An empty published snapshot is not a reviewed price dataset.
+        // Accept reviewed segments and explicitly published automatic road proxies.
         save({
           ...values,
           'land-price': {
@@ -73,7 +73,12 @@ export function useBackendLayers(layers: LayerState) {
             save({
               'land-price': {
                 status: 'ready',
-                available: sample.features.some((f) => f.properties.geometry_reviewed === true),
+                available: sample.features.some(
+                  (f) =>
+                    f.properties.geometry_reviewed === true ||
+                    (f.properties.publication_match_mode === 'automatic' &&
+                      f.properties.geometry_coverage === 'whole_named_road_proxy'),
+                ),
               },
             });
           } catch {

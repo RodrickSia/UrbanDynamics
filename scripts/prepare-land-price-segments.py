@@ -1,4 +1,4 @@
-"""Fetch OSM roads and export unapproved full-road candidates for manual segment review."""
+"""Match published land-price rows to named OSM roads for automatic publication."""
 
 import argparse
 import sys
@@ -45,7 +45,7 @@ def run(cached=False):
             roads.append((way, LineString(coordinates)))
     output = []
     for row in rows:
-        # Remove the ward suffix, retain road identity. Ambiguous names stay unapproved.
+        # Remove the ward suffix and match by normalized road name.
         wanted = normalize(row["road"].split(",")[0])
         candidates = [
             (way, geom)
@@ -63,16 +63,20 @@ def run(cached=False):
                         "road": row["road"],
                         "from": row["from"],
                         "to": row["to"],
-                        "reviewed": False,
-                        "price_values_reviewed": False,
+                        "auto_approved": True,
+                        "match_method": "exact_normalized_osm_name",
+                        "geometry_coverage": "whole_named_road_proxy",
                         "osm_way_ids": [w["id"] for w, _ in candidates],
                         "geometry_source_url": endpoint,
                         "geometry_license": "ODbL 1.0",
-                        "review_note": "Full named road candidate; clip to published from/to intersections before approval",
+                        "review_note": (
+                            "Automatically matched by normalized road name. Geometry covers the full named road; "
+                            "the published from/to endpoints are attributes and were not used to clip geometry."
+                        ),
                     },
                 }
             )
-    path = data_dir() / "review" / "land_price_candidates.geojson"
+    path = data_dir() / "review" / "land_price_auto_segments.geojson"
     write_json(
         path,
         {
@@ -81,11 +85,13 @@ def run(cached=False):
             "metadata": {
                 "source_url": endpoint,
                 "query": query,
+                "matching_method": "exact_normalized_osm_name",
+                "geometry_coverage": "whole_named_road_proxy",
                 "source_time": data.get("osm3s", {}).get("timestamp_osm_base"),
             },
         },
     )
-    print("OSM ways:", len(roads), "unapproved candidates:", len(output), "file:", path)
+    print("OSM ways:", len(roads), "automatically matched rows:", len(output), "file:", path)
 
 
 if __name__ == "__main__":
@@ -93,6 +99,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cached",
         action="store_true",
-        help="Regenerate candidates using the existing OSM download",
+        help="Regenerate automatic matches using the existing OSM download",
     )
     run(parser.parse_args().cached)

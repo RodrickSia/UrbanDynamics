@@ -36,6 +36,8 @@ export default function App() {
           buildingsEnabled={Boolean(workspace.layers['buildings-3d'])}
           poiEnabled={workspace.layers.poi ?? true}
           buildingsOpacity={workspace.opacityByLayer['buildings-3d'] ?? 0.8}
+          landPriceEnabled={Boolean(workspace.layers['land-price'])}
+          landPriceOpacity={workspace.opacityByLayer['land-price'] ?? 0.8}
           measurement={workspace.measurement}
           selection={workspace.selection}
           userLocation={workspace.userLocation}

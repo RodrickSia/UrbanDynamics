@@ -235,6 +235,12 @@ const FIELDS: Record<string, string> = {
   commercial_vnd_m2: 'Commercial (VND/m²)',
   effective_from: 'Effective from',
   price_kind: 'Price type',
+  other_nonagricultural_vnd_m2: 'Other non-agricultural (VND/m²)',
+  publication_match_mode: 'Match mode',
+  geometry_coverage: 'Geometry coverage',
+  review_note: 'Coverage note',
+  source_url: 'Official source',
+  pdf_page: 'Annex page',
   population: 'People / source cell',
 };
 export function BackendDataScene({

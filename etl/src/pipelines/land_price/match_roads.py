@@ -1,11 +1,15 @@
-"""Only exact, manually reviewed segment IDs are eligible for publication."""
+"""Validate road geometry approved by a reviewer or the configured auto-matcher."""
 from shapely.geometry import shape
 
-def reviewed_segments(document):
+def matched_segments(document):
     segments = {}
     for feature in document.get("features", []):
         properties = feature["properties"]
-        if properties.get("reviewed") is not True:
+        auto_approved = (
+            properties.get("auto_approved") is True
+            and properties.get("match_method") == "exact_normalized_osm_name"
+        )
+        if properties.get("reviewed") is not True and not auto_approved:
             continue
         key = properties.get("price_record_id")
         if not key or key in segments:

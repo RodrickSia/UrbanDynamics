@@ -47,8 +47,10 @@ test('published datasets render, filter, inspect and survive style swaps without
     {
       type: 'Feature',
       properties: {
-        geometry_reviewed: true,
-        road: 'Reviewed fixture road',
+        geometry_reviewed: false,
+        publication_match_mode: 'automatic',
+        geometry_coverage: 'whole_named_road_proxy',
+        road: 'Published fixture road',
         residential_vnd_m2: 5000000,
       },
       geometry: {
@@ -108,7 +110,16 @@ test('published datasets render, filter, inspect and survive style swaps without
           features:
             empty || (url.pathname.includes('land_price') && !prices)
               ? []
-              : [{ properties: { location: 'Fixture observation', geometry_reviewed: true } }],
+              : [
+                  {
+                    properties: {
+                      location: 'Fixture observation',
+                      geometry_reviewed: false,
+                      publication_match_mode: 'automatic',
+                      geometry_coverage: 'whole_named_road_proxy',
+                    },
+                  },
+                ],
           metadata: {},
         },
       });
@@ -145,6 +156,7 @@ test('published datasets render, filter, inspect and survive style swaps without
   });
   await page.goto('/tests/browser/data-layers.html');
   await page.waitForFunction('window.dataMap?.isStyleLoaded()');
+  expect(await page.evaluate('Boolean(window.dataMap.getSource("urban-land-price"))')).toBe(false);
   await page.evaluate('window.dataMap.jumpTo({center:[106.7,10.8],zoom:14})');
   await page.getByRole('button', { name: 'Open data layers', exact: true }).click();
   const population = page.getByRole('checkbox', { name: 'Population', exact: true });

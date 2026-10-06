@@ -14,6 +14,7 @@ import {
 } from '../layers/measurementLayer';
 import { setTerrain } from '../layers/terrain';
 import { installMetricRoadWidths } from '../layers/metricRoadWidths';
+import { installLandPricePopup, setLandPriceLayer } from '../layers/landPrice';
 import { createMapInteractionHandlers } from '../utils/mapInteractions';
 import { MeasurementLabels } from './MeasurementLabels';
 import type { UrbanMapProps } from './UrbanMap.types';
@@ -28,6 +29,8 @@ export function UrbanMap(props: UrbanMapProps) {
     mode,
     buildingsEnabled,
     buildingsOpacity,
+    landPriceEnabled,
+    landPriceOpacity,
     measurement,
     selection,
     userLocation,
@@ -64,6 +67,7 @@ export function UrbanMap(props: UrbanMapProps) {
     let mountedMap: MapLibreMap | null = null;
     let disposeInteractions: () => void = () => undefined;
     let disposeRoadWidths: () => void = () => undefined;
+    let disposeLandPricePopup: () => void = () => undefined;
     styleReadyRef.current = false;
 
     void import('maplibre-gl')
@@ -122,6 +126,11 @@ export function UrbanMap(props: UrbanMapProps) {
           disposeRoadWidths = installMetricRoadWidths(map);
           poiVisibility.current(map, propsRef.current.poiEnabled ?? true, true);
           applyMode();
+          if (!propsRef.current.backend) setLandPriceLayer(
+            map,
+            propsRef.current.landPriceEnabled ?? false,
+            propsRef.current.landPriceOpacity ?? 0.8,
+          );
           if (!map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
           // Custom layers survive style diffing but newly added raster/style
           // layers are appended above them. Always restore the overlay order.
@@ -136,6 +145,9 @@ export function UrbanMap(props: UrbanMapProps) {
 
         const interactions = createMapInteractionHandlers(map, () => propsRef.current, measurementLayer.projection);
         disposeInteractions = interactions.dispose;
+        disposeLandPricePopup = installLandPricePopup(map, maplibregl.Popup, () =>
+          !propsRef.current.backend && propsRef.current.measurement.status !== 'active' &&
+          (!propsRef.current.viewshed || propsRef.current.viewshed.state.phase === 'idle'));
 
         map.on('style.load', handleStyleLoad);
         map.on('click', interactions.click);
@@ -155,6 +167,7 @@ export function UrbanMap(props: UrbanMapProps) {
       disposed = true;
       disposeInteractions();
       disposeRoadWidths();
+      disposeLandPricePopup();
       styleReadyRef.current = false;
       markerConstructorRef.current = null;
       measurementLayerRef.current = null;
@@ -204,6 +217,13 @@ export function UrbanMap(props: UrbanMapProps) {
     onBuildingsAvailabilityChange,
     onStatusChange,
   ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current || !configuration.ok || props.backend) return;
+    setLandPriceLayer(map, landPriceEnabled ?? false, landPriceOpacity ?? 0.8);
+    if (map.getLayer(MEASUREMENT_LAYER_ID)) map.moveLayer(MEASUREMENT_LAYER_ID);
+  }, [configuration, landPriceEnabled, landPriceOpacity, mapRevision, props.backend]);
 
   useEffect(() => {
     const map = mapRef.current;
