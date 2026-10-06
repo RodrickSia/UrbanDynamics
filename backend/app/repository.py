@@ -29,6 +29,9 @@ LAYER_INFO = {
             "year",
             "spatial_precision",
             "geocoding_method",
+            "reported_ward",
+            "reported_district",
+            "current_admin_unit",
         ],
         "time_enabled": True,
         "time_field": "observed_at",
@@ -102,6 +105,21 @@ def freshness(info: dict) -> dict:
     result = dict(info)
     if result.get("expires_at"):
         result["stale"] = datetime.now(UTC) >= instant(result["expires_at"])
+    return result
+
+
+def flood_location_context(properties: dict) -> dict:
+    """Expose original administrative context without renaming or moving observations."""
+    result = dict(properties)
+    original = properties.get("original_attributes")
+    if isinstance(original, dict):
+        for target, source in (
+            ("reported_ward", "Ward"),
+            ("reported_district", "District_mentioned"),
+            ("current_admin_unit", "Current_admin_unit"),
+        ):
+            if target not in result and original.get(source) is not None:
+                result[target] = original[source]
     return result
 
 
@@ -192,6 +210,11 @@ def features(layer, bounds=None, start=None, end=None, limit=5000):
             matches.append(feature)
             if len(matches) > limit:
                 break
+    if layer == "flood_history":
+        matches = [
+            {**feature, "properties": flood_location_context(feature["properties"])}
+            for feature in matches
+        ]
     return {
         "type": "FeatureCollection",
         "features": matches[:limit],
@@ -239,7 +262,17 @@ def vector_tile(layer, z, x, y, start=None, end=None) -> bytes:
         FROM (
             SELECT f.feature_id,
                    (SELECT jsonb_object_agg(attribute.key, attribute.value)
-                    FROM jsonb_each(f.properties) AS attribute(key, value)
+                    FROM jsonb_each(
+                        CASE WHEN f.layer = 'flood_history' THEN
+                            jsonb_strip_nulls(jsonb_build_object(
+                                'reported_ward', f.properties #> '{original_attributes,Ward}',
+                                'reported_district',
+                                    f.properties #> '{original_attributes,District_mentioned}',
+                                'current_admin_unit',
+                                    f.properties #> '{original_attributes,Current_admin_unit}'
+                            )) || f.properties
+                        ELSE f.properties END
+                    ) AS attribute(key, value)
                     WHERE jsonb_typeof(attribute.value) NOT IN ('object', 'array', 'null'))
                        AS properties,
                    ST_AsMVTGeom(
@@ -332,40 +365,57 @@ def population_statistics(year: int, bounds: tuple[float, float, float, float]):
 
 
 def population_tile(year: int, z: int, x: int, y: int):
-    """Return a 256-square array of population samples for one Web Mercator tile."""
+    """Display-only interpolation on an exact XYZ grid; raw sampling is unchanged.
+
+    Keep at least two source/output pixels around the tile before warping,
+    including neighbouring storage chunks. Clipping to XYZ loses cell centres.
+    Warp once onto the reference grid, then pad/crop to its exact 256px extent.
+    """
     with connect_to_warehouse() as connection:
         row = connection.execute(
             """
-            WITH tile AS (
+            WITH source_scale AS (
+                SELECT 2 * GREATEST(ABS(ST_ScaleX(rast)), ABS(ST_ScaleY(rast))) AS halo
+                FROM population.population_raster WHERE year = %s LIMIT 1
+            ), tile AS (
                 SELECT ST_TileEnvelope(%s, %s, %s) AS geom
+            ), native_tile AS (
+                SELECT ST_Transform(geom, 4326) AS geom FROM tile
+            ), coverage AS (
+                SELECT ST_Expand(t.geom, GREATEST(
+                    s.halo,
+                    (ST_XMax(t.geom) - ST_XMin(t.geom)) / 128,
+                    (ST_YMax(t.geom) - ST_YMin(t.geom)) / 128
+                )) AS geom
+                FROM native_tile AS t CROSS JOIN source_scale AS s
             ), mosaic AS (
-                SELECT ST_Transform(
-                           ST_Union(
-                               ST_Clip(r.rast, 1, ST_Transform(t.geom, 4326), true)
-                           ),
-                           3857
-                       ) AS rast
-                FROM population.population_raster AS r CROSS JOIN tile AS t
+                SELECT ST_Union(ST_Clip(r.rast, 1, c.geom, true)) AS rast
+                FROM population.population_raster AS r CROSS JOIN coverage AS c
                 WHERE r.year = %s
-                  AND ST_ConvexHull(r.rast) && ST_Transform(t.geom, 4326)
-                  AND ST_Intersects(r.rast, ST_Transform(t.geom, 4326))
+                  AND ST_ConvexHull(r.rast) && c.geom
+                  AND ST_Intersects(r.rast, c.geom)
             ), reference AS (
-                SELECT ST_MakeEmptyRaster(
+                SELECT ST_AddBand(ST_MakeEmptyRaster(
                            256, 256, ST_XMin(geom), ST_YMax(geom),
                            (ST_XMax(geom) - ST_XMin(geom)) / 256,
                            (ST_YMin(geom) - ST_YMax(geom)) / 256,
                            0, 0, 3857
-                       ) AS rast
+                       ), '32BF'::text, -9999::double precision,
+                       -9999::double precision) AS rast
                 FROM tile
+            ), warped AS (
+                SELECT ST_Transform(m.rast, ref.rast, 'Bilinear', 0.0) AS rast
+                FROM mosaic AS m CROSS JOIN reference AS ref
+                WHERE m.rast IS NOT NULL
             )
             SELECT ST_DumpValues(
-                       ST_Resample(m.rast, ref.rast, 'NearestNeighbor', 0.125, false),
+                       ST_MapAlgebra(ref.rast, 1, w.rast, 1, '[rast2.val]',
+                                     '32BF', 'FIRST', '[rast2.val]', NULL, -9999),
                        1,
                        true
                    )
-            FROM mosaic AS m CROSS JOIN reference AS ref
-            WHERE m.rast IS NOT NULL
+            FROM warped AS w CROSS JOIN reference AS ref
             """,
-            (z, x, y, year),
+            (year, z, x, y, year),
         ).fetchone()
     return row[0] if row and row[0] else None

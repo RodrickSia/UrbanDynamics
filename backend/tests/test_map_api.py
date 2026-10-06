@@ -71,7 +71,7 @@ def test_population_tilejson_uses_request_host_and_xyz_template(client, monkeypa
     assert result["format"] == "png"
     assert result["scheme"] == "xyz"
     assert result["tiles"] == [
-        "http://testserver/api/v1/population/2022/tiles/{z}/{x}/{y}.png?palette=pseudocolor"
+        "http://testserver/api/v1/population/2022/tiles/{z}/{x}/{y}.png?palette=pseudocolor&render=2"
     ]
 
 
@@ -88,6 +88,7 @@ def test_population_png_tile_etag_and_invalid_xyz(client, monkeypatch):
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert response.headers["etag"]
+    assert 'population-v2-' in response.headers['etag']
     cached = client.get(url, headers={"If-None-Match": response.headers["etag"]})
     assert cached.status_code == 304
     assert client.get("/api/v1/population/2022/tiles/2/4/0.png").status_code == 404
