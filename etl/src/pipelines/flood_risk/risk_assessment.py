@@ -134,6 +134,7 @@ def evaluate(floods, forecast, history, scenario_mm=None, radius_m=RADIUS_M):
                     ),
                     "forecast_window_start": start.isoformat(),
                     "issued_at": issued_at,
+                    "observed_at": issued_at,
                     "historical_event_id": feature["id"],
                     "location": feature["properties"].get("location"),
                     "scenario": scenario_mm is not None,

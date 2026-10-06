@@ -14,6 +14,7 @@ export default defineConfig({
     command: 'npm run dev -- --host 127.0.0.1 --port 5173',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: true,
+    env: { ...process.env, VITE_GOONG_MAPTILES_KEY: 'playwright-test-key' },
     // Vite may forward vendor console messages containing a public tile key.
     stdout: 'ignore',
     stderr: 'ignore',
