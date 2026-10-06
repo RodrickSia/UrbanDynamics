@@ -27,11 +27,13 @@ export function Fixture() {
   const [mode, setMode] = useState<MapMode>('2d');
   const [style, setStyle] = useState<MapStyleId>('standard');
   const [opacity, setOpacity] = useState(1);
+  const [poi, setPoi] = useState(true);
   const [measurement, setMeasurement] = useState<MeasurementState>({ status: 'active', points: [], preview: null });
   Object.assign(window, { workspace: {
     map: () => captured.map, mode: setMode, style: setStyle, opacity: setOpacity,
     state: () => measurement, animations: () => cameraAnimations,
     measurement: setMeasurement,
+    poi: setPoi,
     project: (lng: number, lat: number, altitude: number) => {
       const map = captured.map!;
       const custom = map.getLayer('urban-distance-measurement') as unknown as { implementation: MeasurementLayer };
@@ -40,7 +42,7 @@ export function Fixture() {
     },
   } });
   return <UrbanMap configuration={configuration} mapStyle={style} mode={mode}
-    buildingsEnabled buildingsOpacity={opacity} measurement={measurement}
+    buildingsEnabled buildingsOpacity={opacity} measurement={measurement} poiEnabled={poi}
     selection={null} userLocation={null} focusRequest={null} controlRequest={null}
     onMeasurementPoint={point => setMeasurement(value => ({ ...value, points: [...value.points, point], preview: null }))}
     onMeasurementPreview={preview => setMeasurement(value => ({ ...value, preview }))}

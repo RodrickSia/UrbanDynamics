@@ -15,7 +15,8 @@ import { readBuildingHeight, resolveMeasurementPoint } from '../utils/measuremen
 
 describe('map domain', () => {
   it('lists priority urban layers before future integrations', () => {
-    expect(URBAN_LAYERS.slice(0, 5).map((layer) => layer.id)).toEqual([
+    expect(URBAN_LAYERS.slice(0, 6).map((layer) => layer.id)).toEqual([
+      'poi',
       'buildings-3d',
       'population',
       'public-facilities',
@@ -57,10 +58,10 @@ describe('map domain', () => {
   });
 
   it('toggles available layers without enabling disconnected data', () => {
-    expect(toggleLayerState({ 'buildings-3d': false }, URBAN_LAYERS[0])).toEqual({
+    expect(toggleLayerState({ 'buildings-3d': false }, URBAN_LAYERS.find(l=>l.id==='buildings-3d')!)).toEqual({
       'buildings-3d': true,
     });
-    expect(toggleLayerState({}, URBAN_LAYERS[1])).toEqual({});
+    expect(toggleLayerState({}, URBAN_LAYERS.find(l=>l.id==='population')!)).toEqual({});
   });
 
   it('keeps the 2D/3D mode and building layer in sync', () => {

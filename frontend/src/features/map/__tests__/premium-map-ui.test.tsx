@@ -35,7 +35,8 @@ describe('premium map workspace', () => {
     await user.click(screen.getByRole('button', { name: 'Open data layers' }));
 
     const layers = screen.getByRole('region', { name: 'Data layers' });
-    expect(within(layers).getByRole('checkbox', { name: 'Population density' })).toBeDisabled();
+    await user.click(within(layers).getByText('More layers'));
+    expect(within(layers).getByRole('checkbox', { name: 'Population' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Rain' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Flood risk' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Land price' })).toBeDisabled();

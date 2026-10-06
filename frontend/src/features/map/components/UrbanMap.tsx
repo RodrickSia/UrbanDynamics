@@ -17,6 +17,9 @@ import { installMetricRoadWidths } from '../layers/metricRoadWidths';
 import { createMapInteractionHandlers } from '../utils/mapInteractions';
 import { MeasurementLabels } from './MeasurementLabels';
 import type { UrbanMapProps } from './UrbanMap.types';
+import { ViewshedScene } from '../viewshed/ViewshedScene';
+import { createPoiVisibility } from '../layers/poi';
+import { BackendDataScene } from '../datasets/BackendDataScene';
 
 export function UrbanMap(props: UrbanMapProps) {
   const {
@@ -38,6 +41,7 @@ export function UrbanMap(props: UrbanMapProps) {
   const markerConstructorRef = useRef<typeof import('maplibre-gl').Marker | null>(null);
   const measurementLayerRef = useRef<MeasurementLayer | null>(null);
   const propsRef = useRef(props);
+  const poiVisibility = useRef(createPoiVisibility());
   const styleRef = useRef(mapStyle);
   const styleReadyRef = useRef(false);
   const cameraModeRef = useRef('2d');
@@ -116,6 +120,7 @@ export function UrbanMap(props: UrbanMapProps) {
           styleReadyRef.current = true;
           configureSceneLod(map);
           disposeRoadWidths = installMetricRoadWidths(map);
+          poiVisibility.current(map, propsRef.current.poiEnabled ?? true, true);
           applyMode();
           if (!map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
           // Custom layers survive style diffing but newly added raster/style
@@ -166,6 +171,11 @@ export function UrbanMap(props: UrbanMapProps) {
     onStatusChange(false, 'Changing basemap…');
     map.setStyle(getMapStyle(configuration.mapKey, mapStyle));
   }, [configuration, mapStyle, onStatusChange]);
+
+  useEffect(() => {
+    if (mapRef.current && styleReadyRef.current)
+      poiVisibility.current(mapRef.current, props.poiEnabled ?? true);
+  }, [props.poiEnabled, mapRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -235,6 +245,10 @@ export function UrbanMap(props: UrbanMapProps) {
   return (
     <>
       <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />
+      {props.backend && <BackendDataScene map={mapRef.current} bridge={props.backend}
+        interactive={measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
+      {props.viewshed && <ViewshedScene map={mapRef.current} projection={measurementLayerRef.current?.projection ?? null}
+        mode={mode} bridge={props.viewshed} />}
       <MeasurementLabels
         map={mapRef.current}
         projection={measurementLayerRef.current?.projection ?? null}

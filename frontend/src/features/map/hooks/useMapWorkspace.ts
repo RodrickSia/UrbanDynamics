@@ -1,4 +1,5 @@
-import { type PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from 'react';
+import { type PointerEvent as ReactPointerEvent, useCallback, useReducer, useRef, useState } from 'react';
+import { initialViewsheds, viewshedReducer, type ViewshedAction } from '../viewshed/state';
 
 import type { MapStyleId } from '../config/mapConfig';
 import { URBAN_LAYERS } from '../layers/layerRegistry';
@@ -46,6 +47,8 @@ export function useMapWorkspace() {
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [measurement, setMeasurement] = useState<MeasurementState>(EMPTY_MEASUREMENT);
+  const [viewsheds, dispatchViewsheds] = useReducer(viewshedReducer, initialViewsheds);
+  const [viewshedStatus, setViewshedStatus] = useState('');
   const [rightPanel, setRightPanel] = useState<RightPanel>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPlaceDetailsCollapsed, setIsPlaceDetailsCollapsed] = useState(false);
@@ -70,6 +73,7 @@ export function useMapWorkspace() {
   );
 
   const startMeasurement = useCallback((kind?: MeasurementKind) => {
+    dispatchViewsheds({type:'done'});
     setIsSearchOpen(false);
     setSelectedPlace(null);
     setSelection(null);
@@ -77,6 +81,21 @@ export function useMapWorkspace() {
     setMeasurement(current => ({ status: 'active', points: [], preview: null,
       kind: kind ?? current.kind ?? 'distance', units: current.units ?? 'metric' }));
   }, []);
+
+  const handleViewshedAction = useCallback((action: ViewshedAction) => {
+    if (action.type === 'start' || action.type === 'select') {
+      handleModeChange('3d');
+      setIsSearchOpen(false);
+      setSelectedPlace(null);
+      setSelection(null);
+      setRightPanel(null);
+      // Keep existing measurement anchors/results while pausing conflicting input.
+      setMeasurement(current => current.status === 'active'
+        ? {...current,status:'complete',preview:null} : current);
+      setViewshedStatus('');
+    }
+    dispatchViewsheds(action);
+  }, [handleModeChange]);
 
   const cancelMeasurement = useCallback(() => {
     setMeasurement(EMPTY_MEASUREMENT);
@@ -230,6 +249,10 @@ export function useMapWorkspace() {
     selectedPlace,
     userLocation,
     measurement,
+    viewsheds,
+    viewshedStatus,
+    handleViewshedAction,
+    setViewshedStatus,
     rightPanel,
     isSearchOpen,
     isPlaceDetailsCollapsed,

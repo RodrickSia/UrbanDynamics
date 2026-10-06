@@ -90,11 +90,14 @@ export const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: TimeRange; label: string
 ];
 
 export type UrbanLayerId =
+  | 'poi'
   | 'buildings-3d'
   | 'population'
   | 'public-facilities'
   | 'traffic'
   | 'flood'
+  | 'flood-history'
+  | 'flood-satellite'
   | 'rain'
   | 'planning'
   | 'land-price'

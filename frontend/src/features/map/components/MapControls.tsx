@@ -11,6 +11,8 @@ import { MotionIconButton } from './MotionIconButton';
 import { TimeRangeSelector } from './TimeRangeSelector';
 
 interface MapControlsProps {
+  viewshedActive?: boolean;
+  onViewshed?: () => void;
   measurement: MeasurementState;
   mode: MapMode;
   rightPanelOpen: boolean;
@@ -33,7 +35,7 @@ export function MapControls(props: MapControlsProps) {
 
   return (
     <>
-      {isMeasuring && (props.measurement.kind === 'area' ?
+      {isMeasuring && !props.viewshedActive && (props.measurement.kind === 'area' ?
         <AreaMeasurementToolbar measurement={props.measurement} mode={props.mode}
           onUnitsChange={props.onMeasurementUnitsChange} onUndo={props.onUndoMeasurementPoint}
           onClear={props.onCancelMeasurement} onNew={() => props.onStartMeasurement()}
@@ -53,7 +55,8 @@ export function MapControls(props: MapControlsProps) {
           <MotionIconButton className="corner-action glass-surface" onClick={props.onClearSelection} aria-label="Clear selection"><Trash2 aria-hidden="true" size={18} /></MotionIconButton>
         )}
         <TimeRangeSelector value={props.timeRange} onChange={props.onTimeRangeChange} />
-        <MeasurementSelector measurement={props.measurement} onSelect={props.onStartMeasurement} />
+        <MeasurementSelector measurement={props.measurement} onSelect={props.onStartMeasurement}
+          viewshedActive={props.viewshedActive} onViewshed={props.onViewshed} />
         <MapStyleSelector value={props.mapStyle} onChange={props.onMapStyleChange} />
       </div>
     </>
