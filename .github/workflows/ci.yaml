@@ -26,8 +26,10 @@ jobs:
             --profile etl-population-hcmc \
             --profile etl-flood-history --profile etl-flood-satellite \
             --profile etl-flood-risk --profile etl-land-price \
+            --profile etl-parcels-hcmc \
             build backend frontend etl-population-hcmc \
-            etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price
+            etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price \
+            etl-parcels-hcmc
 
   database:
     runs-on: ubuntu-latest

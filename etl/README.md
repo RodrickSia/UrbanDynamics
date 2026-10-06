@@ -38,7 +38,8 @@ python -m src.main run flood_history --stage all \
 ```
 
 The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
-stage choices. Its **all** choice runs eligible full pipelines sequentially in
+stage choices for most pipelines, plus `transform` / `load` for parcels. Its
+**all** choice runs eligible full pipelines sequentially in
 this order: population, flood history, flood satellite, flood risk, and land
 price. If rainfall inputs are missing, it downloads forecast/history from
 Open-Meteo for one integration point. If land-price inputs are missing, it

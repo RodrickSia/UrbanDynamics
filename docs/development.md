@@ -30,4 +30,4 @@ CI runs on pushes and pull requests. `integration-tests.yaml` exercises the
 flood, land-price, and API integration against an isolated database. Use the
 manual `Deploy database` workflow for migrations and `Deploy` for the
 application. `Run ETL pipelines` provides pipeline and stage choices for
-manual ETL runs.
+manual ETL runs, including standalone transform and load stages for parcels.
