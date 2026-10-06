@@ -1,15 +1,16 @@
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import geopandas as gpd
 import pytest
-from app.main import app
 from fastapi.testclient import TestClient
 from shapely.geometry import Point
 from src.pipelines.flood_history.transform import transform_frame
 from src.shared.data_io import write_json
 from src.shared.database import connect_to_warehouse, publish
+
+from app.main import app
 
 
 @pytest.fixture
@@ -41,10 +42,7 @@ def test_api_spatial_and_time_filters(client):
 
 @pytest.mark.parametrize("bbox", ["bad", "0,0,1", "1,2,0,3", "0,0,nan,1", "-181,0,1,2"])
 def test_bad_bbox_is_rejected(client, bbox):
-    assert (
-        client[0].get("/api/v1/floods/history", params={"bbox": bbox}).status_code
-        == 400
-    )
+    assert client[0].get("/api/v1/floods/history", params={"bbox": bbox}).status_code == 400
 
 
 def test_database_outage_returns_503_without_connection_details(client, monkeypatch):
@@ -86,7 +84,7 @@ def test_ready_and_layer_catalog(client):
 
 def test_scenario_validates_and_preserves_historical_layer(client):
     api, root = client
-    issued = datetime(2026, 9, 30, tzinfo=timezone.utc)
+    issued = datetime(2026, 9, 30, tzinfo=UTC)
 
     def station(start, count, amount):
         return {
@@ -115,16 +113,11 @@ def test_scenario_validates_and_preserves_historical_layer(client):
     assert result.status_code == 200
     assert result.json()["features"][0]["properties"]["scenario"]
     assert (root / "layers" / "flood_history.geojson").read_bytes() == before
-    assert (
-        api.post("/api/v1/scenarios/rain", json={"rain_3h_mm": -1}).status_code == 422
-    )
+    assert api.post("/api/v1/scenarios/rain", json={"rain_3h_mm": -1}).status_code == 422
 
 
 def test_scenario_without_weather_is_unavailable(client):
-    assert (
-        client[0].post("/api/v1/scenarios/rain", json={"rain_3h_mm": 60}).status_code
-        == 503
-    )
+    assert client[0].post("/api/v1/scenarios/rain", json={"rain_3h_mm": 60}).status_code == 503
 
 
 def test_api_reads_the_shared_postgis_layer():
@@ -165,9 +158,5 @@ def test_api_reads_the_shared_postgis_layer():
             publish(layer, previous)
         else:
             with connect_to_warehouse() as connection:
-                connection.execute(
-                    "DELETE FROM layer_features WHERE layer=%s", (layer,)
-                )
-                connection.execute(
-                    "DELETE FROM layer_snapshots WHERE layer=%s", (layer,)
-                )
+                connection.execute("DELETE FROM layer_features WHERE layer=%s", (layer,))
+                connection.execute("DELETE FROM layer_snapshots WHERE layer=%s", (layer,))

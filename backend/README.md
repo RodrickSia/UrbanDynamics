@@ -1,15 +1,57 @@
-# Backend
+# UrbanDynamics API
 
-The backend is a FastAPI service whose ASGI entry point is `app.main:app`.
-Compose keeps it on the internal network; the frontend is the only service that
-publishes a host port.
+The backend is an isolated FastAPI service. Compose connects it to PostGIS on
+the private Docker network as `postgis:5432`; only the frontend publishes a
+host port. `backend/Dockerfile` builds from the repository root and installs
+the locked backend dependencies with `uv`.
 
-The API reads vector snapshots from the shared PostGIS layer tables. Configure
-the warehouse with `WAREHOUSE_HOST`, `WAREHOUSE_PORT`, `WAREHOUSE_DATABASE`,
-`WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD`. In Compose, the host is `postgis` and
-the port is `5432`. The backend does not create or migrate tables; use the
-versioned migrations and runner in `infra/warehouse/`.
+## API discovery
 
-For API routes and frontend integration expectations, see
-[`docs/khoi-implementation.md`](../docs/khoi-implementation.md) and
-[`docs/frontend-backend-handoff.md`](../docs/frontend-backend-handoff.md).
+- Interactive docs: `/api/v1/docs`
+- OpenAPI document: `/api/v1/openapi.json`
+- API index: `/api/v1`
+- Health and readiness: `/health` and `/ready`
+- Layer catalog: `/api/v1/layers`
+
+Coordinates and GeoJSON use WGS84 / EPSG:4326 in `[longitude, latitude]`
+order. Spatial query bboxes use `west,south,east,north`.
+
+## Map endpoints
+
+| Data | API |
+| --- | --- |
+| Flood, satellite, and reviewed land-price GeoJSON | `/api/v1/layers/{layer}/features?bbox=west,south,east,north&start=...&end=...&limit=...` |
+| Mapbox vector tiles | `/api/v1/layers/{layer}/tiles/{z}/{x}/{y}.pbf` |
+| Vector tile metadata | `/api/v1/layers/{layer}/tilejson.json` |
+| Population years and source metadata | `/api/v1/population/years` |
+| Population XYZ PNG tiles | `/api/v1/population/{year}/tiles/{z}/{x}/{y}.png?palette=pseudocolor` |
+| Population point sample | `/api/v1/population/{year}/value?lng=106.7&lat=10.8` |
+| Population viewport statistics | `/api/v1/population/{year}/stats?bbox=west,south,east,north` |
+
+The vector catalog exposes layer availability, geometry types, fields, source
+metadata, and known limitations. Flood history is reported point observations
+with depth and source attributes; satellite polygons mean positive flood
+pixels, not verified dry areas; flood risk polygons are heuristic rain
+indicators around historical events, not simulated flood extent or depth.
+Land-price lines are published only after geometry and extracted values have
+been reviewed.
+
+Population values are persons per source raster cell. The service does not
+claim population density per square kilometer. The source rasters are stored
+in `population.population_raster`, while vector snapshots remain in
+`public.layer_snapshots` and `public.layer_features`.
+Population PNG rendering is done in the API process from resampled pixel
+values, so it does not require enabling GDAL output drivers in PostGIS.
+
+## Configuration and operation
+
+Set `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` through
+the Compose environment. The backend uses the same connection settings as ETL
+and does not run migrations. Apply warehouse migrations using the existing
+database migration runner/workflow. Optional browser origins may be listed in
+`BACKEND_CORS_ORIGINS` as a comma-separated environment variable; same-origin
+frontend proxy requests need no CORS configuration.
+
+For a local run, enter `backend/`, install with `uv sync --frozen`, then run
+`uv run uvicorn app.main:app --reload`. Configure
+`WAREHOUSE_HOST=localhost` when running outside Compose.

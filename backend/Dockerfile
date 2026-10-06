@@ -1,16 +1,23 @@
 FROM python:3.12-slim
 
+COPY --from=ghcr.io/astral-sh/uv:0.12.6 /uv /uvx /bin/
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app/etl \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH=/app/.venv/bin:$PATH
 WORKDIR /app
-COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-COPY backend/app/ ./app/
-COPY etl/src/shared/ ./etl/src/shared/
-COPY etl/src/pipelines/flood_risk/ ./etl/src/pipelines/flood_risk/
-COPY etl/src/__init__.py ./etl/src/__init__.py
-COPY etl/src/pipelines/__init__.py ./etl/src/pipelines/__init__.py
+
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev
+
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --home-dir /app app
+COPY --chown=app:app backend/app/ ./app/
+COPY --chown=app:app etl/src/ ./etl/src/
+USER app
+
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -18,10 +18,6 @@ def rain_scenario(body: RainScenario):
     try:
         return run(body.rain_3h_mm, body.radius_m, body.polygon)
     except (FileNotFoundError, LayerUnavailable):
-        raise HTTPException(
-            503, "Need flood_history and rainfall input snapshots"
-        ) from None
+        raise HTTPException(503, "Need flood_history and rainfall input snapshots") from None
     except (ValueError, KeyError, TypeError):
-        raise HTTPException(
-            400, "Invalid scenario geometry or rainfall input"
-        ) from None
+        raise HTTPException(400, "Invalid scenario geometry or rainfall input") from None

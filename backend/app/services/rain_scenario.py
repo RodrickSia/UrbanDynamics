@@ -12,27 +12,17 @@ def run(rain_mm, radius_m, polygon=None):
         raise ValueError("Too many historical observations for scenario")
     if polygon:
         area = shape(polygon)
-        if (
-            area.is_empty
-            or not area.is_valid
-            or area.geom_type not in ("Polygon", "MultiPolygon")
-        ):
+        if area.is_empty or not area.is_valid or area.geom_type not in ("Polygon", "MultiPolygon"):
             raise ValueError("Scenario area must be a valid polygon")
         if not (
             -180 <= area.bounds[0] < area.bounds[2] <= 180
             and -90 <= area.bounds[1] < area.bounds[3] <= 90
         ):
             raise ValueError("Scenario area must use WGS84")
-        floods["features"] = [
-            f for f in floods["features"] if area.covers(shape(f["geometry"]))
-        ]
+        floods["features"] = [f for f in floods["features"] if area.covers(shape(f["geometry"]))]
     directory = repository.directory() / "inputs"
-    forecast = json.loads(
-        (directory / "rainfall_forecast.json").read_text(encoding="utf-8")
-    )
-    history = json.loads(
-        (directory / "rainfall_history.json").read_text(encoding="utf-8")
-    )
+    forecast = json.loads((directory / "rainfall_forecast.json").read_text(encoding="utf-8"))
+    history = json.loads((directory / "rainfall_history.json").read_text(encoding="utf-8"))
     return {
         "type": "FeatureCollection",
         "features": evaluate(floods, forecast, history, rain_mm, radius_m),
