@@ -45,9 +45,9 @@ Open-Meteo for one integration point. If land-price inputs are missing, it
 downloads and parses the official annex and fetches OSM road candidates. The
 boundary is also prepared automatically. Flood risk can then run; land-price
 publishing remains skipped until a person reviews the candidate geometry and
-price values. Selecting all pipelines requires stage `all`. `transform` and
-`load` are not supported as independent CLI stages; run the full pipeline to
-execute those steps.
+price values. Selecting all pipelines requires stage `all`. Parcel ETL also
+supports independent `transform` and `load` stages; other pipelines require
+their full pipeline to execute those steps.
 
 ## Warehouse and data
 
@@ -60,6 +60,10 @@ load into `parcels.land_plot` from public vector tiles under
 `etl/data/parcels_hcmc`. Run that pipeline with
 `docker compose --profile etl-parcels-hcmc run --rm etl-parcels-hcmc`.
 It does not download listing prices.
+For an already downloaded tile tree, the parcel ETL can also run the stages
+separately with `--stage transform` (validate the XYZ tile tree) and
+`--stage load` (decode and stream the saved tiles to PostGIS). This avoids
+re-fetching tiles when only the database load needs to be completed.
 
 All pipeline services share the host directory `etl/data/`. Flood risk reads a
 previously published `flood_history` layer and forecast/history JSON from
@@ -68,4 +72,6 @@ to OSM roads by normalized name using
 `etl/data/review/land_price_auto_segments.geojson`. These geometries represent
 whole named roads; they are not clipped to the official price table endpoints.
 
-Flood-risk requires forecast and history rainfall files under `etl/data/inputs/`; the repository does not provide a standalone rainfall pipeline.
+Flood-risk requires forecast and history rainfall files under
+`etl/data/inputs/`; the repository does not provide a standalone rainfall
+pipeline.

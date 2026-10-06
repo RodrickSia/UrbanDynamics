@@ -32,6 +32,15 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         )
         return
 
+    if pipeline_name == "parcels_hcmc" and stage in ("transform", "load"):
+        from src.pipelines.parcels_hcmc import load, transform
+        from src.pipelines.parcels_hcmc.config import config
+
+        normalized = transform.run(config.download_dir)
+        if stage == "load":
+            load.run(normalized)
+        return
+
     if stage == "extract":
         extractor = importlib.import_module(f"src.pipelines.{pipeline_name}.extract")
         if pipeline_name == "flood_history":

@@ -18,7 +18,11 @@ _INSERT = """
     )
     VALUES (
         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-        ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)
+        ST_Multi(
+            ST_CollectionExtract(
+                ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)), 3
+            )
+        )
     )
 """
 

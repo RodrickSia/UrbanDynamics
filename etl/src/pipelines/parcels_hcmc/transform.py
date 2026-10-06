@@ -54,7 +54,9 @@ def decode_tile(path: Path) -> list[LandPlot]:
     tile_x = int(path.parent.name)
     tile_y = int(path.stem)
 
-    decoded = mapbox_vector_tile.decode(raw)
+    # MVT coordinates use a top-left origin. Keep the source y direction so
+    # the tile-to-WGS84 conversion below can measure down from tile.north.
+    decoded = mapbox_vector_tile.decode(raw, default_options={"y_coord_down": True})
     plots: list[LandPlot] = []
     for layer_name, layer in decoded.items():
         extent = _layer_extent(raw, layer_name)
@@ -89,7 +91,17 @@ def decode_tile(path: Path) -> list[LandPlot]:
 
 
 def run(download_dir: Path) -> Path:
-    """Confirm the extract directory exists. Decoding happens per tile at load time."""
+    """Validate the extracted tile tree before the streaming PostGIS load."""
     if not download_dir.is_dir():
         raise FileNotFoundError(f"Parcel download directory does not exist: {download_dir}")
+    tiles = sorted(download_dir.glob("*/*/*.pbf"))
+    if not tiles:
+        raise FileNotFoundError(f"No parcel tiles found under {download_dir}")
+    for path in tiles:
+        try:
+            z, x, y = int(path.parent.parent.name), int(path.parent.name), int(path.stem)
+        except ValueError as error:
+            raise ValueError(f"Invalid parcel tile path: {path}") from error
+        if z < 0 or not 0 <= x < 2**z or not 0 <= y < 2**z:
+            raise ValueError(f"Invalid XYZ parcel tile coordinates: {path}")
     return download_dir
