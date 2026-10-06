@@ -15,6 +15,14 @@ venv/
 .ruff_cache/
 .runtime/
 data/
+# Keep the official land-price annex available to local and CI ETL runs.
+!etl/data/
+etl/data/*
+!etl/data/raw/
+etl/data/raw/*
+!etl/data/raw/land_price/
+etl/data/raw/land_price/*
+!etl/data/raw/land_price/official-annex-2026.pdf
 test-results/
 
 # Frontend dependencies and build output
