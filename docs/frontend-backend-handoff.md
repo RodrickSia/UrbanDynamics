@@ -215,6 +215,23 @@ same-origin Compose proxy, so CORS is not needed for that path.
 
 ## Verification
 
+### Deploy and parcels merge — 2026-10-06
+
+- Application commit `8592442` passes the PostGIS integration workflow. Explicit
+  SQL casts select the expression overload of `ST_MapAlgebra`; untyped literals
+  previously selected the callback overload and caused Population PNG HTTP 503.
+- Deploy run `37468390787` ships that fix and the catalog UI. Live checks through
+  the SSH tunnel confirm `/ready` (4 layers, 16 population years), the new frontend
+  bundle, and three neighbouring zoom-16 PNGs at 106.8/10.875, each 256×256 with
+  no transparent edge pixels. Requests took about 2.7–2.9 seconds through the
+  tunnel; this is not evidence that broader performance optimization is complete.
+- The subsequent merge of `feat/nguyen-hcmc-parcels` is code-only. Before deploying
+  that merge, run the protected database migration workflow for
+  `03-parcels-hcmc.sql`, then explicitly load parcel data as needed. The new
+  repository readiness query requires `parcels.loaded_tile`. No production
+  migration or parcel ETL was run as part of this merge; existing frontend
+  controls do not yet expose a parcels toggle.
+
 ### Dataset rendering and location fixes — 2026-10-06
 
 - Population tiles now retain a two-pixel halo (the larger of source/output

@@ -15,6 +15,7 @@ on:
           - flood_satellite
           - flood_risk
           - land_price
+          - parcels_hcmc
       stage:
         description: ETL stage to run
         type: choice
@@ -23,6 +24,8 @@ on:
         options:
           - all
           - extract
+          - transform
+          - load
 
 permissions:
   contents: read
@@ -68,6 +71,23 @@ jobs:
             'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"' \
             sh "$migration_query" | grep -Fxq t; then
             echo "::error::The vector-layer migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+            exit 1
+          fi
+          if [ "$ETL_PIPELINE" = parcels_hcmc ]; then
+            if [ "$ETL_STAGE" != all ] && [ "$ETL_STAGE" != extract ] && \
+              [ "$ETL_STAGE" != transform ] && [ "$ETL_STAGE" != load ]; then
+              echo "::error::Unsupported parcel ETL stage: $ETL_STAGE" >&2
+              exit 1
+            fi
+            parcel_migration_query="to_regclass('parcels.land_plot') IS NOT NULL AND to_regclass('parcels.loaded_tile') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$parcel_migration_query" | grep -Fxq t; then
+              echo "::error::The parcel migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          elif [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; then
+            echo "::error::The transform and load stages are currently supported only for parcels_hcmc." >&2
             exit 1
           fi
 
