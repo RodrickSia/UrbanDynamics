@@ -126,6 +126,18 @@ services:
       postgis:
         condition: service_healthy
 
+  etl-parcels-hcmc:
+    <<: *etl
+    profiles: ["etl-parcels-hcmc"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: parcels_hcmc
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
   khoi-checks:
     build:
       context: .

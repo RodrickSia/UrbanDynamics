@@ -108,6 +108,6 @@ Giá này là bảng giá Nhà nước hiệu lực năm 2026, không phải gi�
 - OpenStreetMap qua Overpass: giữ attribution OSM/ODbL khi dùng hình học đường.
 - Ranh giới demo: hợp ba quận cũ Thủ Đức, 9, 2 từ bộ dữ liệu nguồn; không phải ranh giới phường hành chính hiện tại.
 
-Workflow `.github/workflows/integration-tests.yaml` sinh password ngẫu nhiên mỗi lần chạy, khởi động image PostGIS và migration chính qua Compose mà không publish port, chạy pytest trong cùng mạng rồi dọn volume kiểm thử. Không cần password CI cố định. Pipeline chạy thủ công qua `.github/workflows/etl.yaml` với lựa chọn pipeline và stage `all` hoặc `extract`; database deployment tiếp tục dùng workflow migration riêng.
+Workflow `.github/workflows/integration-tests.yaml` sinh password ngẫu nhiên mỗi lần chạy, khởi động image PostGIS và migration chính qua Compose mà không publish port, chạy pytest trong cùng mạng rồi dọn volume kiểm thử. Không cần password CI cố định. Pipeline chạy thủ công qua `.github/workflows/etl.yaml` với lựa chọn pipeline và stage `all` hoặc `extract`; parcel còn hỗ trợ `transform` và `load`. Database deployment tiếp tục dùng workflow migration riêng.
 
 Workflow ETL tự lấy boundary DataSuds khi thiếu; với flood-risk, workflow lấy forecast và history từ Open-Meteo tại một điểm tích hợp. Đây là đầu vào cho risk, không phải một rainfall ETL hay lưới đại diện toàn thành phố. Land-price dùng phụ lục PDF đã commit, trích xuất các hàng và ghép tự động với đường OSM theo tên chuẩn hóa; xem phần “Ghép giá đất tự động” để biết giới hạn hình học toàn tuyến.

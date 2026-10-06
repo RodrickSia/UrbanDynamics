@@ -11,6 +11,7 @@ PIPELINES = (
     "flood_satellite",
     "flood_risk",
     "land_price",
+    "parcels_hcmc",
 )
 STAGES = ("all", "extract", "transform", "load")
 
@@ -29,6 +30,15 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         importlib.import_module(f"src.pipelines.{pipeline_name}.pipeline").run(
             **{key: value for key, value in kwargs.items() if value is not None}
         )
+        return
+
+    if pipeline_name == "parcels_hcmc" and stage in ("transform", "load"):
+        from src.pipelines.parcels_hcmc import load, transform
+        from src.pipelines.parcels_hcmc.config import config
+
+        normalized = transform.run(config.download_dir)
+        if stage == "load":
+            load.run(normalized)
         return
 
     if stage == "extract":
