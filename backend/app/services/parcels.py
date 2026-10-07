@@ -113,7 +113,7 @@ def detail(parcel_id):
     for candidate in candidates:
         candidate['properties'] = {k: v for k, v in candidate['properties'].items() if k in allowed}
         candidate['distance_m'] = round(candidate['distance_m'], 2)
-    return {'parcel': parcel, 'land_use': land_use(parcel['mdsdd']),
+    return {'parcel': parcel, 'land_use': land_use(None if parcel['conflicting_land_use'] else parcel['mdsdd']),
             'area_source': 'map_geometry', 'planning': planning_breakdown(parcel['loai_dat_qh']),
             'price': price_reference(parcel, candidates)}
 
@@ -137,7 +137,8 @@ def vector_tile(z, x, y):
                   AND p.area_web >= %s
             ), tile AS (
                 SELECT p.id AS feature_id, p.id::text AS parcel_id, p.mdsdd,
-                       COALESCE(%s::jsonb->>trim(p.mdsdd),'#94a3b8') AS color,
+                       CASE WHEN p.conflicting_land_use THEN '#94a3b8'
+                            ELSE COALESCE(%s::jsonb->>p.mdsdd,'#94a3b8') END AS color,
                        p.to_ban_do, p.thua,
                        ST_AsMVTGeom(p.display_geom,b.geom,4096,64,true) AS geom
                 FROM selected p, bounds b

@@ -91,11 +91,11 @@ def test_canonical_geometry_tile_colors_and_price_api(monkeypatch):
         yield connection
     monkeypatch.setattr(parcels, 'connect_to_warehouse', same_transaction)
     try:
-        for west, east in [(106.699, 106.7002), (106.6998, 106.701)]:
+        for west, east, code in [(106.699, 106.7002, 'ODT'), (106.6998, 106.701, ' ODT ')]:
             connection.execute('''INSERT INTO parcels.land_plot
                 (uniq_id,mdsdd,tile_z,tile_x,tile_y,geom)
-                VALUES (%s,'ODT',16,0,0,ST_MakeEnvelope(%s,10.799,%s,10.801,4326))''',
-                (key, west, east))
+                VALUES (%s,%s,16,0,0,ST_MakeEnvelope(%s,10.799,%s,10.801,4326))''',
+                (key, code, west, east))
         connection.execute('REFRESH MATERIALIZED VIEW parcels.plot')
         row = connection.execute('''SELECT id,source_fragments,ST_Area(geom),area_m2
             FROM parcels.plot WHERE uniq_id=%s''', (key,)).fetchone()

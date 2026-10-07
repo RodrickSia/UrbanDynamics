@@ -34,8 +34,8 @@ API → accessible detail dialog. Raw source fragments remain available for audi
 ## Verification
 
 Python: `python -m pytest etl/tests/test_parcel_geometry.py backend/tests/test_parcels.py -q`.
-PostGIS regression fixtures verify union areas and MVT features, query bounds,
-neighbor selection and indexed spatial lookups in an isolated test database.
+PostGIS regression fixtures verify union areas, normalized land-use colors, MVT
+features at zoom 12/14/16 and road-price association in an isolated test database.
 Frontend: `npm test`, `npm run build`, `npm run lint`; Playwright covers parcel
 colors, borders, zoom 12/16, detail selection, dismissal and source cleanup.
 Record benchmark measurements before settling the lowest usable zoom; do not
