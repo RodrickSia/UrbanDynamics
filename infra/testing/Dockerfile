@@ -14,5 +14,6 @@ RUN uv export --project backend --frozen --no-dev --format requirements.txt \
     && pip install --no-cache-dir -r requirements-dev.txt
 COPY etl/ ./etl/
 COPY backend/ ./backend/
+COPY scripts/building_demo.py ./scripts/building_demo.py
 COPY docs/samples/ ./docs/samples/
 CMD ["python", "-m", "pytest", "-q", "--junitxml=test-results/khoi-linux.xml"]

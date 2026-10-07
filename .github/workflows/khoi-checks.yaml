@@ -53,7 +53,8 @@ jobs:
       - name: Install locked backend and ETL test dependencies
         run: |
           uv export --project backend --frozen --no-dev --format requirements.txt --output-file /tmp/khoi-backend-requirements.txt
-          python -m pip install -r /tmp/khoi-backend-requirements.txt -r etl/requirements.txt -r requirements-dev.txt
+          python -m pip install -r /tmp/khoi-backend-requirements.txt
+          python -m pip install -r etl/requirements.txt -r requirements-dev.txt
       - run: python -m pytest -q --junitxml=test-results/khoi-ci.xml
       - name: Stop temporary database
         if: always()
