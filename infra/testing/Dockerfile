@@ -15,5 +15,6 @@ RUN uv export --project backend --frozen --no-dev --format requirements.txt \
 COPY etl/ ./etl/
 COPY backend/ ./backend/
 COPY scripts/building_demo.py ./scripts/building_demo.py
+COPY scripts/prepare-land-price-segments.py ./scripts/prepare-land-price-segments.py
 COPY docs/samples/ ./docs/samples/
 CMD ["python", "-m", "pytest", "-q", "--junitxml=test-results/khoi-linux.xml"]
