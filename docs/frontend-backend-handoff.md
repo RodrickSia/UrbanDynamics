@@ -139,12 +139,12 @@ Interpret the flood products according to their metadata:
 - Flood date controls default to **All dates**; start is inclusive and end is
   exclusive at midnight UTC. The existing map time-range control is not silently
   applied to historic datasets. Land price is not time-filtered by this API.
-- Land price accepts reviewed geometry or explicitly published automatic
-  whole-named-road proxies. Empty/unpublished snapshots stay disabled. Automatic
-  matching and geometry-coverage caveats appear in the legend details and feature
-  inspection. Prices are official reference VND/m², not transaction prices.
-  The catalog renderer owns this overlay; the standalone Land price adapter is
-  used only without a backend bridge, avoiding duplicate layers and popups.
+- Land price accepts reviewed geometry, spatially checked segments, or explicitly
+  published automatic whole-named-road proxies. Empty/unpublished snapshots stay
+  disabled. The land-price adapter from main owns this overlay and its price-color
+  legend, coverage counts, retry and selection details; the generic catalog renderer
+  excludes it to avoid duplicate sources and popups. Spatial matching is not manual
+  review. Prices are official reference VND/m², not transaction prices.
 - HCMC parcels use the backend vector-tile source and catalog availability.
   The layer begins requesting/rendering tiles at zoom 16, avoids per-pan
   GeoJSON/count probes, and opens the parcel's allowlisted cadastral attributes
