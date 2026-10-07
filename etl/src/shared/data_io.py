@@ -34,6 +34,10 @@ def write_json(path, value):
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             json.dump(value, stream, ensure_ascii=False, allow_nan=False)
+        # Public ETL snapshots are shared with the backend's separate container
+        # user. mkstemp defaults to 0600, which prevents that user reading them.
+        if os.name != "nt":
+            os.chmod(temporary, 0o644)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
