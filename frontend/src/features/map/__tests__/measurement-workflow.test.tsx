@@ -86,6 +86,7 @@ describe('distance measurement workflow', () => {
     expect(within(toolbar).queryByText('Horizontal total')).not.toBeInTheDocument();
     expect(within(toolbar).queryByText('Last segment')).not.toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: 'Done' })).toBeEnabled();
+    expect(within(toolbar).getByRole('button', { name: 'Clear measurement' }).querySelector('svg')?.getAttribute('class')).toMatch(/trash/i);
 
     await user.click(screen.getByRole('button', { name: 'Switch to 3D' }));
     expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');
@@ -149,7 +150,10 @@ describe('distance measurement workflow', () => {
     expect(screen.getByRole('region',{name:'Viewshed analysis'})).toHaveTextContent('place the observer');
     expect(screen.queryByRole('region',{name:'Distance measurement'})).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');
-    await user.click(screen.getByRole('button',{name:'Cancel'}));
+    expect(screen.queryByRole('button',{name:'Done'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Delete selected viewshed'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'New'})).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button',{name:'Close viewshed editing'}));
     expect(screen.queryByRole('region',{name:'Viewshed analysis'})).not.toBeInTheDocument();
     expect(screen.getByRole('region',{name:'Distance measurement'})).toHaveTextContent('Measurement complete');
     expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');

@@ -105,7 +105,7 @@ test('classifies real obstruction, survives camera/style changes, and edits worl
   await page.screenshot({ path: 'test-results/viewshed-analysis.png' });
   await page.evaluate('window.viewshedHarness.map.jumpTo({bearing:35,pitch:62,zoom:17.3})');
   expect(await page.evaluate('JSON.stringify(window.viewshedHarness.state.items)')).toBe(before);
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.getByRole('button', { name: 'Close viewshed editing' }).click();
   await expect(page.getByRole('region', { name: 'Viewshed analysis' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit viewshed 1' }).focus();
   await page.keyboard.press('Enter');
@@ -173,11 +173,11 @@ test('classifies real obstruction, survives camera/style changes, and edits worl
   await expect(page.getByLabel('Viewshed spatial handles')).toBeVisible();
   expect(await page.evaluate('JSON.stringify(window.viewshedHarness.state.items)')).toBe(edited);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Close viewshed editing' })).toBeInViewport();
   await page.screenshot({ path: 'test-results/viewshed-mobile.png' });
   expect(await page.evaluate('window.viewshedHarness.glError()')).toBe(0);
   expect(errors).toEqual([]);
-  await page.getByRole('button', { name: 'Delete selected viewshed' }).click();
+  await page.evaluate('window.viewshedHarness.onAction({type:"delete"})');
   await expect.poll(() => page.evaluate('window.viewshedHarness.state.items.length')).toBe(0);
 });
 

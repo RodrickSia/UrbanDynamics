@@ -13,6 +13,14 @@ export interface ParcelDetail {
   price: {
     status: 'reference' | 'unavailable' | 'ambiguous' | 'unverified' | 'unsupported_land_use';
     method: string;
+    source_land_use: string | null;
+    normalized_land_use: string | null;
+    price_category: 'Residential' | 'Commercial' | 'Other non-agricultural' | null;
+    classification_confidence: 'high' | 'medium' | 'low' | 'unmapped';
+    valuation_confidence: 'high' | 'medium' | 'low' | 'none';
+    road_match_status: string;
+    geometry_review_status: string;
+    provenance: string;
     unit_price_vnd_m2: number | null;
     estimated_land_total_vnd: number | null;
     selected: PriceCandidate | null;

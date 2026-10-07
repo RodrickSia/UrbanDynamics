@@ -1,4 +1,4 @@
-import { Check, Eye, Plus, Trash2, X } from 'lucide-react';
+import { Eye, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap, motionDuration, useGSAP } from '../motion';
 import { MotionIconButton } from '../components/MotionIconButton';
@@ -63,8 +63,7 @@ export function ViewshedPanel({
   onAction: (action: ViewshedAction) => void;
   status: string;
 }) {
-  const root = useRef<HTMLElement>(null),
-    [confirmClear, setConfirmClear] = useState(false);
+  const root = useRef<HTMLElement>(null);
   const selected = state.items.find((v) => v.id === state.selectedId);
   const d = selected ? direction(selected) : null;
   useGSAP(
@@ -239,7 +238,7 @@ export function ViewshedPanel({
         </details>
       )}
       {state.items.length >= MAX_VIEWSHEDS && (
-        <p>Limit: {MAX_VIEWSHEDS} analyses. Delete one to add another.</p>
+        <p>Limit: {MAX_VIEWSHEDS} analyses. Select an existing analysis to edit.</p>
       )}
       {state.items.length > 1 && (
         <label className="viewshed-select">
@@ -259,57 +258,6 @@ export function ViewshedPanel({
             ))}
           </select>
         </label>
-      )}
-      <footer>
-        {state.phase === 'observer' || state.phase === 'target' ? (
-          <button className="secondary-button" onClick={() => onAction({ type: 'cancel' })}>
-            Cancel
-          </button>
-        ) : (
-          <button
-            className="secondary-button"
-            onClick={() => onAction({ type: 'start' })}
-            disabled={state.items.length >= MAX_VIEWSHEDS}
-          >
-            <Plus size={15} />
-            New
-          </button>
-        )}
-        {selected && state.phase === 'editing' && (
-          <MotionIconButton
-            className="quiet-icon-button"
-            aria-label="Delete selected viewshed"
-            onClick={() => onAction({ type: 'delete' })}
-          >
-            <Trash2 size={16} />
-          </MotionIconButton>
-        )}
-        {state.phase === 'editing' && (
-          <button className="primary-button" onClick={() => onAction({ type: 'done' })}>
-            <Check size={15} />
-            Done
-          </button>
-        )}
-      </footer>
-      {state.items.length > 1 && (
-        <div className="viewshed-clear">
-          {confirmClear ? (
-            <>
-              <span>Remove all {state.items.length}?</span>
-              <button
-                onClick={() => {
-                  onAction({ type: 'clear' });
-                  setConfirmClear(false);
-                }}
-              >
-                Clear all
-              </button>
-              <button onClick={() => setConfirmClear(false)}>Keep</button>
-            </>
-          ) : (
-            <button onClick={() => setConfirmClear(true)}>Clear all viewsheds</button>
-          )}
-        </div>
       )}
     </section>
   );

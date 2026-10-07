@@ -96,25 +96,6 @@
   cursor: pointer;
   margin-bottom: 0.5rem;
 }
-.viewshed-panel footer {
-  position: sticky;
-  bottom: -1rem;
-  padding: 0.75rem 0;
-  background: rgba(239, 246, 245, 0.96);
-  backdrop-filter: blur(12px);
-  border-radius: 10px;
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 0.75rem;
-}
-.viewshed-panel footer button {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-height: 36px;
-}
 .viewshed-select {
   display: flex;
   align-items: center;
@@ -136,20 +117,6 @@
 }
 .viewshed-quality {
   color: #496267;
-}
-.viewshed-clear {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.65rem;
-  font-size: 0.7rem;
-}
-.viewshed-clear button {
-  background: none;
-  border: 0;
-  text-decoration: underline;
-  color: inherit;
-  cursor: pointer;
 }
 .viewshed-handles {
   position: absolute;
