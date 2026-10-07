@@ -31,6 +31,8 @@ python -m src.main run land_price --full-city --segments etl/data/review/land_pr
 
 Workflow thủ công `.github/workflows/land-price-matching-data.yaml` chạy trên GitHub-hosted runner để tải nguồn và tạo artifact; không có thông tin đăng nhập hoặc quyền truy cập database production. Artifact có roads, polygon phường, đoạn tự ghép, dòng chờ và snapshot giá đất. Cache và artifact phần đã tải được lưu khi lỗi nguồn; nhập `resume_run_id` để tiếp tục từ artifact của lượt trước.
 
+Nếu đã có roads toàn thành phố ở local/server, chọn `source_scope=wards` để chỉ tải polygon phường/xã. Tải artifact về, đặt `inputs/land_price_wards.geojson` và `raw/land_price/wards/` vào cùng `DATA_DIR` của road cache, rồi chạy lệnh chuẩn bị có `--cached`. Chế độ wards không publish lớp giá.
+
 ## Frontend
 
 UI trước thay đổi này khóa lớp Land price. Đã nối lớp với TileJSON và vector tiles của API hiện có, thêm chú giải màu, giá ba loại đất, nguồn PDF, tình trạng duyệt và thống kê phần đã ghép/chờ. Chỉ tải tiles trong khung nhìn; kiểm tra metadata mỗi 5 phút và làm mới khi snapshot thay đổi.
