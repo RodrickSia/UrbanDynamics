@@ -32,7 +32,10 @@ jobs:
       - name: Prepare the sourced analytical city boundary
         run: python scripts/prepare-hcmc-boundary.py --cached
       - name: Fetch roads and current ward polygons; match named intersections
-        run: python scripts/prepare-land-price-segments.py --cached
+        # This tracked annex is byte-identical to the full official PDF
+        # (SHA256 a8e6fee0a6c5698b2937662d71cc858009edf0406c1f2655a4de494f479cfcb6).
+        # Explicit full-city extraction avoids an unnecessary CDN download.
+        run: python scripts/prepare-land-price-segments.py --cached --source etl/data/raw/land_price/official-annex-2026.pdf
       - name: Publish a local GeoJSON snapshot (no production database)
         run: >-
           python -m src.main run land_price --full-city
