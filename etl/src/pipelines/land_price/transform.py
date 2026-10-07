@@ -27,8 +27,14 @@ def run(source, segments):
                 and not segment_properties.get("price_values_reviewed")
                 and not auto_approved):
             continue
+        if record.get('duplicate_identity_review_required'):
+            continue
+        approved_values = segment['properties'].get('reviewed_price_values_1000_vnd_m2')
+        if approved_values is not None and list(values)!=approved_values:
+            continue
         model = LandPrice(identifier, record["road"], record["from"], record["to"], *(v*1000 for v in values))
         properties = asdict(model)
+        properties.update({'ward':record.get('ward'),'region_id':record.get('region_id')})
         properties.update({"source_url": source["source_url"], "effective_from": source["effective_from"],
                            "unit": "VND/m2", "price_kind": "official_reference",
                            "geometry_reviewed": segment_properties.get("reviewed") is True,
@@ -46,6 +52,7 @@ def run(source, segments):
     return collection("land_price", features, source_url=source["source_url"], source_rows=len(source["records"]),
                       matched_rows=len(features), pending_rows=len(source["records"])-len(features),
                       effective_from=source["effective_from"], price_kind="official_reference",
-                      limitations=("Partial named-road coverage. Automatic matches use exact normalized OSM road names "
-                                   "and full-road geometry; official from/to price sections are not spatially clipped. "
-                                   "Values are official reference prices, not transaction or asking prices.")), matched_ids
+                      scope=source.get('scope','HCMC source coverage'),
+                      region_counts=source.get('region_counts'),
+                      rejected_rows=len(source.get('rejected',[])),
+                      limitations="Partial road coverage. Automatic matches are whole named-road proxies, not clipped official price sections. Reviewed matches retain their own coverage labels. Not transaction or asking prices."), matched_ids

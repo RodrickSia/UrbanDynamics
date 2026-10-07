@@ -9,6 +9,9 @@ from shapely.geometry import box, shape
 from src.shared.database import connect_to_warehouse, warehouse_configured
 
 LAYERS = (
+    "hcmc_boundary",
+    "hcmc_regions",
+    "rainwater",
     "flood_history",
     "flood_satellite",
     "flood_satellite_catalog",
@@ -92,6 +95,12 @@ LAYER_INFO = {
     },
 }
 
+
+LAYER_INFO.update({
+    "hcmc_boundary": {"title": "Sourced expanded HCMC analytical boundary", "geometry": ["Polygon", "MultiPolygon"], "fields": ["name"], "time_enabled": False},
+    "hcmc_regions": {"title": "Source administrative regions", "geometry": ["Polygon", "MultiPolygon"], "fields": ["name"], "time_enabled": False},
+    "rainwater": {"title": "Citywide modeled rainfall", "geometry": ["Polygon", "MultiPolygon"], "fields": ["station_id", "forecast_24h_mm", "forecast_max_3h_mm", "issued_at", "status"], "time_enabled": False},
+})
 
 class LayerUnavailable(Exception):
     """Raised when a known layer has no published snapshot."""

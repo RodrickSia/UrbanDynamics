@@ -1,6 +1,15 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
+
+[[package]]
+name = "aenum"
+version = "3.1.17"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/e9/8b283567c1fef7c24d1f390b37daede8b61593d8cdaffb8e95d571699e83/aenum-3.1.17.tar.gz", hash = "sha256:a969a4516b194895de72c875ece355f17c0d272146f7fda346ef74f93cf4d5ba", size = 137648, upload-time = "2026-03-20T20:43:29.846Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/8d/1fe30c6fd8999b9d462547c4a1bb6690bda24af38f2913c4bec7decb81f2/aenum-3.1.17-py3-none-any.whl", hash = "sha256:8b883a37a04e74cc838ac442bdd28c266eae5bbf13e1342c7ef123ed25230139", size = 165560, upload-time = "2026-03-20T20:43:27.681Z" },
+]
 
 [[package]]
 name = "annotated-doc"
@@ -180,6 +189,22 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c7/0e/7fa0ef50764b67090eca4114772a2abf8b6148198475e54c660b97caeee6/click-8.5.0.tar.gz", hash = "sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34", size = 382235, upload-time = "2026-08-26T13:33:14.56Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl", hash = "sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360", size = 125251, upload-time = "2026-08-26T13:33:12.928Z" },
+]
+
+[[package]]
+name = "eclipse-sumo"
+version = "1.27.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sumo-data" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/6e/fef6f21243e6f58b57e8356af0d03e45733bf7817afc059b20aec375f431/eclipse_sumo-1.27.1-py3-none-macosx_14_0_arm64.whl", hash = "sha256:2255536237d81383efe5e53862b030e2dee6e18025210ff6ba4819f11edbb0d4", size = 53827663, upload-time = "2026-06-25T09:47:57.01Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/bc/4377e881434460531762e16cffb41a49a5c625e902193642e1af8d8e2a31/eclipse_sumo-1.27.1-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:e557879511b66511943f0fa1b0f95d2c135d26e2b681665546deb8001133edd5", size = 77553233, upload-time = "2026-06-25T09:48:02.481Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/00/0b88a931c50e277a46ee6110216ef8ca299b064cca82d1fc481d4155754a/eclipse_sumo-1.27.1-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:97abddcb7395c25538f22a272ef67ca77c8a625d3eec6010eed5b62dfac011f3", size = 89032738, upload-time = "2026-06-25T09:48:07.868Z" },
+    { url = "https://files.pythonhosted.org/packages/31/ff/ac71562ad6dade48642c475c80d2c159ec7a83907e8ab9bb2d2f7fb59bda/eclipse_sumo-1.27.1-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:4b56e8bb331bee39d5a102feda7b3441fdfca4704a9ba4f7ed2cdf99ac19d915", size = 126468252, upload-time = "2026-06-25T09:48:15.001Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/13/401d9a7f8dbd404c7ec9cef95a7762a38d71088c38bf964789bc012428ce/eclipse_sumo-1.27.1-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:fd96ace26bccb78312c8c04464c0894a5432db8e2c072388b73e8ae3a6a43586", size = 147105795, upload-time = "2026-06-25T09:48:22.856Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/c4/f12aa67ed92aae1b52de68c4dd73398119c16a2e4921050161d829bc8566/eclipse_sumo-1.27.1-py3-none-win_amd64.whl", hash = "sha256:80f68e916d10696a677a60db81f13d5340efae9451eaa8f3088e67e89870d6aa", size = 165702015, upload-time = "2026-06-25T09:48:30.96Z" },
 ]
 
 [[package]]
@@ -782,6 +807,34 @@ wheels = [
 ]
 
 [[package]]
+name = "sumo-data"
+version = "1.27.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/9d/1c4e7bb11044372fdeafad36a753b2c919b328d280820a14e1ac74f18290/sumo_data-1.27.1-py3-none-any.whl", hash = "sha256:2e547fd20558e07d6004d576eeaf85f4aa061efb4a9bab7675233726364fba61", size = 16189121, upload-time = "2026-06-25T09:50:30.943Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/f9/0ed46d6d8bed8d96f5901907903baea2200196741b579b1b6768396a9f7c/sumo_data-1.27.1-py3-none-macosx_14_0_arm64.whl", hash = "sha256:cc3f71bbeac8dc45a67ef90b023fa8d7ee4bd25c7f62f8006c5c036d545a9527", size = 116182082, upload-time = "2026-06-25T09:50:39.363Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/54/7cfac7fe78b9393ffc0487d799bbeebbdd508147cb84da1c43f19e33e63f/sumo_data-1.27.1-py3-none-win_amd64.whl", hash = "sha256:fa53a3cd34c2f9fd7137d055451b19c44b8972b65dcc15328d2f469647d6d38d", size = 129615571, upload-time = "2026-06-25T09:50:46.708Z" },
+]
+
+[[package]]
+name = "swmm-toolkit"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aenum" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/6f/e059e9e7d3a7107cbd1dc5f897b0b29ae32b63b7a2287ad87d8928785db5/swmm_toolkit-0.17.0.tar.gz", hash = "sha256:83e8e9dccbac785aa4868643cdfc3972ff7ffe06f04fdfa6f603b82f5c643e72", size = 592747, upload-time = "2026-02-26T17:20:02.378Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/d6/24c8da26e3db21d4515d833f15c3551019c257dcb96d248bcd6078207c2d/swmm_toolkit-0.17.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:0390d0afdfb7fb3296638c813dd549b290e0028e6812aac4acab59b442f88870", size = 606795, upload-time = "2026-02-26T17:19:52.02Z" },
+    { url = "https://files.pythonhosted.org/packages/24/34/f0290172534bae205b9ac5a3f2f37f22c74d27b4db3fe3a8b0e262c0e781/swmm_toolkit-0.17.0-cp39-abi3-macosx_11_0_x86_64.whl", hash = "sha256:587025031c81548cd914018663bb4259e000601eb4224b36675aee266fb56e50", size = 682096, upload-time = "2026-02-26T17:19:53.696Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/69/f3f182590129a0d36507823c956981ec4dc55ad30bf1712aaf7f0a4579b2/swmm_toolkit-0.17.0-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f0d5026a98f14db88a79cf790b74877b6822f71e7a548b6618b55ce4a1b0f23e", size = 495529, upload-time = "2026-02-26T17:19:55.115Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/0d/4954077349d3957903ee6b20fe0d4846b44328e6a2a9ce2d077c2f7b8ee3/swmm_toolkit-0.17.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:28737dd539d383a6d8ea2000fc372825b1e25bdaef076bd01fab816ebe62c06e", size = 520831, upload-time = "2026-02-26T17:19:56.562Z" },
+    { url = "https://files.pythonhosted.org/packages/86/82/609a6aa0f442481f7d307f527b4822b4c46827c812901a2473c608c59b7d/swmm_toolkit-0.17.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:34ca45714f790fc84e6884567cfd2af97c702dd5e6a1af6a9f3dd000210db6d2", size = 541304, upload-time = "2026-02-26T17:19:58.017Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/1a/21817b7e1cd6ac3da0897cf1fed0034306569a81109bf40c924aac1eb1a6/swmm_toolkit-0.17.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:c7b81deebf0b65ba6021a6d362b8af14157ffb15781f7fd8ef4c6ca4911f8b80", size = 563777, upload-time = "2026-02-26T17:19:59.436Z" },
+    { url = "https://files.pythonhosted.org/packages/59/be/48a70a62de1ebeb1c2c099290853ac141ca757c2207c9170b335561abd8a/swmm_toolkit-0.17.0-cp39-abi3-win_amd64.whl", hash = "sha256:a8a5a3e5e282d8660fb268f41a87d0da5c3cbed8fae12545ca9fa89a4324187b", size = 1000363, upload-time = "2026-02-26T17:20:00.891Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -816,6 +869,7 @@ name = "urbandynamics-backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "eclipse-sumo" },
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pillow" },
@@ -824,11 +878,13 @@ dependencies = [
     { name = "pyproj" },
     { name = "requests" },
     { name = "shapely" },
+    { name = "swmm-toolkit" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "eclipse-sumo", specifier = "==1.27.1" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "numpy", specifier = ">=2,<3" },
     { name = "pillow", specifier = ">=11,<13" },
@@ -837,6 +893,7 @@ requires-dist = [
     { name = "pyproj", specifier = ">=3.6,<4" },
     { name = "requests", specifier = ">=2.32,<3" },
     { name = "shapely", specifier = ">=2.0,<3" },
+    { name = "swmm-toolkit", specifier = "==0.17.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30,<1" },
 ]
 

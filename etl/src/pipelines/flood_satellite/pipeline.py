@@ -10,6 +10,8 @@ def run(boundary=None, catalog_only=False, limit=MAX_ITEMS, **kwargs):
             "flood_satellite requires --boundary pointing to a WGS84 polygon"
         )
     polygon = read_boundary(boundary)
-    return load.run(
-        transform.run(extract.run(polygon, catalog_only, limit), polygon, catalog_only)
-    )
+    document = transform.run(extract.run(polygon,catalog_only,limit),polygon,catalog_only)
+    from src.shared.data_io import read_json
+    document['metadata']['scope'] = read_json(boundary).get('metadata',{}).get('scope','Custom boundary-filtered area')
+    document['metadata']['lookback_days'] = 30
+    return load.run(document)

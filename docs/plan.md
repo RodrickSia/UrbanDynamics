@@ -1,5 +1,9 @@
 # Kế hoạch triển khai MVP UrbanDynamics đến 17/10/2026
 
+**Cập nhật phần Khôi ngày 07/10:** phạm vi dữ liệu là TP.HCM mở rộng, gồm Bình Dương, Bà Rịa–Vũng Tàu và Côn Đảo. Khôi nhận toàn bộ ETL mưa từ Duy. Dùng [hướng dẫn ETL toàn TP](khoi-citywide-etl.md) cho ranh giới, lịch cập nhật và API hiện hành. Các mô tả Thủ Đức và phân công mưa cho Duy bên dưới là lịch sử kế hoạch. Lưới lấy mẫu mặc định 10 km; scheduler hiện dùng Python stdlib với khóa leader và lịch riêng từng job.
+
+**Cập nhật phạm vi simulation ngày 06/10:** dùng [kế hoạch tác động tổng hợp của building](integrated-building-impact-plan.md) cho công việc tiếp theo. Kế hoạch này bao gồm ngập/dòng chảy, giao thông, điện/nước/nước thải, xanh/nhiệt, dân cư/dịch vụ và bối cảnh giá/quy hoạch; cho phép dữ liệu tổng hợp có nhãn theo thông tin ban tổ chức mà người dùng cung cấp. Những mốc và yêu cầu dữ liệu thật trong các phần cũ bên dưới là lịch sử kế hoạch, không thay thế phạm vi mới.
+
 > Đây là tài liệu kế hoạch có mốc thời gian và mục tiêu ban đầu. Nó không phải trạng thái triển khai hiện tại; xem README và tài liệu service để biết những phần đã có trong mã nguồn.
 
 ## 1\. Mục tiêu và kiến trúc
@@ -41,6 +45,12 @@ Các lớp giao thông trực tiếp, quy hoạch theo thửa và mạng thoát 
 Mọi lớp đều có thông tin nguồn, giấy phép, thời gian quan sát, ngày nhập và độ phân giải. Bộ DataSuds mang giấy phép **CC BY-NC 4.0**, cần giữ attribution và giới hạn sử dụng tương ứng.
 
 ## 3\. Dữ liệu, API và AI
+
+### Ưu tiên bổ sung: so sánh tác động công trình
+
+Ngày 05/10 chỉnh luồng đánh giá tác động công trình: nhập hiện trạng + công trình dự định xây → dự tính chỉ số → đánh giá → tìm gợi ý theo ngân sách/ràng buộc → tính lại. Người dùng không nhập sẵn thiết kế cải thiện. Module dự tính bề mặt, thể tích dòng chảy, chuyến xe cao điểm, nước, nước thải và điện theo hệ số có nguồn do planner cung cấp; đối chiếu phần công suất còn trống trước khi xây. Lưu từng lần chạy có phiên bản; trang demo tại `/simulation`. Chưa dự báo độ sâu/vùng ngập hoặc ùn tắc/thời gian chờ. Chi tiết tại [hướng dẫn simulation hiện tại](building-impact-prediction.md).
+
+Các bước tiếp theo: thay hệ số/công suất giả định trong demo bằng khảo sát hoặc dữ liệu hạ tầng có nguồn; bổ sung chiều cao và mạng đường cho bóng đổ/tiếp cận dịch vụ; hiệu chỉnh mô hình thủy lực và giao thông trên một khu vực nhỏ; tích hợp diễn giải AI từ kết quả đã tính. Tiến độ phụ thuộc dữ liệu và nguồn lực nhóm, chưa được coi là tính năng đã hoàn thành.
 
 **ETL và lưu trữ**
 

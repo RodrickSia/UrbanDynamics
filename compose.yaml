@@ -44,8 +44,11 @@ services:
       <<: *warehouse-env
       DATA_DIR: /data
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-}
+      SCENARIO_DATA_DIR: /runtime/scenarios
+      SIMULATION_WORK_DIR: /runtime/solvers
     volumes:
       - ./etl/data:/data:ro
+      - simulation_runtime:/runtime
     depends_on:
       postgis:
         condition: service_healthy
@@ -147,11 +150,37 @@ services:
     environment:
       <<: *warehouse-env
       POSTGIS_TESTS: "1"
+      TEST_DATABASE_URL: postgresql://${WAREHOUSE_USER:-urbandynamics}:${WAREHOUSE_PASSWORD:-}@postgis:5432/${WAREHOUSE_DATABASE:-urbandynamics}
     volumes:
       - ./test-results:/app/test-results
     depends_on:
       postgis:
         condition: service_healthy
 
+  etl-rainwater:
+    <<: *etl
+    profiles: ["etl-rainwater"]
+    entrypoint: ["python", "-m", "src.khoi_service"]
+    command: []
+    restart: unless-stopped
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      HCMC_BOUNDARY: /app/data/inputs/hcmc_expanded_boundary.geojson
+      RAIN_GRID_M: ${RAIN_GRID_M:-10000}
+      RAIN_BATCH_SIZE: ${RAIN_BATCH_SIZE:-10}
+      RAIN_HISTORY_START_YEAR: ${RAIN_HISTORY_START_YEAR:-2016}
+      RAIN_HISTORY_END_YEAR: ${RAIN_HISTORY_END_YEAR:-}
+      RAIN_HISTORY_STATIONS_PER_RUN: ${RAIN_HISTORY_STATIONS_PER_RUN:-4}
+      RAIN_REFRESH_SECONDS: ${RAIN_REFRESH_SECONDS:-3600}
+      RAIN_HISTORY_REFRESH_SECONDS: ${RAIN_HISTORY_REFRESH_SECONDS:-300}
+      SATELLITE_REFRESH_SECONDS: ${SATELLITE_REFRESH_SECONDS:-21600}
+      FLOOD_HISTORY_REFRESH_SECONDS: ${FLOOD_HISTORY_REFRESH_SECONDS:-604800}
+      LAND_PRICE_REFRESH_SECONDS: ${LAND_PRICE_REFRESH_SECONDS:-2592000}
+    depends_on:
+      postgis:
+        condition: service_healthy
+
 volumes:
   postgis_data:
+  simulation_runtime:

@@ -49,12 +49,14 @@ class WarehouseConfig:
 
 def connect_to_warehouse() -> Connection:
     """Open a warehouse connection using the current environment settings."""
+    if os.getenv("DATABASE_URL"):
+        return psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=5)
     return WarehouseConfig.from_env().connect()
 
 
 def warehouse_configured() -> bool:
     """Use PostGIS when a password is configured; otherwise use local snapshots."""
-    return bool(os.getenv("WAREHOUSE_PASSWORD", "").strip())
+    return bool(os.getenv("DATABASE_URL") or os.getenv("WAREHOUSE_PASSWORD", "").strip())
 
 
 def _validate_document(layer: str, document: dict[str, Any]) -> list[tuple[str, dict, dict, str | None]]:
@@ -118,6 +120,24 @@ def publish(layer: str, document: dict[str, Any], root: str | Path | None = None
         write_json(target / "layers" / f"{layer}.geojson", normalized_document)
         return {"layer": layer, "features": len(rows), "storage": "snapshot"}
 
+    if os.getenv("DATABASE_URL"):
+        # Standalone local stack: bootstrap once, outside the publishing transaction.
+        # The shared WAREHOUSE_* stack uses its migration runner instead.
+        with connect_to_warehouse() as bootstrap:
+            bootstrap.execute("SELECT pg_advisory_xact_lock(hashtext('urban_layer_schema'))")
+            bootstrap.execute("""
+                CREATE EXTENSION IF NOT EXISTS postgis;
+                CREATE TABLE IF NOT EXISTS layer_snapshots (
+                    layer text PRIMARY KEY, metadata jsonb NOT NULL,
+                    updated_at timestamptz NOT NULL DEFAULT now());
+                CREATE TABLE IF NOT EXISTS layer_features (
+                    layer text NOT NULL REFERENCES layer_snapshots(layer),
+                    feature_id text NOT NULL, geom geometry(Geometry,4326) NOT NULL,
+                    properties jsonb NOT NULL, observed_at timestamptz,
+                    PRIMARY KEY (layer, feature_id));
+                CREATE INDEX IF NOT EXISTS layer_features_geom_idx ON layer_features USING gist(geom);
+                CREATE INDEX IF NOT EXISTS layer_features_time_idx ON layer_features(layer, observed_at);
+            """)
     with connect_to_warehouse() as connection:
         connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (layer,))
         connection.execute(
@@ -133,6 +153,9 @@ def publish(layer: str, document: dict[str, Any], root: str | Path | None = None
                    VALUES (%s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), %s, %s::timestamptz)""",
                 (layer, feature_id, json.dumps(geometry, allow_nan=False), Jsonb(properties), observed_at),
             )
+    # Keep a local, atomically replaced cache for context snapshots and offline use.
+    target = Path(root) if root is not None else data_dir()
+    write_json(target / "layers" / f"{layer}.geojson", normalized_document)
     return {"layer": layer, "features": len(rows), "storage": "postgis"}
 
 

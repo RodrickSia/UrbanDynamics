@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UrbanDynamics · Tác động công trình</title>
+    <script defer src="/simulation/integrated.js"></script>
+    <style>
+      :root {
+        font: 15px system-ui;
+        color: #173c43;
+        background: #eef3f3;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      header {
+        padding: 24px max(20px, calc((100vw - 1200px) / 2));
+        background: #123e44;
+        color: white;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0;
+      }
+      h2 {
+        font-size: 20px;
+      }
+      header p {
+        color: #c4dddf;
+      }
+      main {
+        max-width: 1240px;
+        padding: 20px;
+        margin: auto;
+      }
+      .panel {
+        background: white;
+        padding: 22px;
+        border: 1px solid #d2dfdf;
+        border-radius: 12px;
+        margin-bottom: 18px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      label {
+        font-size: 13px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        display: block;
+        padding: 9px;
+        margin: 5px 0 12px;
+        border: 1px solid #acc2c3;
+        border-radius: 6px;
+        font: inherit;
+      }
+      textarea {
+        font:
+          12px ui-monospace,
+          monospace;
+        min-height: 170px;
+      }
+      button,
+      .button {
+        display: inline-block;
+        border: 0;
+        background: #126d71;
+        color: white;
+        padding: 11px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+        margin: 4px 4px 4px 0;
+        text-decoration: none;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      .secondary {
+        background: #e6eeee;
+        color: #173c43;
+      }
+      .notice {
+        padding: 14px;
+        background: #fff1d4;
+        border-left: 4px solid #ba8a34;
+        line-height: 1.6;
+      }
+      .hint {
+        font-size: 13px;
+        color: #516a70;
+        line-height: 1.6;
+      }
+      .scroll {
+        overflow: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        white-space: nowrap;
+      }
+      td,
+      th {
+        padding: 11px 8px;
+        text-align: left;
+        border-bottom: 1px solid #d8e4e3;
+        font-size: 13px;
+      }
+      th {
+        background: #edf5f4;
+      }
+      summary {
+        cursor: pointer;
+        margin: 12px 0;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-size: 12px;
+      }
+      #map {
+        width: 100%;
+        height: 330px;
+        background: #edf3ec;
+        border: 1px solid #ccdcd5;
+        border-radius: 8px;
+        touch-action: none;
+      }
+      #chart {
+        width: 100%;
+        height: 170px;
+      }
+      #status {
+        padding: 10px 0;
+        overflow-wrap: anywhere;
+      }
+      #status.error {
+        color: #a82626;
+      }
+      .benefit,
+      .better,
+      .reduced_demand {
+        color: #08725b;
+      }
+      .worse,
+      .increased_demand {
+        color: #a45215;
+      }
+      .suggestion {
+        padding: 16px;
+        background: #f0f7f5;
+        border: 1px solid #c9ddda;
+        border-radius: 8px;
+        margin: 12px 0;
+      }
+      .tags {
+        font-size: 12px;
+        color: #597477;
+      }
+      a {
+        color: #126d71;
+      }
+      input[type="checkbox"] {
+        width: auto;
+        display: inline;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .metric {
+        padding: 15px;
+        background: #eff7f7;
+        border-radius: 8px;
+      }
+      .metric strong {
+        font-size: 22px;
+        display: block;
+      }
+      #selected {
+        font-weight: bold;
+      }
+      .map-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+      }
+      .legend {
+        font-size: 12px;
+        line-height: 1.8;
+      }
+      #results[hidden] {
+        display: none;
+      }
+      header a {
+        color: #c4eeeb;
+      }
+      @media (max-width: 800px) {
+        main {
+          padding: 12px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .fields {
+          grid-template-columns: 1fr 1fr;
+        }
+        .metrics {
+          grid-template-columns: 1fr 1fr;
+        }
+        h1 {
+          font-size: 22px;
+        }
+        .panel {
+          padding: 16px;
+        }
+      }
+      @media print {
+        #editor,
+        #controls,
+        .actions {
+          display: none;
+        }
+        body {
+          background: white;
+        }
+        .panel {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Đặt một công trình. Xem tác động xung quanh.</h1>
+      <p>
+        Thiết kế → dự tính nhiều feature → đánh giá → chạy lại phương án cải
+        thiện.
+      </p>
+      <a href="/simulation">Mở demo công thức trước đây</a>
+    </header>
+    <main>
+      <p class="notice">
+        Demo có dữ liệu tổng hợp: hiện trạng khu đất, mạng đường/cống, nhu cầu
+        và năng lực hạ tầng. SUMO và SWMM chạy trên mạng kịch bản này. Kết quả
+        chưa được hiệu chỉnh bằng quan trắc địa phương.
+      </p>
+      <section class="panel" id="editor">
+        <h2>1. Building plan</h2>
+        <div class="grid">
+          <div>
+            <label
+              >Mẫu công trình
+              <select id="preset">
+                <option value="residential">Chung cư tại Thủ Đức</option>
+                <option value="school">Trường học</option>
+                <option value="office">Văn phòng</option>
+                <option value="hospital">Bệnh viện</option>
+                <option value="other">Khác</option>
+              </select></label
+            >
+            <label>Tên phương án <input id="title" maxlength="160" /></label>
+            <div class="fields">
+              <label
+                >Số tầng<input
+                  id="floors"
+                  type="number"
+                  min="1"
+                  max="100" /></label
+              ><label
+                >Chiều cao (m)<input
+                  id="height_m"
+                  type="number"
+                  min="1" /></label
+              ><label>Số căn<input id="units" type="number" min="0" /></label>
+              <label
+                >Cư dân thường trú<input
+                  id="residents"
+                  type="number"
+                  min="0" /></label
+              ><label>Nhân viên<input id="staff" type="number" min="0" /></label
+              ><label
+                >Khách/ngày<input id="daily_visitors" type="number" min="0"
+              /></label>
+              <label
+                >Học sinh/người dùng/bệnh nhân (không là cư dân)<input
+                  id="daily_users"
+                  type="number"
+                  min="0"
+              /></label>
+              <label
+                >Đất xanh (m²)<input
+                  id="green_m2"
+                  type="number"
+                  min="0"
+                  step="0.01" /></label
+              ><label
+                >Sân thấm (m²)<input
+                  id="permeable_m2"
+                  type="number"
+                  min="0"
+                  step="0.01" /></label
+              ><label
+                >Sân cứng (m²)<input
+                  id="paved_m2"
+                  type="number"
+                  min="0"
+                  step="0.01"
+              /></label>
+              <label
+                >Bể giữ nước (m³)<input
+                  id="storage_m3"
+                  type="number"
+                  min="0" /></label
+              ><label
+                >Chỗ đỗ xe<input
+                  id="parking_spaces"
+                  type="number"
+                  min="0" /></label
+              ><label
+                >Sạc EV<input id="ev_chargers" type="number" min="0"
+              /></label>
+              <label
+                >Làn tiếp cận cổng<input
+                  id="gate_lanes"
+                  type="number"
+                  min="1"
+                  max="4" /></label
+              ><label
+                >Dừng phục vụ cổng (s)<input
+                  id="gate_service_seconds"
+                  type="number"
+                  min="1"
+                  max="120" /></label
+              ><label
+                >Công suất dịch vụ (người/ngày)<input
+                  id="service_capacity"
+                  type="number"
+                  min="0"
+              /></label>
+            </div>
+            <p class="hint">
+              Mái lấy từ footprint. Mẫu tự điền lịch và hệ số theo công năng.
+              Chỗ đỗ xe được lưu trong thiết kế; chưa có mô hình tìm chỗ đỗ hay
+              hàng chờ parking.
+            </p>
+            <button id="balance" class="secondary">
+              Tính sân cứng còn lại
+            </button>
+          </div>
+          <div>
+            <h3>Khu đất và footprint</h3>
+            <svg
+              id="map"
+              viewBox="0 0 600 330"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="Bản đồ khu đất và tác động"
+            ></svg>
+            <div class="map-actions">
+              <button id="draw-site" class="secondary">Vẽ khu đất</button
+              ><button id="draw-building" class="secondary">Vẽ footprint</button
+              ><button id="finish-draw" class="secondary" disabled>
+                Xong polygon</button
+              ><button id="cancel-draw" class="secondary" disabled>Hủy</button>
+            </div>
+            <p class="hint" id="map-hint">
+              Bản đồ vector WGS84, không cần dịch vụ tile. Nhấp các đỉnh, sau đó
+              chọn Xong polygon. Có thể nhập tọa độ chính xác trong JSON.
+            </p>
+            <p class="legend">
+              🟦 Khu đất · 🟧 Công trình · 🟪 Bóng đổ · đường màu xám / dịch vụ
+              màu xanh: nền tổng hợp · điểm đỏ: lịch sử ngập · điểm tím: nút
+              cống SWMM tổng hợp.
+            </p>
+            <label
+              >Kịch bản sức ép
+              <select id="level">
+                <option value="low">Low — mưa và tải chuyến 0,7×</option>
+                <option value="base" selected>Base — 60 mm/trận</option>
+                <option value="high">High — mưa và tải chuyến 1,3×</option>
+              </select></label
+            >
+            <label
+              >Ngày xét bóng đổ <input id="solar_date" type="date"
+            /></label>
+            <label
+              >Seed <input id="seed" type="number" min="0" max="2147483647"
+            /></label>
+            <p class="hint">
+              Low/base/high là kịch bản sức ép, không phải khoảng tin cậy. Mưa
+              thiết kế tổng hợp; forecast cũ không được dùng làm mưa hiện tại.
+            </p>
+          </div>
+        </div>
+        <details>
+          <summary>
+            Nâng cao: nhiều khối, lịch vận hành, cây, hiện trạng có nguồn, thiết
+            bị và hình học
+          </summary>
+          <textarea
+            id="plan-json"
+            aria-label="Building plan JSON"
+            rows="16"
+          ></textarea
+          ><button id="apply-json" class="secondary">Áp dụng JSON</button
+          ><label
+            >Nhập plan JSON
+            <input id="import-plan" type="file" accept=".json,application/json"
+          /></label>
+        </details>
+        <button id="predict">2. Dự tính tác động</button
+        ><button id="export-plan" class="secondary">Xuất building plan</button>
+        <div id="status" role="status" aria-live="polite">Đang tải mẫu…</div>
+      </section>
+      <section id="results" hidden>
+        <div class="panel">
+          <h2>2. Kết quả trước/sau</h2>
+          <p id="assessment"></p>
+          <div class="metrics" id="cards"></div>
+          <div class="actions">
+            <button id="export-result" class="secondary">
+              Xuất snapshot JSON</button
+            ><a id="artifacts" class="button secondary"
+              >Tải input/output engine ZIP</a
+            ><button id="print" class="secondary">In báo cáo</button>
+          </div>
+          <p class="hint" id="run-info"></p>
+          <label
+            >Xem trên bản đồ và biểu đồ
+            <select id="state">
+              <option value="development">Thiết kế ban đầu</option>
+              <option value="baseline">Hiện trạng</option>
+            </select></label
+          ><label
+            >Bóng đổ trên bản đồ
+            <select id="shadow-hour">
+              <option value="12">12:00</option>
+              <option value="9">09:00</option>
+              <option value="15">15:00</option>
+            </select></label
+          >
+          <div class="scroll">
+            <table id="impact">
+              <thead>
+                <tr>
+                  <th>Feature / đơn vị</th>
+                  <th>Hiện trạng</th>
+                  <th>Đề xuất</th>
+                  <th>Phương án đang xem</th>
+                  <th>Đánh giá đề xuất</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <h3>Nhu cầu theo giờ</h3>
+          <label
+            >Chuỗi
+            <select id="series">
+              <option value="power_kw">Điện (kW)</option>
+              <option value="water_m3">Nước (m³/giờ)</option>
+              <option value="wastewater_m3">Nước thải (m³/giờ)</option>
+              <option value="person_trips">Chuyến người/giờ</option>
+            </select></label
+          ><svg
+            id="chart"
+            viewBox="0 0 720 170"
+            role="img"
+            aria-label="Nhu cầu theo giờ"
+          ></svg>
+          <p class="hint">
+            Xám: hiện trạng · Cam: đề xuất · Xanh: phương án đang xem. Bins 1
+            giờ, múi giờ UTC+7.
+          </p>
+          <details open>
+            <summary>Không gian, dịch vụ và các nút thoát nước</summary>
+            <pre id="spatial-summary"></pre>
+          </details>
+          <details open>
+            <summary>SUMO, SWMM và giới hạn kết quả</summary>
+            <pre id="engine-summary"></pre>
+          </details>
+          <details>
+            <summary>Nguồn, tham số, mục tiêu, seed và dữ liệu chưa có</summary>
+            <pre id="provenance"></pre>
+          </details>
+        </div>
+        <div class="panel" id="controls">
+          <h2>3. Tìm phương án cải thiện</h2>
+          <p class="hint">
+            Hệ thống giữ nguyên footprint, diện tích sàn, số tầng, cư dân và
+            công suất phục vụ; thay bề mặt hoặc thiết bị/lịch nếu được phép, rồi
+            chạy lại các engine. Chi phí là giả định demo.
+          </p>
+          <div class="fields">
+            <label
+              >Ngân sách (VND, có thể để trống)<input
+                id="budget"
+                type="number"
+                min="0" /></label
+            ><label
+              >Chuyển bề mặt tối đa (m²)<input
+                id="conversion"
+                type="number"
+                value="1500"
+                min="0"
+                max="10000" /></label
+            ><label
+              >Bể bổ sung tối đa (m³)<input
+                id="extra-storage"
+                type="number"
+                value="200"
+                min="0"
+                max="1000" /></label
+            ><label
+              >Sân cứng tối thiểu (m²)<input
+                id="min-paved"
+                type="number"
+                value="0"
+                min="0"
+            /></label>
+          </div>
+          <label
+            ><input id="allow-surfaces" type="checkbox" checked /> Cho sửa bề
+            mặt</label
+          >
+          <label
+            ><input id="allow-storage" type="checkbox" checked /> Cho thêm
+            bể</label
+          >
+          <label
+            ><input id="allow-operations" type="checkbox" checked /> Cho sửa
+            thiết bị/lịch</label
+          >
+          <button id="recommend">Chạy lại và so sánh gợi ý</button>
+          <div id="suggestions"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

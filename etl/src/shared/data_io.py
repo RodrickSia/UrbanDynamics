@@ -61,9 +61,11 @@ def download(url, path, max_bytes=100_000_000):
     size = 0
     digest = hashlib.sha256()
     try:
-        with session().get(url, stream=True, timeout=(20, 120)) as response:
-            response.raise_for_status()
-            with os.fdopen(handle, "wb") as stream:
+        # Own the descriptor before network I/O so a DNS/HTTP failure closes it
+        # before Windows removes the temporary file.
+        with os.fdopen(handle, "wb") as stream:
+            with session().get(url, stream=True, timeout=(20, 120)) as response:
+                response.raise_for_status()
                 for block in response.iter_content(65536):
                     size += len(block)
                     if size > max_bytes:

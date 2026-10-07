@@ -1,5 +1,7 @@
 # Hướng dẫn phần Khôi
 
+**Phạm vi mới ngày 07/10/2026:** dùng [hướng dẫn ETL TP.HCM mở rộng](khoi-citywide-etl.md) cho phần Khôi, gồm ETL mưa và dữ liệu cả ba khu vực. Phần mô tả Thủ Đức dưới đây ghi lại phiên bản ban đầu.
+
 ## Phạm vi đã viết
 
 | Thư mục | Công việc |
