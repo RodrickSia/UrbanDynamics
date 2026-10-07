@@ -1198,6 +1198,32 @@ input:focus-visible {
   }
 }
 
+.land-price-legend {
+  position: absolute;
+  z-index: 5;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 65vh;
+  overflow-y: auto;
+  padding: 1rem;
+  border-radius: 1rem;
+  font-size: .8rem;
+}
+.land-price-legend p { margin: .5rem 0; }
+.land-price-legend small { color: var(--text-secondary); }
+.land-price-scale { height: .6rem; border-radius: .3rem; margin-top: .65rem; }
+.land-price-scale-labels { position: relative; height: 1.4rem; font-size: .7rem; }
+.land-price-scale-labels span { position: absolute; transform: translateX(-50%); }
+.land-price-scale-labels span:first-child { left: 0; transform: none; }
+.land-price-scale-labels span:nth-child(2) { left: 6.67%; }
+.land-price-scale-labels span:nth-child(3) { left: 33.33%; }
+.land-price-scale-labels span:last-child { right: 0; transform: none; }
+.land-price-details { position: relative; border-top: 1px solid var(--border-soft, #d1d5db); margin-top: .7rem; padding-top: .7rem; }
+.land-price-details dl { display: grid; grid-template-columns: 1fr auto; gap: .3rem; }
+.land-price-details dd { margin: 0; font-variant-numeric: tabular-nums; }
+.land-price-close { float: right; cursor: pointer; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

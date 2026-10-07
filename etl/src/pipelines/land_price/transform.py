@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from collections import Counter
 from src.shared.data_io import collection
 from .extract import row_id
 from .models import LandPrice
@@ -46,6 +47,12 @@ def run(source, segments):
                            "geometry_source_url": segment_properties.get("geometry_source_url"),
                            "geometry_license": segment_properties.get("geometry_license"),
                            "review_note": segment_properties.get("review_note"),
+                           "match_confidence": "reviewed" if segment_properties.get("reviewed") else segment_properties.get("match_confidence", "name_only_proxy"),
+                           "matcher_version": segment_properties.get("matcher_version"),
+                           "ward_osm_relation_id": segment_properties.get("ward_osm_relation_id"),
+                           "ward_source_url": segment_properties.get("ward_source_url"),
+                           "endpoint_evidence": segment_properties.get("endpoint_evidence"),
+                           "matched_length_m": segment_properties.get("matched_length_m"),
                            "pdf_page": record.get("pdf_page")})
         features.append({"type": "Feature", "id": identifier, "geometry": segment["geometry"], "properties": properties})
         matched_ids.add(identifier)
@@ -55,4 +62,6 @@ def run(source, segments):
                       scope=source.get('scope','HCMC source coverage'),
                       region_counts=source.get('region_counts'),
                       rejected_rows=len(source.get('rejected',[])),
-                      limitations="Partial road coverage. Automatic matches are whole named-road proxies, not clipped official price sections. Reviewed matches retain their own coverage labels. Not transaction or asking prices."), matched_ids
+                      geometry_coverage_counts=dict(Counter(f['properties']['geometry_coverage'] for f in features)),
+                      matched_region_counts=dict(Counter(f['properties']['region_id'] for f in features)),
+                      limitations="Partial road coverage. Spatial matches use OSM commune boundaries and named intersections, not legal cadastral verification. Legacy name-only proxies retain their coverage labels. Extracted PDF prices need review. Not transaction or asking prices."), matched_ids
