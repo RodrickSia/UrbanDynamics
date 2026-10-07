@@ -50,29 +50,12 @@ def boundary(inspect_only=False):
     print("Boundary prepared:", geometry.bounds)
 
 def weather():
-    client = session()
-    issued = datetime.now(timezone.utc).isoformat()
-    for kind, endpoint, parameters in (
-        ("forecast", "https://api.open-meteo.com/v1/forecast", {"forecast_days": 2}),
-        ("history", "https://archive-api.open-meteo.com/v1/archive",
-         {"start_date": "2016-01-01", "end_date": "2025-12-31"}),
-    ):
-        response = client.get(endpoint, params={"latitude": 10.82, "longitude": 106.76,
-                                               "hourly": "precipitation", "timezone": "Asia/Ho_Chi_Minh", **parameters},
-                              timeout=(20, 180))
-        response.raise_for_status()
-        data = response.json()
-        if data["hourly_units"]["precipitation"] != "mm":
-            raise ValueError("Unexpected precipitation unit")
-        hours = [{"time": t+"+07:00", "precipitation_mm": rain}
-                 for t, rain in zip(data["hourly"]["time"], data["hourly"]["precipitation"], strict=True) if rain is not None]
-        # This single coordinate is a live integration input, not citywide coverage.
-        document = {"issued_at": issued, "source_url": response.url,
-                    "stations": [{"id": "thu-duc-test-point", "longitude": 106.76, "latitude": 10.82, "hourly": hours}],
-                    "limitations": "One weather grid point for local integration; Duy supplies production grid."}
-        write_json(data_dir() / "inputs" / f"rainwater_{kind}.json", document)
-        print(kind, "hours:", len(hours))
-
+    from src.pipelines.rainwater.pipeline import run
+    from src.pipelines.flood_risk.pipeline import run as risk
+    result = run(refresh_history=True)
+    if (data_dir()/"layers/flood_history.geojson").exists():
+        result["flood_risk"] = risk()
+    print(json.dumps(result,ensure_ascii=False,indent=2))
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("target", choices=["boundary", "inspect-boundary", "weather", "all"])

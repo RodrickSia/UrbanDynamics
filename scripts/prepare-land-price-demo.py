@@ -9,14 +9,18 @@ from shapely.geometry import MultiLineString, mapping
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/"etl"))
 from src.shared.data_io import data_dir, read_json, write_json
+from src.pipelines.flood_history.transform import normalize
 
 def run():
     rows = read_json(data_dir()/"review/land_price_rows.json")
-    record = next(r for r in rows["records"] if r["road"] == "TRẦN NÃO"
-                  and r["from"] == "XA LỘ HÀ NỘI" and r["to"] == "LƯƠNG ĐINH CỦA")
+    record = next(r for r in rows['records'] if r.get('ward')=='AN KHÁNH'
+                  and normalize(r['road'])=='trannao'
+                  and normalize(r['from'])=='xalohanoi'
+                  and normalize(r['to'])=='luongdinhcua')
     actual = tuple(record[k] for k in ("residential_1000_vnd_m2", "commercial_1000_vnd_m2",
                                      "other_nonagricultural_1000_vnd_m2"))
-    if actual != (152900,91700,76500) or record["pdf_page"] != 36:
+    expected_page = 234 if 'official-full' in rows.get('local_source_name','') or 'cdnchinhphu.vn' in rows['source_url'] else 36
+    if actual != (152900,91700,76500) or record['pdf_page'] != expected_page:
         raise ValueError("Price row changed; repeat PDF review")
     source = read_json(data_dir()/"raw/land_price/osm_roads.json")
     ways = {w["id"]:w for w in source["elements"]}
@@ -39,15 +43,17 @@ def run():
                   "geometry_coverage":"partial_published_segment", "osm_way_ids":[w["id"] for w in selected],
                   "geometry_source_url":"https://www.openstreetmap.org/way/242014077",
                   "geometry_license":"ODbL 1.0", "reviewed_at":"2026-10-04",
-                  "review_note":"PDF page 36 (printed 37), first Tran Nao row: 152.900/91.700/76.500 thousand VND/m2. Two interior OSM carriageway subsets; coverage is partial."}
+                  'reviewed_price_values_1000_vnd_m2':list(actual),
+                  'review_note':f'PDF page {expected_page}, first Tran Nao row: 152.900/91.700/76.500 thousand VND/m2. Two interior OSM carriageway subsets; coverage is partial.'}
     result = {"type":"FeatureCollection", "features":[{"type":"Feature",
               "geometry":mapping(MultiLineString(lines)), "properties":properties}],
               "metadata":{"coverage":"one partial road segment", "source_time":source.get("osm3s",{}).get("timestamp_osm_base")}}
     target = data_dir()/"review/land_price_reviewed.geojson"
     if target.exists():
         existing = read_json(target)
-        result["features"] += [f for f in existing["features"]
-                              if f["properties"].get("price_record_id") != properties["price_record_id"]]
+        result['features'] += [f for f in existing['features']
+                              if f['properties'].get('price_record_id') != properties['price_record_id']
+                              and f['properties'].get('osm_way_ids') != properties['osm_way_ids']]
     write_json(target,result)
     print("Prepared one reviewed partial Tran Nao feature:",target)
 

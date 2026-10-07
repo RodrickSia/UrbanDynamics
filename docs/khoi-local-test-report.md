@@ -1,5 +1,7 @@
 # Báo cáo kiểm thử local phần Khôi
 
+Báo cáo này là đợt 04/10. Kết quả mở rộng TP.HCM và ETL mưa ngày 07/10 được ghi tại [báo cáo mới](khoi-citywide-test-report.md).
+
 Đợt rà soát trước khi push bắt đầu **04/10/2026 23:14:37 (UTC+7)**. Kết quả tổng hợp **PASS**. Kết quả và thời gian từng bước nằm trong `test-results/khoi-local-report.json`. Đây chưa phải nghiệm thu đủ mọi tính năng MVP trong `plan.md`.
 
 ## Môi trường

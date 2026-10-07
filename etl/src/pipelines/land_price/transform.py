@@ -24,8 +24,14 @@ def run(source, segments):
         # Reviewer must confirm the extracted text/values as well as geometry.
         if record.get("extraction_review_required") and not segment["properties"].get("price_values_reviewed"):
             continue
+        if record.get('duplicate_identity_review_required'):
+            continue
+        approved_values = segment['properties'].get('reviewed_price_values_1000_vnd_m2')
+        if approved_values is not None and list(values)!=approved_values:
+            continue
         model = LandPrice(identifier, record["road"], record["from"], record["to"], *(v*1000 for v in values))
         properties = asdict(model)
+        properties.update({'ward':record.get('ward'),'region_id':record.get('region_id')})
         properties.update({"source_url": source["source_url"], "effective_from": source["effective_from"],
                            "unit": "VND/m2", "price_kind": "official_reference", "geometry_reviewed": True,
                            "geometry_coverage": segment["properties"].get("geometry_coverage", "reviewed_published_segment"),
@@ -39,4 +45,7 @@ def run(source, segments):
     return collection("land_price", features, source_url=source["source_url"], source_rows=len(source["records"]),
                       matched_rows=len(features), pending_rows=len(source["records"])-len(features),
                       effective_from=source["effective_from"], price_kind="official_reference",
+                      scope=source.get('scope','HCMC source coverage'),
+                      region_counts=source.get('region_counts'),
+                      rejected_rows=len(source.get('rejected',[])),
                       limitations="Partial manually reviewed road coverage. Not transaction or asking prices."), matched_ids

@@ -12,6 +12,13 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env
+    environment:
+      DATA_DIR: /data
+      SCENARIO_DATA_DIR: /runtime/scenarios
+      SIMULATION_WORK_DIR: /runtime/solvers
+    volumes:
+      - ./data:/data:ro
+      - simulation_runtime:/runtime
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
@@ -39,4 +46,13 @@ services:
   etl-rainwater:
     <<: *etl
     profiles: ["etl-rainwater"]
-    command: ["python", "-m", "src.main", "rainwater"]
+    command: ["python", "-m", "src.khoi_service", "--jobs", "forecast", "history"]
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+    environment:
+      DATA_DIR: /data
+      HCMC_BOUNDARY: /data/inputs/hcmc_expanded_boundary.geojson
+
+volumes:
+  simulation_runtime:

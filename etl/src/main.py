@@ -29,9 +29,11 @@ def main() -> None:
     parser.add_argument("--weather-input", help="Rainwater forecast contract JSON")
     parser.add_argument("--history-input", help="Rainwater historical contract JSON")
     parser.add_argument("--catalog-only", action="store_true", help="Verify STAC coverage without claiming flood pixels")
-    parser.add_argument("--limit", type=int, default=3, choices=range(1, 11))
+    parser.add_argument("--limit", type=int, default=100, choices=range(1, 1001))
+    parser.add_argument('--refresh-history',action='store_true',help='Resume weather history bootstrap from cache')
+    parser.add_argument('--full-city',action='store_true',help='Use complete three-region land-price PDF')
     args = parser.parse_args()
-    if args.pipeline in ("rainwater", "population_hcmc"):
+    if args.pipeline == "population_hcmc":
         PIPELINES[args.pipeline]()
     else:
         result = PIPELINES[args.pipeline](**{k: v for k, v in vars(args).items() if k != "pipeline"})

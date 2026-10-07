@@ -4,3 +4,6 @@ psycopg[binary]>=3.2,<4
 shapely>=2.0,<3
 pyproj>=3.6,<4
 numpy>=2,<3
+requests>=2.32,<3
+eclipse-sumo==1.27.1
+swmm-toolkit==0.17.0

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from shapely.geometry import shape, box
 
-LAYERS = ("flood_history", "flood_satellite", "flood_satellite_catalog", "flood_risk", "land_price")
+LAYERS = ("hcmc_boundary", "hcmc_regions", "rainwater", "flood_history", "flood_satellite", "flood_satellite_catalog", "flood_risk", "land_price")
 
 class LayerUnavailable(Exception):
     pass

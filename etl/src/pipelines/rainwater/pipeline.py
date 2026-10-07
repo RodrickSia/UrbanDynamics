@@ -1,8 +1,9 @@
-from src.pipelines.rainwater import extract, load, transform
+from . import config,grid,extract,load
 
-
-def run() -> None:
-    """Run the rainwater pipeline once its source and transformations are defined."""
-    raw_data = extract.run()
-    normalized_data = transform.run(raw_data)
-    load.run(normalized_data)
+def run(boundary=None,refresh_history=False,**kwargs):
+    settings = config.settings(boundary)
+    cells,metadata = grid.build(settings)
+    forecast = extract.forecast(settings,cells,metadata)
+    history = (extract.history(settings,cells,metadata) if refresh_history
+               else extract.history_cached(settings,cells,metadata))
+    return load.run(forecast,history)

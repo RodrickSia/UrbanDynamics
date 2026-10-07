@@ -32,6 +32,19 @@ def three_hour_windows(station):
 
 def threshold(history_station, month, issued_at):
     cutoff = timestamp(issued_at)
+    if 'thresholds_by_month' in history_station:
+        if history_station.get('threshold_method') != 'wet_p90_3h':
+            raise ValueError('Unsupported cached rainfall threshold')
+        if timestamp(history_station['covered_until']) > cutoff:
+            raise ValueError('Cached threshold includes future historical rain')
+        summary = history_station['thresholds_by_month'].get(str(month), {})
+        count = summary.get('wet_windows', 0)
+        value = summary.get('p90_3h_mm')
+        if count < MIN_WET_WINDOWS or value is None:
+            return None, count
+        if not math.isfinite(value) or value < 0:
+            raise ValueError('Invalid cached rainfall threshold')
+        return value, count
     # Vietnam's calendar month, not UTC's month at midnight boundaries.
     vietnam = timezone(timedelta(hours=7))
     values = [rain for start, rain in three_hour_windows(history_station)
@@ -68,12 +81,18 @@ def evaluate(floods, forecast, history, scenario_mm=None, radius_m=RADIUS_M):
         raise ValueError("Forecast stations missing")
     output = []
     threshold_cache = {}
+    station_lons = np.array([item[1].x for item in prepared])
+    station_lats = np.array([item[1].y for item in prepared])
     for feature in floods["features"]:
         point = shape(feature["geometry"])
         if point.geom_type != "Point":
             raise ValueError("Flood risk requires historical Point observations")
         forward, reverse = metric_transforms(point)
-        station, station_point, windows = min(prepared, key=lambda item: transform(forward, item[1]).distance(Point(0, 0)))
+        # One vectorized projection instead of 117 geometry transforms per event.
+        xs,ys = forward(station_lons,station_lats)
+        distances = np.hypot(xs,ys)
+        nearest = int(np.argmin(distances))
+        station, station_point, windows = prepared[nearest]
         # Alert horizon is the greatest 3h total over the supplied forecast (normally next 24h).
         start, forecast_mm = max(windows, key=lambda item: item[1])
         month = start.astimezone(timezone(timedelta(hours=7))).month
@@ -89,7 +108,7 @@ def evaluate(floods, forecast, history, scenario_mm=None, radius_m=RADIUS_M):
                        "properties": {"status": status, "rain_3h_mm": rain_mm,
                            "threshold_p90_3h_mm": threshold_mm, "wet_windows": sample_count,
                            "radius_m": radius_m, "station_id": station["id"],
-                           "station_distance_m": round(transform(forward, station_point).distance(Point(0, 0)), 1),
+                           "station_distance_m": round(float(distances[nearest]), 1),
                            "forecast_window_start": start.isoformat(), "issued_at": issued_at,
                            "historical_event_id": feature["id"], "location": feature["properties"].get("location"),
                            "scenario": scenario_mm is not None,

@@ -4,7 +4,7 @@ from pathlib import Path
 import pdfplumber
 import numpy as np
 from src.shared.data_io import data_dir, download, read_json, file_provenance
-from .config import PDF_URL, EFFECTIVE_FROM
+from .config import PDF_URL, FULL_PDF_URL, EFFECTIVE_FROM, REGIONS
 
 def row_id(record):
     key = "|".join(str(record.get(k, "")).strip().upper() for k in ("ward", "road", "from", "to"))
@@ -40,31 +40,42 @@ def text_rows(page):
             output.append(cells)
     return output
 
-def parse_pdf(path):
+def parse_pdf(path, source_url=PDF_URL):
     records, rejected = [], []
     # Continue this ward across pages, stopping at the next explicitly titled ward.
     with pdfplumber.open(path) as pdf:
         current_ward = None
         previous_road = None
         pending = None
+        region = 'hcmc_previous'
         for page_index, page in enumerate(pdf.pages):
             text = page.extract_text() or ""
-            title = re.search(r"BẢNG GIÁ ĐẤT PHƯỜNG ([^\n]+)", text)
-            if title:
+            annex = re.search(r'Phụ lục\s+(IV|III|II|V|I)\b',text)
+            if annex:
+                region = REGIONS.get(annex.group(1))
+            title = re.search(r'BẢNG GIÁ ĐẤT (PHƯỜNG|XÃ|ĐẶC KHU)\s+([^\n]+)',text)
+            ward = title.group(2).strip() if title else None
+            if ward and ward != current_ward:
                 if pending:
                     rejected.append({"page":pending[0],"cells":pending[1],"reason":"Unresolved page continuation"})
-                current_ward = title.group(1).strip()
+                current_ward = ward
                 previous_road = None
                 pending = None
-            if current_ward != "AN KHÁNH":
+            if not current_ward or region is None:
                 continue
             tables = page.extract_tables()
             if not tables:
-                tables = [text_rows(page)]
+                try:
+                    tables = [text_rows(page)]
+                except ValueError as error:
+                    rejected.append({'page':page_index+1,'ward':current_ward,'region_id':region,'reason':str(error)})
+                    continue
             for table in tables:
                 for cells in table:
                     cells = [(c or "").replace("\n", " ").strip() for c in cells]
                     if len(cells) != 7:
+                        continue
+                    if cells[0] in ('STT','(1)') or cells[2] in ('TỪ','ĐOẠN ĐƯỜNG'):
                         continue
                     if pending is not None:
                         if cells[0]:
@@ -84,7 +95,7 @@ def parse_pdf(path):
                         rejected.append({"page": page_index+1, "cells": cells, "reason": "Incomplete road segment"})
                         continue
                     previous_road = road
-                    record = {"ward": "AN KHÁNH", "road": road, "from": cells[2], "to": cells[3] or "TRỌN ĐƯỜNG",
+                    record = {"ward": current_ward, 'region_id':region, "road": road, "from": cells[2], "to": cells[3] or "TRỌN ĐƯỜNG",
                               "residential_1000_vnd_m2": int(cells[4].replace(".", "")),
                               "commercial_1000_vnd_m2": int(cells[5].replace(".", "")),
                               "other_nonagricultural_1000_vnd_m2": int(cells[6].replace(".", "")),
@@ -92,20 +103,47 @@ def parse_pdf(path):
                               "segment_scope": "whole_road" if whole_road else "between_endpoints"}
                     record["id"] = row_id(record)
                     records.append(record)
+            if hasattr(page,'close'):
+                page.close()
+            if (page_index+1)%100==0:
+                print(f'Land-price PDF: page {page_index+1}, {len(records)} candidate rows',flush=True)
         if pending:
             rejected.append({"page":pending[0],"cells":pending[1],"reason":"Unresolved page continuation"})
     # Text row grouping can include a clipped continuation at a page edge.
     # Such rows remain explicitly review-required rather than asserted correct.
     if not records:
-        raise ValueError("No supported An Khanh table extracted; use --source with reviewed JSON rows")
-    return {"source_url": PDF_URL, "effective_from": EFFECTIVE_FROM, "published_unit": "1000 VND/m2",
-            "records": records, "rejected": rejected}
+        raise ValueError('No supported road-price table extracted; supply reviewed JSON rows')
+    unique = {}
+    for record in records:
+        if record['id'] in unique:
+            rejected.append({'page':record['pdf_page'],'reason':'Duplicate segment identity needs manual review','record':record})
+            unique[record['id']]['duplicate_identity_review_required'] = True
+        else:
+            unique[record['id']] = record
+    return {"source_url": source_url, "effective_from": EFFECTIVE_FROM, "published_unit": "1000 VND/m2",
+            "records": list(unique.values()), "rejected": rejected,
+            'region_counts':{region:sum(r['region_id']==region for r in unique.values()) for region in REGIONS.values()},
+            'scope':'HCMC expanded; extracted candidates require review',
+            'limitations':'Road-price tables only. Rejected layouts and unreviewed rows are not map-ready prices.'}
 
-def run(source=None):
+def cached_pdf(path,url):
+    provenance = file_provenance(path,url)
+    cache = data_dir()/f'review/land_price_pdf_v2_{provenance["sha256"][:16]}.json'
+    if cache.exists():
+        return read_json(cache)
+    rows = parse_pdf(path,url)
+    rows['source_pdf_sha256'] = provenance['sha256']
+    rows['local_source_name'] = Path(path).name
+    from src.shared.data_io import write_json
+    write_json(cache,rows)
+    return rows
+
+def run(source=None, full_city=False, refresh_source=False):
     if source:
         path = Path(source)
-        rows = read_json(path) if path.suffix.lower() == ".json" else parse_pdf(path)
+        rows = read_json(path) if path.suffix.lower() == '.json' else cached_pdf(path,FULL_PDF_URL if full_city else PDF_URL)
         return rows, [file_provenance(path,rows["source_url"])]
-    path = data_dir() / "raw" / "land_price" / "official-annex-2026.pdf"
-    provenance = download(PDF_URL, path)
-    return parse_pdf(path), [provenance]
+    path = data_dir()/'raw/land_price'/('official-full-2026.pdf' if full_city else 'official-annex-2026.pdf')
+    url = FULL_PDF_URL if full_city else PDF_URL
+    provenance = file_provenance(path,url) if path.exists() and not refresh_source else download(url,path)
+    return cached_pdf(path,url),[provenance]
