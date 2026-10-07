@@ -1,4 +1,5 @@
 from src.shared.data_io import data_dir, read_json, write_json
+from src.shared.spatial import read_boundary
 from . import extract, transform, load, unmatched_rows
 def run(source=None, segments=None, full_city=False, refresh_source=False, **kwargs):
     rows, provenance = extract.run(source,full_city=full_city,refresh_source=refresh_source)
@@ -9,7 +10,9 @@ def run(source=None, segments=None, full_city=False, refresh_source=False, **kwa
         from .road_sources import prepare
         from .road_matcher import match
         roads, wards = prepare(cached=not refresh_source)
-        automatic, pending = match(rows, roads, wards)
+        city_path = data_dir()/'inputs/hcmc_expanded_boundary.geojson'
+        city = read_boundary(city_path) if city_path.exists() else None
+        automatic, pending = match(rows, roads, wards, city_geometry=city)
         write_json(data_dir()/"review/land_price_auto_segments.geojson", automatic)
         # Human-reviewed segments override automatic results. Older name-only
         # proxies must not bypass the citywide spatial checks.

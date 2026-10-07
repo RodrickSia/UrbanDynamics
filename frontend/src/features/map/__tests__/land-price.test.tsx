@@ -64,10 +64,11 @@ describe('land-price map connection', () => {
   it('shows prices, partial coverage and review status without rendering source HTML', () => {
     render(<LandPriceLegend status={{state:'ready',matched:42,sourceRows:9502,pending:9460}}
       selected={{road:'<img src=x onerror=alert(1)>',residential_vnd_m2:152900000,
-        match_confidence:'spatially_checked',source_url:'javascript:alert(1)'}}
+        match_confidence:'spatially_checked',geometry_coverage:'partial_city_clipped_segment',source_url:'javascript:alert(1)'}}
       onClose={vi.fn()} onRetry={vi.fn()} />);
     expect(screen.getByText('152.900.000 ₫/m²')).toBeInTheDocument();
     expect(screen.getByText('Spatial match · not manually reviewed')).toBeInTheDocument();
+    expect(screen.getByText('Partial segment clipped to the analytical city boundary')).toBeInTheDocument();
     expect(screen.getByText(/Blank areas have no mapped price/)).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();

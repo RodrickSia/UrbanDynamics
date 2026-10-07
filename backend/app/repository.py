@@ -87,6 +87,7 @@ LAYER_INFO = {
             "match_confidence",
             "match_method",
             "geometry_coverage",
+            "city_boundary_clipped",
             "source_values_reviewed",
             "pdf_page",
         ],

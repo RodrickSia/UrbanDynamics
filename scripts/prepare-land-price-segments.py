@@ -8,6 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'etl' if (ROOT/'etl').is_dir() else ROOT))
 from src.shared.data_io import data_dir, write_json
+from src.shared.spatial import read_boundary
 from src.pipelines.land_price.extract import run as extract
 from src.pipelines.land_price.road_sources import prepare, wards as fetch_wards
 from src.pipelines.land_price.road_matcher import match
@@ -21,7 +22,8 @@ def run(cached=False, boundary=None, source=None, wards_only=False):
         print(json.dumps({'ward_boundary_count':len(document['features']), **document['metadata']}, ensure_ascii=False))
         return
     roads, wards = prepare(Path(boundary) if boundary else None, cached=cached)
-    automatic, pending = match(rows, roads, wards)
+    city = read_boundary(Path(boundary) if boundary else data_dir()/'inputs/hcmc_expanded_boundary.geojson')
+    automatic, pending = match(rows, roads, wards, city_geometry=city)
     write_json(data_dir()/'review/land_price_auto_segments.geojson', automatic)
     write_json(data_dir()/'review/land_price_spatial_pending.json', {'pending':pending,'metadata':automatic['metadata']})
     print(json.dumps(automatic['metadata'], ensure_ascii=False, indent=2))
