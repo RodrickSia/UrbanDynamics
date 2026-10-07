@@ -33,7 +33,7 @@ export function LandPriceLegend({ status, selected, onClose, onRetry }: {
           <dt>Other non-agricultural</dt><dd>{priceText(selected.other_nonagricultural_vnd_m2)}</dd>
         </dl>
         <p>{matchLabel(selected)}</p>
-        <small>{selected.geometry_coverage === 'partial_published_segment' ? 'Partial published segment' : selected.geometry_coverage === 'whole_named_road_proxy' ? 'Full named-road proxy; endpoints not clipped' : 'OSM geometry; legal segment limits require verification'}</small>
+        <small>{selected.geometry_coverage === 'partial_city_clipped_segment' ? 'Partial segment clipped to the analytical city boundary' : selected.geometry_coverage === 'partial_published_segment' ? 'Partial published segment' : selected.geometry_coverage === 'whole_named_road_proxy' ? 'Full named-road proxy; endpoints not clipped' : 'OSM geometry; legal segment limits require verification'}</small>
         <p>Effective {String(selected.effective_from ?? 'unknown')} · PDF page {String(selected.pdf_page ?? 'unknown')}{source && <> · <a href={source} target="_blank" rel="noopener noreferrer">Source</a></>}</p>
       </section>}
     </aside>

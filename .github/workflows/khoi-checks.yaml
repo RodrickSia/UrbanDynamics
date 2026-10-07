@@ -37,7 +37,7 @@ jobs:
           POSTGRES_PASSWORD="$db_password" docker run --detach --name khoi-ci-postgis \
             -e POSTGRES_PASSWORD -e POSTGRES_USER=urban_test -e POSTGRES_DB=urban_test \
             -p 127.0.0.1:5432:5432 \
-            --health-cmd "pg_isready -U urban_test -d urban_test" \
+            --health-cmd "pg_isready -h 127.0.0.1 -U urban_test -d urban_test" \
             --health-interval 2s --health-timeout 5s --health-retries 30 \
             khoi-ci-warehouse
           for attempt in {1..30}; do

@@ -12,7 +12,7 @@ services:
       - khoi_database:/var/lib/postgresql/data
       - ./infra/warehouse/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U urban -d urban"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U urban -d urban"]
       interval: 5s
       timeout: 5s
       retries: 20

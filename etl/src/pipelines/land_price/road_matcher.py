@@ -8,6 +8,8 @@ import re
 
 from pyproj import Transformer
 from shapely.geometry import LineString, Point, mapping, shape
+from shapely.errors import GEOSException
+from shapely.prepared import prep
 from shapely.ops import linemerge, substring, transform, unary_union
 
 from src.pipelines.flood_history.transform import normalize
@@ -33,11 +35,11 @@ def road_keys(value):
     return result
 
 
-def lines(geometry):
+def lines(geometry, minimum_length=.01):
     if geometry.geom_type == 'LineString':
-        return [geometry] if geometry.length > .01 else []
+        return [geometry] if geometry.length > minimum_length else []
     if geometry.geom_type in ('MultiLineString', 'GeometryCollection'):
-        return [line for part in geometry.geoms for line in lines(part)]
+        return [line for part in geometry.geoms for line in lines(part, minimum_length)]
     return []
 
 
@@ -129,26 +131,31 @@ def road_level(tags):
     return '0'
 
 
-def endpoint_geometry(text, named_roads, ward, target_ways, way_tags):
+def endpoint_geometry(text, named_roads, ward, target_ways, way_tags, ward_buffer=None):
     matches = {item[0]:item for name in road_keys(text) for item in named_roads.get(name, [])}
     if not matches:
         raise ValueError('endpoint_road_missing')
     # Allow the crossing road at the ward boundary, not elsewhere in the city.
+    buffered = ward_buffer if ward_buffer is not None else ward.buffer(2)
     intersections = []
     for identifier, geometry in matches.values():
+        if not geometry.intersects(buffered):
+            continue
+        clipped = geometry.intersection(buffered)
         for target_id, target in target_ways:
             # A flyover crossing is not a named at-grade intersection.
             if road_level(way_tags[identifier]) != road_level(way_tags[target_id]):
                 continue
-            intersections.append(geometry.intersection(ward.buffer(2)).intersection(target))
+            if clipped.intersects(target):
+                intersections.append(clipped.intersection(target))
     return unary_union(intersections)
 
 
-def clip_unique_path(road, start_road, end_road, allow_dual=False):
+def clip_unique_path(road, start_road, end_road, allow_dual=False, *, computed_intersections=False):
     # Computed intersection points must not be intersected a second time:
     # floating point projection can move them microscopically off the line.
-    starts = points(start_road if start_road.geom_type in ('Point','MultiPoint') else road.intersection(start_road))
-    ends = points(end_road if end_road.geom_type in ('Point','MultiPoint') else road.intersection(end_road))
+    starts = points(start_road if computed_intersections or start_road.geom_type in ('Point','MultiPoint') else road.intersection(start_road))
+    ends = points(end_road if computed_intersections or end_road.geom_type in ('Point','MultiPoint') else road.intersection(end_road))
     if not starts or not ends:
         raise ValueError('endpoint_not_intersecting')
     graph = graph_for(road, starts + ends)
@@ -199,8 +206,9 @@ def whole_road(road, allow_dual=False):
     return road
 
 
-def match(source, road_document, ward_document):
+def match(source, road_document, ward_document, city_geometry=None):
     named_roads, ward_index = {}, {}
+    city = prep(city_geometry) if city_geometry is not None else None
     way_tags = {way['id']:way.get('tags',{}) for way in road_document['elements']}
     for way in road_document['elements']:
         coords = [(p['lon'],p['lat']) for p in way.get('geometry', [])]
@@ -218,7 +226,7 @@ def match(source, road_document, ward_document):
     ward_regions = {}
     for row in source['records']:
         ward_regions.setdefault(ward_name(row.get('ward', '')), set()).add(row.get('region_id'))
-    outputs, pending, cache = [], [], {}
+    outputs, pending, cache, ward_geometry = [], [], {}, {}
     for row in source['records']:
         reason = None
         try:
@@ -231,7 +239,10 @@ def match(source, road_document, ward_document):
             if len(candidates) != 1 or len(ward_regions[wk]) != 1:
                 raise ValueError('ambiguous_ward_identity')
             ward_feature = candidates[0]
-            ward = transform(PROJECT, shape(ward_feature['geometry']))
+            if wk not in ward_geometry:
+                polygon = transform(PROJECT, shape(ward_feature['geometry']))
+                ward_geometry[wk] = (polygon, polygon.buffer(2))
+            ward, buffered = ward_geometry[wk]
             names = tuple(sorted(road_keys(row['road'])))
             ck = (wk, names)
             if ck not in cache:
@@ -253,24 +264,41 @@ def match(source, road_document, ward_document):
             else:
                 targets = {item[0]:item for name in names for item in named_roads.get(name, [])
                            if item[0] in way_ids}
-                a = endpoint_geometry(row['from'], named_roads, ward, targets.values(), way_tags)
-                b = endpoint_geometry(row['to'], named_roads, ward, targets.values(), way_tags)
-                selected, starts, ends = clip_unique_path(road, a, b,allow_dual)
+                a = endpoint_geometry(row['from'], named_roads, ward, targets.values(), way_tags, buffered)
+                b = endpoint_geometry(row['to'], named_roads, ward, targets.values(), way_tags, buffered)
+                selected, starts, ends = clip_unique_path(road, a, b,allow_dual, computed_intersections=True)
                 method, coverage = 'spatial_ward_unique_path', 'between_named_intersections_within_ward'
                 evidence = {'start_intersections': starts, 'end_intersections': ends}
+            geographic = transform(UNPROJECT, selected)
+            original_coverage, scope_clipped = coverage, False
+            length = selected.length
+            if city is not None and not city.covers(geographic):
+                pieces = lines(geographic.intersection(city_geometry), minimum_length=0)
+                if not pieces:
+                    raise ValueError('outside_city_boundary')
+                geographic = unary_union(pieces)
+                length = transform(PROJECT, geographic).length
+                if length < 10:
+                    raise ValueError('city_clipped_segment_too_short')
+                coverage, scope_clipped = 'partial_city_clipped_segment', True
             properties = {'price_record_id':row['id'], 'road':row['road'], 'ward':row.get('ward'),
                 'region_id':row.get('region_id'), 'auto_approved':True, 'reviewed':False,
                 'price_values_reviewed':False, 'match_method':method, 'matcher_version':VERSION,
                 'match_confidence':'spatially_checked', 'geometry_coverage':coverage,
+                'source_segment_coverage':original_coverage, 'city_boundary_clipped':scope_clipped,
                 'osm_way_ids':way_ids, 'ward_osm_relation_id':ward_feature['properties'].get('osm_relation_id'),
                 'geometry_source_url':road_document.get('source_endpoint'), 'geometry_license':'ODbL 1.0',
                 'ward_source_url':ward_feature['properties'].get('source_url'),
-                'endpoint_evidence':evidence, 'matched_length_m':round(selected.length,2),
+                'endpoint_evidence':evidence, 'matched_length_m':round(length,2),
                 'review_note':'Automatic OSM spatial checks; current commune and unique named-road path. PDF extraction and legal segment limits still require verification.'}
-            outputs.append({'type':'Feature','id':row['id'], 'geometry':mapping(transform(UNPROJECT,selected)),
+            outputs.append({'type':'Feature','id':row['id'], 'geometry':mapping(geographic),
                 'properties':properties})
         except ValueError as error:
             reason = str(error)
+        except GEOSException:
+            # One malformed/unstable OSM overlay must not discard valid rows.
+            # Keep it pending rather than silently repairing its coordinates.
+            reason = 'osm_geometry_overlay_error'
         if reason:
             pending.append({**row, 'unmatched_reason':reason})
     metadata = {'matcher_version':VERSION, 'source_rows':len(source['records']),

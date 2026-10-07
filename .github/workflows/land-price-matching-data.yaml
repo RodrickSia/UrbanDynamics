@@ -7,6 +7,12 @@ on:
         description: 'Optional earlier data workflow run whose artifact should be reused'
         required: false
         type: string
+      source_scope:
+        description: 'Fetch only wards when the full road cache is already available locally'
+        required: true
+        default: full
+        type: choice
+        options: [full, wards]
 
 permissions:
   contents: read
@@ -46,11 +52,16 @@ jobs:
       - name: Prepare the sourced analytical city boundary
         run: python scripts/prepare-hcmc-boundary.py --cached
       - name: Fetch roads and current ward polygons; match named intersections
+        if: inputs.source_scope != 'wards'
         # This tracked annex is byte-identical to the full official PDF
         # (SHA256 a8e6fee0a6c5698b2937662d71cc858009edf0406c1f2655a4de494f479cfcb6).
         # Explicit full-city extraction avoids an unnecessary CDN download.
         run: python scripts/prepare-land-price-segments.py --cached --source etl/data/raw/land_price/official-annex-2026.pdf
+      - name: Fetch only commune polygons for an existing road cache
+        if: inputs.source_scope == 'wards'
+        run: python scripts/prepare-land-price-segments.py --cached --wards-only --source etl/data/raw/land_price/official-annex-2026.pdf
       - name: Publish a local GeoJSON snapshot (no production database)
+        if: inputs.source_scope != 'wards'
         run: >-
           python -m src.main run land_price --full-city
           --source etl/data/review/land_price_rows.json
