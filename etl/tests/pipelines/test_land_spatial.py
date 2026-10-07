@@ -3,7 +3,7 @@ from shapely.geometry import LineString, box, mapping, shape
 from src.pipelines.land_price.road_matcher import match, clip_unique_path
 from src.pipelines.land_price.road_sources import relation_polygon
 from src.pipelines.land_price.transform import run as prices
-from src.pipelines.land_price import pipeline, road_sources, road_matcher
+from src.pipelines.land_price import pipeline, road_sources
 
 
 def inputs():
@@ -142,3 +142,31 @@ def test_source_failure_does_not_publish_a_partial_snapshot(monkeypatch, tmp_pat
     with pytest.raises(RuntimeError, match='Source unavailable'):
         pipeline.run(full_city=True)
     assert not published
+
+
+def test_overloaded_road_query_subdivides_and_caches_complete_result(monkeypatch, tmp_path):
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    calls = []
+    def source(query):
+        calls.append(query)
+        if len(calls) == 1:
+            raise RuntimeError('Server overloaded')
+        return {'elements':[{'id':1}], 'osm3s':{'timestamp_osm_base':'fixture-time'}}, 'https://fixture'
+    monkeypatch.setattr(road_sources, 'request', source)
+    result = road_sources.road_chunk((106,10,107,11), cached=True)
+    assert result['elements'] == [{'id':1}]
+    assert len(calls) == 5
+    assert len(result['queries']) == 4
+    assert result['source_endpoints'] == ['https://fixture']
+    assert road_sources.road_chunk((106,10,107,11), cached=True) == result
+    assert len(calls) == 5
+
+
+def test_subdivision_failure_does_not_create_a_complete_chunk(monkeypatch, tmp_path):
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    def unavailable(query):
+        raise RuntimeError('Unavailable')
+    monkeypatch.setattr(road_sources, 'request', unavailable)
+    with pytest.raises(RuntimeError):
+        road_sources.road_chunk((106,10,107,11), cached=True)
+    assert not list(tmp_path.rglob('bbox-v1-*.json'))

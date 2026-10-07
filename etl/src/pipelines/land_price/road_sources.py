@@ -1,5 +1,6 @@
 """Cached OSM roads and current commune boundaries for spatial price matching."""
 import logging
+import hashlib
 import requests
 
 from shapely.geometry import LineString, Point, mapping, shape
@@ -29,7 +30,8 @@ def request(query):
             return result, endpoint
         except (ValueError, requests.RequestException) as error:
             last = error
-            LOGGER.warning('OSM source failed: %s (%s)', endpoint, type(error).__name__)
+            LOGGER.warning('OSM source failed: %s (%s, HTTP %s)', endpoint, type(error).__name__,
+                           getattr(getattr(error, 'response', None), 'status_code', None))
     raise RuntimeError('OSM sources unavailable; previous published data retained') from last
 
 
@@ -157,6 +159,36 @@ def wards(boundary, cached=False):
     return document
 
 
+def road_chunk(bounds, cached=False, depth=0):
+    """Reduce overloaded road queries; cache successful subdivisions atomically."""
+    west, south, east, north = bounds
+    identifier = hashlib.sha256(','.join(f'{v:.8f}' for v in bounds).encode()).hexdigest()[:20]
+    path = data_dir()/f'raw/land_price/osm_chunks/bbox-v1-{identifier}.json'
+    if cached and path.exists():
+        return read_json(path)
+    query = (f'[out:json][timeout:90];way[highway][name]'
+             f'({south},{west},{north},{east});out geom;')
+    try:
+        body, endpoint = request(query)
+        body['source_endpoint'] = endpoint
+        body['queries'] = [query]
+    except RuntimeError:
+        if depth >= 2:
+            raise
+        x, y = (west+east)/2, (south+north)/2
+        LOGGER.info('Subdividing overloaded OSM road query at depth %s', depth)
+        children = [road_chunk(b, cached, depth+1) for b in (
+            (west,south,x,y), (x,south,east,y), (west,y,x,north), (x,y,east,north))]
+        ways = {w['id']:w for child in children for w in child['elements']}
+        endpoints = sorted({u for child in children for u in
+                            child.get('source_endpoints', [child.get('source_endpoint', ENDPOINTS[0])])})
+        body = {'elements':list(ways.values()), 'source_endpoints':endpoints,
+                'source_endpoint':endpoints[0], 'queries':[q for child in children for q in child['queries']],
+                'source_times':[child.get('osm3s', {}).get('timestamp_osm_base') for child in children]}
+    write_json(path, body)
+    return body
+
+
 def roads(boundary, cached=False):
     cache = data_dir()/'raw/land_price/osm_roads.json'
     if cached and cache.exists():
@@ -166,26 +198,27 @@ def roads(boundary, cached=False):
     from src.pipelines.rainwater.config import Settings
     from src.pipelines.rainwater.grid import build
     city = read_boundary(boundary)
-    cells, grid = build(Settings(boundary, grid_m=50000))
-    ways, queries, body = {}, [], {}
+    cells, grid = build(Settings(boundary, grid_m=20000))
+    ways, queries, endpoints, source_times = {}, [], set(), []
     for index, cell in enumerate(cells):
         west, south, east, north = shape(cell['geometry']).bounds
-        query = (f'[out:json][timeout:90];way[highway][name]'
-                 f'({south},{west},{north},{east});out geom;')
         chunk = data_dir()/f'raw/land_price/osm_chunks/{grid["grid_id"]}-{index}.json'
         if cached and chunk.exists():
             body = read_json(chunk)
         else:
-            body, endpoint = request(query)
+            body = road_chunk((west,south,east,north), cached)
             write_json(chunk, body)
         for way in body['elements']:
             coords = [(p['lon'],p['lat']) for p in way.get('geometry',[])]
             if len(coords) >= 2 and LineString(coords).intersects(city):
                 ways[way['id']] = way
-        queries.append(query)
+        queries.extend(body.get('queries', []))
+        endpoints.update(body.get('source_endpoints', [body.get('source_endpoint', ENDPOINTS[0])]))
+        source_times.extend(body.get('source_times', [body.get('osm3s', {}).get('timestamp_osm_base')]))
         LOGGER.info('OSM roads %s/%s', index+1, len(cells))
     result = {'elements':list(ways.values()), 'queries':queries, 'scope':'HCMC expanded',
-        'source_endpoint':ENDPOINTS[0], 'osm3s':body.get('osm3s',{})}
+        'source_endpoint':sorted(endpoints)[0], 'source_endpoints':sorted(endpoints),
+        'source_times':source_times}
     write_json(cache, result)
     return result
 
