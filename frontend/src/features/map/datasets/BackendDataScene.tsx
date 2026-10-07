@@ -12,6 +12,8 @@ import { type DataSelection, type DataLayerId, type LayerReport } from './datase
 import { dataSourceId, datasetStyle } from './datasetStyle';
 import { floodLocationDetails } from './floodLocation';
 import { populationRasterSource, viewportProbeDelayAfterMove } from './populationRaster';
+import { PARCEL_MIN_ZOOM, PARCEL_MAX_NATIVE_ZOOM, PARCEL_OUTLINE, parcelOutline } from './parcelStyle';
+import { ParcelDetails } from '../parcels/ParcelDetails';
 import './data.css';
 
 export interface BackendBridge {
@@ -77,9 +79,9 @@ function DatasetSource({
           tileError ? 'error' : 'ready',
           tileError
             ? 'Parcel tiles unavailable · retry'
-            : map.getZoom() < 16
-              ? 'Zoom in to level 16 to view parcel boundaries'
-              : 'Click a parcel to inspect its attributes',
+            : map.getZoom() < PARCEL_MIN_ZOOM
+              ? 'Zoom closer to explore land use'
+              : 'Select a plot for land use and road-price references',
         );
         return;
       }
@@ -132,8 +134,8 @@ function DatasetSource({
             : {
                 type: 'vector',
                 tiles: [selectedAtAttach.url],
-                minzoom: selectedAtAttach.dataset === 'parcels' ? 16 : 0,
-                maxzoom: 18,
+                minzoom: selectedAtAttach.dataset === 'parcels' ? PARCEL_MIN_ZOOM : 0,
+                maxzoom: selectedAtAttach.dataset === 'parcels' ? PARCEL_MAX_NATIVE_ZOOM : 18,
                 attribution: 'UrbanDynamics · published datasets',
               },
         );
@@ -158,6 +160,9 @@ function DatasetSource({
               String(layer.type) === 'custom',
           )?.id;
         map.addLayer(datasetStyle(selectedAtAttach), before);
+        if (selectedAtAttach.dataset === 'parcels' && !map.getLayer(PARCEL_OUTLINE)) {
+          map.addLayer(parcelOutline(), before);
+        }
       }
       applyOpacity(map, selectedAtAttach, opacityRef.current);
       publish('loading', 'Loading…');
@@ -203,6 +208,7 @@ function DatasetSource({
       map.off('movestart', moving);
       map.off('error', onError);
       map.off('idle', settled);
+      if (selectedAtAttach.dataset === 'parcels' && map.getLayer(PARCEL_OUTLINE)) map.removeLayer(PARCEL_OUTLINE);
       if (map.getLayer(sourceId)) map.removeLayer(sourceId);
       if (map.getSource(sourceId)) map.removeSource(sourceId);
     };
@@ -225,6 +231,9 @@ function applyOpacity(map: MapLibreMap, selection: DataSelection, opacity: numbe
           : 'fill';
   const multiplier = selection.dataset === 'parcels' ? 0.35 : type === 'fill' ? 0.6 : 1;
   map.setPaintProperty(id, `${type}-opacity`, opacity * multiplier);
+  if (selection.dataset === 'parcels' && map.getLayer(PARCEL_OUTLINE)) {
+    map.setPaintProperty(PARCEL_OUTLINE, 'line-opacity', Math.min(1, opacity * 1.15));
+  }
 }
 const FIELDS: Record<string, string> = {
   location: 'Reported location',
@@ -299,6 +308,7 @@ export function BackendDataScene({
 }
 function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: BackendBridge }) {
   const [inspection, setInspection] = useState<Record<string, unknown> | null>(null);
+  const [parcelId, setParcelId] = useState<string | null>(null);
   const current = useRef(bridge);
   useEffect(() => {
     current.current = bridge;
@@ -310,6 +320,14 @@ function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: B
     const click = (event: MapMouseEvent) => {
       request?.abort();
       const selections = current.current.selections;
+      const parcel = selections.some(s => s.id === 'parcels') && map.getLayer('dataset-parcels')
+        ? map.queryRenderedFeatures(event.point, { layers: ['dataset-parcels'] })[0] : undefined;
+      if (parcel?.properties.parcel_id) {
+        setInspection(null);
+        setParcelId(String(parcel.properties.parcel_id));
+        return;
+      }
+      setParcelId(null);
       const ids = selections
         .filter((s) => s.dataset !== 'population')
         .map((s) => dataSourceId(s.id))
@@ -349,6 +367,7 @@ function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: B
   }, [map, selectionKey]);
   return (
     <>
+      {parcelId && <ParcelDetails key={parcelId} parcelId={parcelId} onClose={() => setParcelId(null)} />}
       {inspection && bridge.selections.length > 0 && (
         <aside className="dataset-inspection glass-panel" aria-label="Dataset details">
           <button

@@ -106,7 +106,7 @@ export function tileUrl(
       ? `/api/v1/population/${year}/tiles/{z}/{x}/{y}.png${queryString({ palette, render: '2' })}`
       : `/api/v1/layers/${dataset}/tiles/{z}/{x}/{y}.pbf${queryString(
           dataset === 'land_price' || dataset === 'parcels'
-            ? {}
+            ? (dataset === 'parcels' ? { schema: '2' } : {})
             : { ...dates, ...(dataset === 'flood_history' ? { schema: '2' } : {}) },
         )}`;
   return `${API_BASE_URL}${path}`;

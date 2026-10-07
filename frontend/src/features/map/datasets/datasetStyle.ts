@@ -1,5 +1,6 @@
 import type { LayerSpecification } from 'maplibre-gl';
 import { type DataSelection, type DataLayerId, RISK_COLORS } from './datasets';
+import { parcelFill } from './parcelStyle';
 export const dataSourceId = (id: DataLayerId) => `dataset-${id}`;
 export function datasetStyle(selection: DataSelection): LayerSpecification {
   const source = dataSourceId(selection.id);
@@ -76,15 +77,6 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
         },
       };
     case 'parcels':
-      return {
-        ...common,
-        type: 'fill',
-        minzoom: 16,
-        paint: {
-          'fill-color': '#3da8ae',
-          'fill-opacity': 0.18,
-          'fill-outline-color': '#005b65',
-        },
-      };
+      return parcelFill();
   }
 }

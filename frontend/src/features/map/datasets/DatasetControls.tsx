@@ -108,10 +108,10 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
       )}
       {id === 'parcels' && (
         <>
-          <Legend color="#3da8ae" label="Cadastral plot" />
+          <Legend color="#e85430" label="Land-use colors" />
           <DatasetNote>
-            Boundaries appear from zoom level 16. Source attributes describe the mapped parcel and
-            do not verify ownership or legal status.
+            Colors follow source land-use codes; grey means unknown. Small plots appear as you
+            zoom in. Select a plot to see its source attributes and nearby road-price references.
           </DatasetNote>
         </>
       )}
