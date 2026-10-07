@@ -1,0 +1,596 @@
+{
+  "source": "etl/data/parcels_hcmc/samples/thua-q1.geojson",
+  "source_field": "color",
+  "source_feature_count": 57514,
+  "provenance_note": "Observed sample colors, not verified cadastral/legal palette. Raw MVT source has no color field. Trimmed-code collisions use the most frequent sample color; preserve case and diacritics. Labels, when present, repeat source text without legal interpretation.",
+  "fallback_color": "#94a3b8",
+  "entries": {
+    "AN": {
+      "color": "#6b443c",
+      "sample_count": 1
+    },
+    "AN/QP": {
+      "color": "#bb8c7f",
+      "sample_count": 65
+    },
+    "Ao(Hồ).c": {
+      "color": "#a9a440",
+      "sample_count": 1
+    },
+    "B.Vien": {
+      "color": "#9e91a1",
+      "sample_count": 2
+    },
+    "B.thÕ": {
+      "color": "#9d4281",
+      "sample_count": 3
+    },
+    "B.thọ": {
+      "color": "#956081",
+      "sample_count": 1
+    },
+    "B.vien": {
+      "color": "#3e9db3",
+      "sample_count": 1
+    },
+    "B.viƯn": {
+      "color": "#4848b3",
+      "sample_count": 2
+    },
+    "B.viện": {
+      "color": "#6088b7",
+      "sample_count": 3
+    },
+    "B.điện": {
+      "color": "#9b868c",
+      "sample_count": 3
+    },
+    "C. ty": {
+      "color": "#7a7692",
+      "sample_count": 1
+    },
+    "C.A": {
+      "color": "#6e5f3d",
+      "sample_count": 12
+    },
+    "C.L.B": {
+      "color": "#69a892",
+      "sample_count": 1
+    },
+    "C.hang": {
+      "color": "#ab7780",
+      "sample_count": 2
+    },
+    "C.quan": {
+      "color": "#82ba85",
+      "sample_count": 214
+    },
+    "C.ty": {
+      "color": "#ba4c61",
+      "sample_count": 167,
+      "source_variants": [
+        {
+          "source_value": "C.ty",
+          "colors": {
+            "186,76,97": 165
+          }
+        },
+        {
+          "source_value": "C.ty ",
+          "colors": {
+            "154,92,147": 2
+          }
+        }
+      ]
+    },
+    "CD": {
+      "color": "#a3443c",
+      "sample_count": 1
+    },
+    "CDG": {
+      "color": "#4a623d",
+      "sample_count": 108
+    },
+    "CDK": {
+      "color": "#4e623d",
+      "sample_count": 35,
+      "source_variants": [
+        {
+          "source_value": "CDK ",
+          "colors": {
+            "174,164,97": 1
+          }
+        },
+        {
+          "source_value": "CDK",
+          "colors": {
+            "78,98,61": 34
+          }
+        }
+      ]
+    },
+    "CLB": {
+      "color": "#4d633d",
+      "sample_count": 4
+    },
+    "Ch*a": {
+      "color": "#52b962",
+      "sample_count": 3
+    },
+    "Cho": {
+      "color": "#96663d",
+      "sample_count": 1
+    },
+    "Chùa": {
+      "color": "#815462",
+      "sample_count": 5,
+      "label": "Chùa"
+    },
+    "Cty": {
+      "color": "#ac683d",
+      "sample_count": 1
+    },
+    "D.hoc": {
+      "color": "#8840a5",
+      "sample_count": 1
+    },
+    "DDT": {
+      "color": "#98663d",
+      "sample_count": 16
+    },
+    "DSK": {
+      "color": "#5a8c5a",
+      "sample_count": 1795
+    },
+    "DT": {
+      "color": "#54453c",
+      "sample_count": 2
+    },
+    "Dầu khí": {
+      "color": "#9c525d",
+      "sample_count": 1,
+      "label": "Dầu khí"
+    },
+    "GT": {
+      "color": "#b7453c",
+      "sample_count": 45
+    },
+    "H.D.thuật": {
+      "color": "#763d47",
+      "sample_count": 2
+    },
+    "IIa^": {
+      "color": "#4d8765",
+      "sample_count": 1
+    },
+    "K.s/n": {
+      "color": "#a592a4",
+      "sample_count": 1
+    },
+    "K.san": {
+      "color": "#9799a4",
+      "sample_count": 5
+    },
+    "K.sạn": {
+      "color": "#577fa8",
+      "sample_count": 5
+    },
+    "Kh.sách": {
+      "color": "#3c4ba7",
+      "sample_count": 1
+    },
+    "Kho": {
+      "color": "#9e883d",
+      "sample_count": 3,
+      "label": "Kho"
+    },
+    "Kh¸c": {
+      "color": "#aaae66",
+      "sample_count": 1
+    },
+    "Khác": {
+      "color": "#73b466",
+      "sample_count": 8,
+      "label": "Khác"
+    },
+    "L": {
+      "color": "#883c3c",
+      "sample_count": 1
+    },
+    "L.sự": {
+      "color": "#7a5a66",
+      "sample_count": 2
+    },
+    "M.giáo": {
+      "color": "#77b253",
+      "sample_count": 7
+    },
+    "M.non": {
+      "color": "#a2b648",
+      "sample_count": 1
+    },
+    "Miếu": {
+      "color": "#a6aa6b",
+      "sample_count": 2,
+      "label": "Miếu"
+    },
+    "N.tho": {
+      "color": "#43685a",
+      "sample_count": 2
+    },
+    "N.thê": {
+      "color": "#3e685a",
+      "sample_count": 2
+    },
+    "N.tre": {
+      "color": "#83695a",
+      "sample_count": 2
+    },
+    "N.trÅ": {
+      "color": "#63695a",
+      "sample_count": 1
+    },
+    "Ngh.cứu": {
+      "color": "#4867b6",
+      "sample_count": 1
+    },
+    "Nh.khách": {
+      "color": "#3fa38d",
+      "sample_count": 6
+    },
+    "Nh.máy": {
+      "color": "#47b8a3",
+      "sample_count": 1
+    },
+    "Nhà khách": {
+      "color": "#91724c",
+      "sample_count": 1,
+      "label": "Nhà khách"
+    },
+    "Nhà vệ sinh": {
+      "color": "#8149b5",
+      "sample_count": 1,
+      "label": "Nhà vệ sinh"
+    },
+    "NĐ": {
+      "color": "#5a473c",
+      "sample_count": 8
+    },
+    "ODT": {
+      "color": "#d6604d",
+      "sample_count": 26
+    },
+    "OTC": {
+      "color": "#e85430",
+      "sample_count": 53181,
+      "source_variants": [
+        {
+          "source_value": "OTC",
+          "colors": {
+            "232,84,48": 53178
+          }
+        },
+        {
+          "source_value": " OTC",
+          "colors": {
+            "130,163,78": 3
+          }
+        }
+      ]
+    },
+    "Q.sư": {
+      "color": "#9e7a69",
+      "sample_count": 1
+    },
+    "Q.sự": {
+      "color": "#5f9869",
+      "sample_count": 10
+    },
+    "R/p": {
+      "color": "#8d9f3d",
+      "sample_count": 2
+    },
+    "Rap": {
+      "color": "#7fa53d",
+      "sample_count": 2
+    },
+    "S.thị": {
+      "color": "#a480b5",
+      "sample_count": 1
+    },
+    "Sân": {
+      "color": "#5fba3d",
+      "sample_count": 1,
+      "label": "Sân"
+    },
+    "T": {
+      "color": "#903c3c",
+      "sample_count": 165,
+      "source_variants": [
+        {
+          "source_value": "T",
+          "colors": {
+            "144,60,60": 155
+          }
+        },
+        {
+          "source_value": "T ",
+          "colors": {
+            "176,70,60": 10
+          }
+        }
+      ]
+    },
+    "T.Hoc": {
+      "color": "#784046",
+      "sample_count": 1
+    },
+    "T.hoc": {
+      "color": "#984847",
+      "sample_count": 2
+    },
+    "T.viƯn": {
+      "color": "#9aa3b0",
+      "sample_count": 2
+    },
+    "T.viện": {
+      "color": "#b263b4",
+      "sample_count": 20
+    },
+    "TL": {
+      "color": "#5c473c",
+      "sample_count": 2
+    },
+    "TON": {
+      "color": "#8dab3d",
+      "sample_count": 1
+    },
+    "Th.nhi": {
+      "color": "#a5a0a2",
+      "sample_count": 3
+    },
+    "Tr.C.đoàn": {
+      "color": "#afb97a",
+      "sample_count": 1
+    },
+    "Tr.hoc": {
+      "color": "#8a7c57",
+      "sample_count": 14
+    },
+    "Tr.hình": {
+      "color": "#5aac41",
+      "sample_count": 1
+    },
+    "Tr.học": {
+      "color": "#a8665b",
+      "sample_count": 25
+    },
+    "Tr.liên lạc": {
+      "color": "#4d5356",
+      "sample_count": 2
+    },
+    "Tr.tâm": {
+      "color": "#733e57",
+      "sample_count": 1
+    },
+    "U.B": {
+      "color": "#81ab3d",
+      "sample_count": 5
+    },
+    "UB": {
+      "color": "#73473c",
+      "sample_count": 15
+    },
+    "UBND Phường 19 QL": {
+      "color": "#a66166",
+      "sample_count": 1
+    },
+    "V.C.học": {
+      "color": "#694875",
+      "sample_count": 1
+    },
+    "V.hoá": {
+      "color": "#987a6b",
+      "sample_count": 2
+    },
+    "V.sinh": {
+      "color": "#52a658",
+      "sample_count": 4
+    },
+    "Vườn": {
+      "color": "#6d8d76",
+      "sample_count": 1,
+      "label": "Vườn"
+    },
+    "X.nghiep": {
+      "color": "#5d786e",
+      "sample_count": 1
+    },
+    "X.nghiêp": {
+      "color": "#82896e",
+      "sample_count": 1
+    },
+    "X.nghiƯp": {
+      "color": "#67a36e",
+      "sample_count": 20
+    },
+    "X.nghiệp": {
+      "color": "#7f6372",
+      "sample_count": 3
+    },
+    "XD": {
+      "color": "#58473c",
+      "sample_count": 19,
+      "source_variants": [
+        {
+          "source_value": "XD ",
+          "colors": {
+            "120,187,61": 2
+          }
+        },
+        {
+          "source_value": "XD",
+          "colors": {
+            "88,71,60": 17
+          }
+        }
+      ]
+    },
+    "Xg.dau": {
+      "color": "#437f64",
+      "sample_count": 1
+    },
+    "Xg.dầu": {
+      "color": "#496668",
+      "sample_count": 7
+    },
+    "Xưởng": {
+      "color": "#786d64",
+      "sample_count": 2,
+      "label": "Xưởng"
+    },
+    "Y tế": {
+      "color": "#483f6d",
+      "sample_count": 1
+    },
+    "Y.tế": {
+      "color": "#567b6d",
+      "sample_count": 3
+    },
+    "chùa": {
+      "color": "#a16074",
+      "sample_count": 2,
+      "label": "chùa"
+    },
+    "sân": {
+      "color": "#7f423e",
+      "sample_count": 8,
+      "label": "sân"
+    },
+    "Đ.học": {
+      "color": "#72b194",
+      "sample_count": 5
+    }
+  },
+  "excluded_values": [
+    {
+      "source_value": null,
+      "colors": {
+        "123,60,60": 1326
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": " ",
+      "colors": {
+        "92,60,60": 44
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "121",
+      "colors": {
+        "80,147,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "53",
+      "colors": {
+        "68,67,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "139",
+      "colors": {
+        "121,147,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "9",
+      "colors": {
+        "117,60,60": 2
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "8",
+      "colors": {
+        "116,60,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "11",
+      "colors": {
+        "62,66,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "13",
+      "colors": {
+        "64,66,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "14",
+      "colors": {
+        "65,66,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "62",
+      "colors": {
+        "100,67,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "60",
+      "colors": {
+        "98,67,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "112",
+      "colors": {
+        "176,146,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "104",
+      "colors": {
+        "145,146,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "21",
+      "colors": {
+        "95,66,60": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "103.2",
+      "colors": {
+        "176,157,77": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    },
+    {
+      "source_value": "bbbbbbbbbbbbbb",
+      "colors": {
+        "88,124,70": 1
+      },
+      "reason": "missing_or_invalid_land_use_code"
+    }
+  ]
+}

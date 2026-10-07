@@ -162,7 +162,7 @@ def metadata(layer: str) -> dict:
         with connect_to_warehouse() as connection:
             if layer == "parcels":
                 row = connection.execute(
-                    "SELECT (SELECT count(*) FROM parcels.land_plot), count(*), max(loaded_at) "
+                    "SELECT coalesce(sum(feature_count),0), count(*), max(loaded_at) "
                     "FROM parcels.loaded_tile"
                 ).fetchone()
                 if not row or not row[1]:
@@ -201,7 +201,7 @@ def features(layer, bounds=None, start=None, end=None, limit=5000):
                     "SELECT id, ST_AsGeoJSON(geom), jsonb_strip_nulls(jsonb_build_object("
                     "'uniq_id',uniq_id,'tinh',tinh,'quan',quan,'phuong',phuong,'to_ban_do',to_ban_do,"
                     "'thua',thua,'mdsdd',mdsdd,'loai_dat_qh',loai_dat_qh,'quyet_dinh',quyet_dinh,'do_an',do_an)) "
-                    "FROM parcels.land_plot WHERE " + " AND ".join(clauses) + " ORDER BY id LIMIT %s",
+                    "FROM parcels.plot WHERE " + " AND ".join(clauses) + " ORDER BY id LIMIT %s",
                     arguments,
                 ).fetchall()
             matches = [{"type":"Feature", "id":row[0], "geometry":json.loads(row[1]), "properties":row[2]} for row in rows]
@@ -302,26 +302,8 @@ def readiness() -> dict:
 def vector_tile(layer, z, x, y, start=None, end=None) -> bytes:
     """Build one Mapbox vector tile and preserve scalar GeoJSON properties."""
     if layer == "parcels":
-        with connect_to_warehouse() as connection:
-            if connection.execute("SELECT 1 FROM parcels.loaded_tile LIMIT 1").fetchone() is None:
-                raise LayerUnavailable(layer)
-            row = connection.execute(
-                """
-                SELECT ST_AsMVT(parcel_features, 'features', 4096, 'geom')
-                FROM (
-                    SELECT p.id AS feature_id,
-                           jsonb_strip_nulls(jsonb_build_object(
-                             'uniq_id',p.uniq_id,'tinh',p.tinh,'quan',p.quan,'phuong',p.phuong,
-                             'to_ban_do',p.to_ban_do,'thua',p.thua,'mdsdd',p.mdsdd,
-                             'loai_dat_qh',p.loai_dat_qh,'quyet_dinh',p.quyet_dinh,'do_an',p.do_an
-                           )) AS properties,
-                           ST_AsMVTGeom(ST_Transform(p.geom,3857),ST_TileEnvelope(%s,%s,%s),4096,64,true) AS geom
-                    FROM parcels.land_plot p
-                    WHERE p.geom && ST_Transform(ST_TileEnvelope(%s,%s,%s),4326)
-                ) AS parcel_features
-                """, (z,x,y,z,x,y),
-            ).fetchone()
-        return bytes(row[0]) if row and row[0] else b""
+        from app.services.parcels import vector_tile as parcel_tile
+        return parcel_tile(z, x, y)
     clauses = [
         "f.layer = %s",
         "f.geom && ST_Transform(ST_TileEnvelope(%s, %s, %s), 4326)",
