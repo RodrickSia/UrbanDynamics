@@ -28,7 +28,7 @@ describe('premium map workspace', () => {
     expect(within(workspace).queryByRole('button', { name: 'Hanoi, Vietnam' })).not.toBeInTheDocument();
   });
 
-  it('shows disconnected data layers without enabling them', async () => {
+  it('enables connected land prices while keeping disconnected layers unavailable', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -38,7 +38,7 @@ describe('premium map workspace', () => {
     expect(within(layers).getByRole('checkbox', { name: 'Population density' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Rain' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Flood risk' })).toBeDisabled();
-    expect(within(layers).getByRole('checkbox', { name: 'Land price' })).toBeDisabled();
+    expect(within(layers).getByRole('checkbox', { name: 'Land price' })).toBeEnabled();
     expect(within(layers).queryByText('Urban intelligence')).not.toBeInTheDocument();
     expect(within(layers).queryByText(/Add compatible datasets/i)).not.toBeInTheDocument();
     expect(within(layers).queryByText(/Waiting for a backend/i)).not.toBeInTheDocument();

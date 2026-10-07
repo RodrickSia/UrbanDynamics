@@ -69,7 +69,7 @@ LAYER_INFO = {
         "time_field": "issued_at",
     },
     "land_price": {
-        "title": "Reviewed official reference prices joined to reviewed road segments",
+        "title": "Official reference prices with road-match provenance",
         "geometry": ["LineString", "MultiLineString"],
         "fields": [
             "road",
@@ -82,6 +82,13 @@ LAYER_INFO = {
             "unit",
             "geometry_reviewed",
             "price_kind",
+            "ward",
+            "region_id",
+            "match_confidence",
+            "match_method",
+            "geometry_coverage",
+            "source_values_reviewed",
+            "pdf_page",
         ],
         "time_enabled": False,
         "time_field": None,

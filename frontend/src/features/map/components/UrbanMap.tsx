@@ -7,6 +7,8 @@ import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
 import { setBuildings3d } from '../layers/buildings3d';
+import { installLandPrice, LAND_PRICE_LAYER, type LandPriceStatus, type LandPriceProperties } from '../layers/landPrice';
+import { LandPriceLegend } from './LandPriceLegend';
 import {
   createMeasurementLayer,
   MEASUREMENT_LAYER_ID,
@@ -25,6 +27,8 @@ export function UrbanMap(props: UrbanMapProps) {
     mode,
     buildingsEnabled,
     buildingsOpacity,
+    landPriceEnabled = false,
+    landPriceOpacity = 0.8,
     measurement,
     selection,
     userLocation,
@@ -42,6 +46,9 @@ export function UrbanMap(props: UrbanMapProps) {
   const styleReadyRef = useRef(false);
   const cameraModeRef = useRef('2d');
   const [mapRevision, setMapRevision] = useState(0);
+  const [landPriceStatus, setLandPriceStatus] = useState<LandPriceStatus>({ state: 'loading' });
+  const [landPriceSelection, setLandPriceSelection] = useState<LandPriceProperties | null>(null);
+  const [priceRetry, setPriceRetry] = useState(0);
   propsRef.current = props;
 
   useLocationMarkers(mapRef, markerConstructorRef, mapRevision, selection, userLocation);
@@ -52,6 +59,19 @@ export function UrbanMap(props: UrbanMapProps) {
     onStatusChange,
     onUserLocationChange: props.onUserLocationChange,
   });
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current || !landPriceEnabled) return;
+    return installLandPrice(map, propsRef.current.landPriceOpacity ?? 0.8, setLandPriceStatus,
+      properties => { if (properties === null || propsRef.current.measurement.status !== 'active') setLandPriceSelection(properties); });
+  }, [landPriceEnabled, mapRevision, priceRetry]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map?.getLayer(LAND_PRICE_LAYER)) map.setPaintProperty(LAND_PRICE_LAYER, 'line-opacity', landPriceOpacity);
+  }, [landPriceOpacity, mapRevision, landPriceStatus.state]);
+
 
   useEffect(() => {
     if (!containerRef.current || !configuration.ok) return;
@@ -241,6 +261,8 @@ export function UrbanMap(props: UrbanMapProps) {
         measurement={measurement}
         mode={mode}
       />
+      {landPriceEnabled && <LandPriceLegend status={landPriceStatus} selected={landPriceSelection}
+        onClose={() => setLandPriceSelection(null)} onRetry={() => setPriceRetry(value => value + 1)} />}
     </>
   );
 }
