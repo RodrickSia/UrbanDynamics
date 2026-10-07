@@ -23,6 +23,55 @@ def test_unique_spatial_match_can_estimate_mapped_residential_area():
     assert result['unit_price_vnd_m2'] == 10_000_000
     assert result['estimated_land_total_vnd'] == 1_000_000_000
     assert result['method'] == 'nearby_road_geometry'
+    assert result['price_category'] == 'Residential'
+    assert result['normalized_land_use'] == 'Residential land'
+    assert result['classification_confidence'] == 'high'
+
+
+@pytest.mark.parametrize('source,category,field,family', [
+    ('OTC', 'Residential', 'residential_vnd_m2', 'Residential land'),
+    ('K.sạn', 'Commercial', 'commercial_vnd_m2', 'Hotel'),
+    ('C.hang', 'Commercial', 'commercial_vnd_m2', 'Retail'),
+    ('Xg.dầu', 'Commercial', 'commercial_vnd_m2', 'Fuel retail'),
+    ('B.viện', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'Hospital'),
+    ('Tr.học', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'School'),
+    ('C.ty', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'Company'),
+])
+def test_observed_codes_use_their_road_category_price(source, category, field, family):
+    prices = {'residential_vnd_m2': 163_000_000, 'commercial_vnd_m2': 97_800_000,
+              'other_nonagricultural_vnd_m2': 81_500_000}
+    result = parcels.price_reference({'uniq_id': 'parcel', 'mdsdd': source, 'area_m2': 100},
+                                     [road(**prices)])
+    assert result['price_category'] == category
+    assert result['normalized_land_use'] == family
+    assert result['unit_price_vnd_m2'] == prices[field]
+    assert result['estimated_land_total_vnd'] == 100 * prices[field]
+
+
+@pytest.mark.parametrize('source', ['DSK', 'CDG', 'Khác', 'R/p', 'Kh.sách', 'Dầu khí',
+                                    'Tr.tâm', 'TL', '12345', None])
+def test_unclear_source_codes_keep_null_price(source):
+    result = parcels.price_reference({'uniq_id': 'parcel', 'mdsdd': source, 'area_m2': 100},
+                                     [road(commercial_vnd_m2=97_800_000)])
+    assert result['price_category'] is None
+    assert result['unit_price_vnd_m2'] is None
+    assert result['estimated_land_total_vnd'] is None
+
+
+def test_missing_matching_road_price_is_null_even_when_land_use_is_known():
+    result = parcels.price_reference({'uniq_id': 'parcel', 'mdsdd': 'K.san', 'area_m2': 100},
+                                     [road(commercial_vnd_m2=None)])
+    assert result['price_category'] == 'Commercial'
+    assert result['unit_price_vnd_m2'] is None
+    assert result['estimated_land_total_vnd'] is None
+
+
+def test_imperfect_source_variant_retains_family_with_low_confidence():
+    result = parcels.price_reference({'uniq_id': 'parcel', 'mdsdd': 'B.viƯn', 'area_m2': 100},
+                                     [road(other_nonagricultural_vnd_m2=81_500_000)])
+    assert result['normalized_land_use'] == 'Hospital'
+    assert result['classification_confidence'] == 'low'
+    assert result['valuation_confidence'] == 'low'
 
 
 @pytest.mark.parametrize('attributes,candidates,status', [
@@ -118,6 +167,9 @@ def test_canonical_geometry_tile_colors_and_price_api(monkeypatch):
         assert body['parcel']['source_fragments'] == 2
         assert body['price']['unit_price_vnd_m2'] == 10_000_000
         assert body['price']['estimated_land_total_vnd'] == round(row[3] * 10_000_000)
+        assert body['price']['price_category'] == 'Residential'
+        assert body['price']['road_match_status'] == 'spatially_checked'
+        assert body['price']['provenance'] == 'Published road-price layer'
     finally:
         connection.rollback()
         connection.close()

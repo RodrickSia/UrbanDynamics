@@ -8,15 +8,13 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from src.shared.database import connect_to_warehouse
 from src.pipelines.parcels_hcmc import config as parcel_config
+from app.services.parcel_classification import PRICE_CATEGORIES, classify
 
 PALETTE = json.loads(Path(parcel_config.__file__).with_name('land_use_colors.json').read_text(encoding='utf-8'))
 COLORS = {code: entry['color'] for code, entry in PALETTE['entries'].items()}
 MIN_ZOOM = 12
 MAX_NATIVE_ZOOM = 16
 UNKNOWN = {'', 'null', 'none', 'nan'}
-PRICE_FIELDS = {'ODT': 'residential_vnd_m2', 'ONT': 'residential_vnd_m2',
-                'OTC': 'residential_vnd_m2', 'TMD': 'commercial_vnd_m2',
-                'SKC': 'other_nonagricultural_vnd_m2'}
 
 
 def land_use(raw):
@@ -47,16 +45,26 @@ def positive(value):
 
 
 def price_reference(parcel, candidates):
+    classification = classify(parcel.get('mdsdd'))
+    if parcel.get('conflicting_land_use'):
+        classification.update(normalized_land_use=None, price_category=None,
+                              classification_confidence='unmapped')
     result = {'status': 'unavailable', 'method': 'nearby_road_geometry',
               'unit_price_vnd_m2': None, 'estimated_land_total_vnd': None,
-              'candidates': candidates, 'selected': None}
+              'candidates': candidates, 'selected': None,
+              'road_match_status': 'none', 'geometry_review_status': 'unknown',
+              'valuation_confidence': 'none', 'provenance': 'Published road-price layer',
+              **classification}
+    if not classification['price_category']:
+        result['status'] = 'unsupported_land_use'
+        return result
     # Boundaries near a road are evidence of proximity, not legal frontage.
     nearby = [item for item in candidates if item['distance_m'] <= 15]
     if not nearby:
         return result
     identities = {(item['properties'].get('road'), item['properties'].get('start'),
                    item['properties'].get('end'),
-                   tuple(str(item['properties'].get(field)) for field in sorted(set(PRICE_FIELDS.values()))))
+                   tuple(str(item['properties'].get(field)) for field in sorted(PRICE_CATEGORIES.values())))
                   for item in nearby}
     if len(identities) != 1 or len(candidates) >= 9:
         result['status'] = 'ambiguous'
@@ -64,18 +72,21 @@ def price_reference(parcel, candidates):
     selected = nearby[0]
     props = selected['properties']
     result['selected'] = selected
+    result['road_match_status'] = str(props.get('match_confidence') or 'unknown')
+    result['geometry_review_status'] = 'reviewed' if props.get('geometry_reviewed') is True else 'unreviewed'
     if (props.get('geometry_coverage') == 'whole_named_road_proxy' or
         not (props.get('geometry_reviewed') is True or props.get('match_confidence') == 'spatially_checked')):
         result['status'] = 'unverified'
         return result
-    field = PRICE_FIELDS.get(str(parcel.get('mdsdd') or '').strip())
-    if not field or parcel.get('conflicting_land_use'):
-        result['status'] = 'unsupported_land_use'
-        return result
+    field = PRICE_CATEGORIES[classification['price_category']]
     unit_price = positive(props.get(field))
     if not unit_price:
         return result
     result.update(status='reference', unit_price_vnd_m2=unit_price)
+    result['valuation_confidence'] = (
+        'low' if classification['classification_confidence'] == 'low' else
+        'high' if result['geometry_review_status'] == 'reviewed' and
+                  classification['classification_confidence'] == 'high' else 'medium')
     area = positive(parcel.get('area_m2'))
     identity = str(parcel.get('uniq_id') or '').strip().lower()
     if area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
@@ -109,7 +120,7 @@ def detail(parcel_id):
     # Expose only public price provenance, not arbitrary source metadata.
     allowed = {'road', 'start', 'end', 'ward', 'source_url', 'pdf_page', 'effective_from',
                'geometry_reviewed', 'source_values_reviewed', 'match_confidence', 'geometry_coverage',
-               *PRICE_FIELDS.values()}
+               *PRICE_CATEGORIES.values()}
     for candidate in candidates:
         candidate['properties'] = {k: v for k, v in candidate['properties'].items() if k in allowed}
         candidate['distance_m'] = round(candidate['distance_m'], 2)

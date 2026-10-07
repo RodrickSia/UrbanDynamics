@@ -26,12 +26,23 @@ API → accessible detail dialog. Raw source fragments remain available for audi
   whole-road proxies or missing values must not produce an estimated total.
 - Totals refer to mapped land area × land reference unit price, never house
   construction value, transaction price or cadastral valuation. Geometry area
-  is labeled as calculated from the map. Matching method, distance, source and
+  is labeled as mapped area. Matching method, distance, source and
   coverage qualifications are visible.
 - Dialog: loading/error/retry, Escape, focus containment/restore, close button,
   narrow screens, no stale responses after another selection or layer disable.
 
 ## Verification
+
+The observed MDSDD labels are classified conservatively in
+`backend/app/services/parcel_classification.py`. ODT and OTC are the only
+confident residential codes. Clear retail/hospitality/fuel-service codes map
+to Commercial; clear institutional/utility/industrial codes map to Other
+non-agricultural. Ambiguous values remain unmapped with `null` unit and total
+prices. Rates come from the matched road feature's category column, not global
+example rates. Planning-area breakdowns do not prove current cadastral mixed
+use, so they are displayed without contributing to parcel value. The result
+retains the source code, normalized family, category, road match and geometry
+review status, confidence, and price provenance.
 
 Python: `python -m pytest etl/tests/test_parcel_geometry.py backend/tests/test_parcels.py -q`.
 PostGIS regression fixtures verify union areas, normalized land-use colors, MVT
