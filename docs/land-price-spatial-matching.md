@@ -40,6 +40,7 @@ Các lần cập nhật dữ liệu tiếp theo không cần sửa UI nếu gi�
 ## Kiểm chứng local
 
 - Frontend: 80/80 test đạt, build production và ESLint đạt.
+- Trình duyệt Chromium/MapLibre thật: test vector tile, click giá, opacity, đổi nền và tắt lớp đạt; dùng dữ liệu fixture có kiểm soát.
 - ETL/API: 31 test đạt, 1 test PostGIS integration bỏ qua vì Docker local chưa chạy; CI kiểm tra PostGIS riêng.
 - Smoke test nguồn thật: 1 polygon Phường Phú Thuận, 63.459 OSM ways, 9.502 dòng giá: 7 dòng ghép được. Đây là kiểm tra một phường, chưa phải kết quả toàn thành phố.
 - Chưa kiểm chứng đầy đủ toàn thành phố: tải polygon còn bị lỗi DNS trên máy local; SSH máy 156 timeout. Không công bố con số phủ toàn thành phố hoặc cập nhật production từ smoke test.

@@ -27,9 +27,11 @@ export function Fixture() {
   const [mode, setMode] = useState<MapMode>('2d');
   const [style, setStyle] = useState<MapStyleId>('standard');
   const [opacity, setOpacity] = useState(1);
+  const [landPriceEnabled, setLandPriceEnabled] = useState(false);
   const [measurement, setMeasurement] = useState<MeasurementState>({ status: 'active', points: [], preview: null });
   Object.assign(window, { workspace: {
     map: () => captured.map, mode: setMode, style: setStyle, opacity: setOpacity,
+    landPrice: setLandPriceEnabled,
     state: () => measurement, animations: () => cameraAnimations,
     measurement: setMeasurement,
     project: (lng: number, lat: number, altitude: number) => {
@@ -41,6 +43,7 @@ export function Fixture() {
   } });
   return <UrbanMap configuration={configuration} mapStyle={style} mode={mode}
     buildingsEnabled buildingsOpacity={opacity} measurement={measurement}
+    landPriceEnabled={landPriceEnabled} landPriceOpacity={opacity}
     selection={null} userLocation={null} focusRequest={null} controlRequest={null}
     onMeasurementPoint={point => setMeasurement(value => ({ ...value, points: [...value.points, point], preview: null }))}
     onMeasurementPreview={preview => setMeasurement(value => ({ ...value, preview }))}
