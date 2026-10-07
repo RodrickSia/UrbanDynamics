@@ -91,7 +91,7 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   {
     id: 'land-price',
     label: 'Land price',
-    description: 'Official 2026 An Khánh reference prices. Zoom in to inspect matched roads.',
+    description: 'Official reference prices by road segment, with partial spatially checked coverage.',
     category: 'planning',
     enabledByDefault: false,
     status: 'available',

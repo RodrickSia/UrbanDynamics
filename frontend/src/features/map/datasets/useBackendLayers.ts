@@ -59,7 +59,7 @@ export function useBackendLayers(layers: LayerState) {
             stale: entry?.stale,
           };
         }
-        // Accept reviewed segments and explicitly published automatic road proxies.
+        // Accept reviewed segments, spatial matches and published automatic road proxies.
         save({
           ...values,
           'land-price': {
@@ -76,6 +76,7 @@ export function useBackendLayers(layers: LayerState) {
                 available: sample.features.some(
                   (f) =>
                     f.properties.geometry_reviewed === true ||
+                    f.properties.match_confidence === 'spatially_checked' ||
                     (f.properties.publication_match_mode === 'automatic' &&
                       f.properties.geometry_coverage === 'whole_named_road_proxy'),
                 ),

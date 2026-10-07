@@ -29,5 +29,5 @@ def flood(
 
 @router.get("/land-price")
 def land_price(bbox: str | None = None, limit: int = Query(5000, ge=1, le=10000)):
-    """Return official reference prices matched to road geometry as GeoJSON."""
+    """Return official reference-price road segments with matching provenance."""
     return get_features("land_price", bbox, limit=limit)

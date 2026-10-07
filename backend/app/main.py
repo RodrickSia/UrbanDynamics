@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.repository import readiness
-from app.routers import floods, land_prices, layers, population, scenarios, urban
+from app.routers import floods, land_prices, layers, population, scenarios, urban, building_scenarios, weather, integrated_scenarios
 
 app = FastAPI(
     title="UrbanDynamics Data API",
@@ -21,6 +23,16 @@ if settings.allowed_origins:
         allow_headers=["Content-Type", "Authorization"],
     )
 
+@app.exception_handler(RequestValidationError)
+async def invalid_request(_request, error):
+    # Do not echo arbitrary input: NaN/Infinity cannot be serialized as JSON,
+    # and submitted fields may contain private data.
+    return JSONResponse(status_code=422, content={"detail": [
+        {"type": item["type"], "loc": list(item["loc"]), "msg": item["msg"]}
+        for item in error.errors()
+    ]})
+
+
 for router in (
     layers.router,
     floods.router,
@@ -28,6 +40,9 @@ for router in (
     population.router,
     scenarios.router,
     urban.router,
+    building_scenarios.router,
+    weather.router,
+    integrated_scenarios.router,
 ):
     app.include_router(router)
 

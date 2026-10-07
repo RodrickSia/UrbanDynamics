@@ -10,11 +10,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/app/.venv/bin:$PATH
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 libgomp1 libatomic1 libx11-6 libxext6 libxrender1 libgl1 \
+    && rm -rf /var/lib/apt/lists/*
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev
 
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /app app
+RUN mkdir -p /runtime && chown app:app /runtime
 COPY --chown=app:app backend/app/ ./app/
 COPY --chown=app:app etl/src/ ./etl/src/
 USER app

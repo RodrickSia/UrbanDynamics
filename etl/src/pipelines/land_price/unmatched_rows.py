@@ -4,9 +4,10 @@ import argparse
 from src.shared.data_io import read_json, write_json
 from .extract import row_id
 
-def run(rows, matched_ids, path):
+def run(rows, matched_ids, path, reasons=None):
+    reasons = reasons or {}
     pending = [{**row, "id": row.get("id") or row_id(row),
-                "unmatched_reason": "No exact normalized OSM road-name match"}
+                "unmatched_reason": reasons.get(row.get('id') or row_id(row), "No verified spatial road segment")}
                for row in rows if (row.get("id") or row_id(row)) not in matched_ids]
     write_json(path, {"pending": pending, "matched": len(matched_ids)})
     return len(pending)

@@ -144,8 +144,8 @@ def transform_frame(frame, boundary=None, scope="HCMC"):
 
 
 def run(source, boundary=None):
-    return transform_frame(
-        geographic_frame(source),
-        read_boundary(boundary) if boundary else None,
-        "Thu Duc (boundary-filtered)" if boundary else "HCMC (not Thu Duc filtered)",
-    )
+    scope = 'HCMC (source coverage; no boundary filter)'
+    if boundary:
+        from src.shared.data_io import read_json
+        scope = read_json(boundary).get('metadata',{}).get('scope','Custom boundary-filtered area')
+    return transform_frame(geographic_frame(source),read_boundary(boundary) if boundary else None,scope)

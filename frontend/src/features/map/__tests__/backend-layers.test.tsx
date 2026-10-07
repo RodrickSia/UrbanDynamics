@@ -10,6 +10,7 @@ function fixture(
     land?: boolean;
     reviewed?: boolean;
     automatic?: boolean;
+    spatial?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -30,6 +31,7 @@ function fixture(
                   {
                     properties: {
                       geometry_reviewed: options.reviewed,
+                      match_confidence: options.spatial ? 'spatially_checked' : undefined,
                       publication_match_mode: options.automatic ? 'automatic' : undefined,
                       geometry_coverage: options.automatic ? 'whole_named_road_proxy' : undefined,
                     },
@@ -53,6 +55,12 @@ function fixture(
   );
 }
 describe('backend layer availability and selections', () => {
+  it('accepts main spatially checked prices without claiming manual review', async () => {
+    fixture({ land: true, reviewed: false, spatial: true });
+    const { result } = renderHook(() => useBackendLayers({ 'land-price': true }));
+    await waitFor(() => expect(result.current.catalog['land-price']?.available).toBe(true));
+    expect(result.current.selections.map((s) => s.dataset)).toEqual(['land_price']);
+  });
   it('keeps published automatic whole-road matches available without claiming reviewed geometry', async () => {
     fixture({ land: true, reviewed: false, automatic: true });
     const { result } = renderHook(() => useBackendLayers({ 'land-price': true }));

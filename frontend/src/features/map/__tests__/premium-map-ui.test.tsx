@@ -11,6 +11,7 @@ describe('premium map workspace', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('shows recent searches and lets the user remove an item', async () => {
@@ -28,7 +29,14 @@ describe('premium map workspace', () => {
     expect(within(workspace).queryByRole('button', { name: 'Hanoi, Vietnam' })).not.toBeInTheDocument();
   });
 
-  it('shows disconnected data layers without enabling them', async () => {
+  it('enables connected land prices while keeping disconnected layers unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => new Response(JSON.stringify(
+      new URL(input, 'http://localhost').pathname.endsWith('/land_price/features')
+        ? { type: 'FeatureCollection', features: [{ properties: { match_confidence: 'spatially_checked' } }], metadata: {} }
+        : input.endsWith('/population')
+          ? { available: false, years: [] }
+          : { layers: [{ id: 'land_price', available: true }] },
+    ))));
     const user = userEvent.setup();
     render(<App />);
 
@@ -39,7 +47,7 @@ describe('premium map workspace', () => {
     expect(within(layers).getByRole('checkbox', { name: 'Population' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Rain' })).toBeDisabled();
     expect(within(layers).getByRole('checkbox', { name: 'Flood risk' })).toBeDisabled();
-    expect(within(layers).getByRole('checkbox', { name: 'Land price' })).toBeDisabled();
+    await vi.waitFor(() => expect(within(layers).getByRole('checkbox', { name: 'Land price' })).toBeEnabled());
     expect(within(layers).queryByText('Urban intelligence')).not.toBeInTheDocument();
     expect(within(layers).queryByText(/Add compatible datasets/i)).not.toBeInTheDocument();
     expect(within(layers).queryByText(/Waiting for a backend/i)).not.toBeInTheDocument();

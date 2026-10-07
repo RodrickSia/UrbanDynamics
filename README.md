@@ -28,6 +28,17 @@ See [ETL usage](etl/README.md) to run a pipeline and
 
 ## Documentation
 
+- [Integrated building simulation: SUMO/SWMM, hourly demand, shadows and rerun recommendations](docs/integrated-building-impact.md)
+- [Citywide rainfall/flood/land-price ETL and scheduler](docs/khoi-citywide-etl.md)
+- [Combined local regression report](docs/integrated-simulation-test-report.md)
+- [Integrated deployment preparation for 156](docs/integrated-deployment.md)
+
+The shared application retains `compose.yaml`, PostGIS 17 and the team's frontend.
+For isolated simulation development, `compose.khoi.yaml` exposes the demo at
+`http://127.0.0.1:8001/simulation/integrated`. It starts with a residential building
+in Thu Duc and runs native SUMO/SWMM on explicitly synthetic networks. AI
+explanation is deferred; advanced thermal/2D/water-pressure solvers are pending.
+
 - [Architecture](docs/architecture.md)
 - [Development](docs/development.md)
 - [Flood and land-price ETL guide](docs/khoi-implementation.md)

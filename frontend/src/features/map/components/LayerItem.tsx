@@ -83,7 +83,7 @@ export function LayerItem({
       </label>
       {active && available && (layer.supportsOpacity || (backend && isDataLayer(layer.id))) && (
         <div className="dataset-row-details">
-          {backend && isDataLayer(layer.id) && <DatasetControls id={layer.id} data={backend} />}
+          {backend && isDataLayer(layer.id) && layer.id !== 'land-price' && <DatasetControls id={layer.id} data={backend} />}
           {layer.supportsOpacity && (
             <label className="opacity-control">
               <span>Opacity</span>

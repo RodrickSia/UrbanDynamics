@@ -102,6 +102,8 @@ test('published datasets render, filter, inspect and survive style swaps without
       });
     if (url.pathname === '/api/v1/population')
       return route.fulfill({ json: { available: true, years: [{ year: 2022 }, { year: 2024 }] } });
+    if (url.pathname === '/api/v1/layers/land_price/tilejson.json')
+      return route.fulfill({ json: { metadata: { matched_rows: 1, source_rows: 2, pending_rows: 1 } } });
     if (url.pathname.endsWith('/features'))
       return route.fulfill({
         status: fail ? 503 : 200,
@@ -259,11 +261,15 @@ test('published datasets render, filter, inspect and survive style swaps without
     await expect
       .poll(() =>
         page.evaluate(
-          (id) => window['dataMap'].queryRenderedFeatures({ layers: [`dataset-${id}`] }).length,
+          (id) => window['dataMap'].queryRenderedFeatures({ layers: [id === 'land-price' ? 'urban-land-price-lines' : `dataset-${id}`] }).length,
           id,
         ),
       )
       .toBeGreaterThan(0);
+    if (id === 'land-price') {
+      expect(await page.evaluate('Boolean(window.dataMap.getSource("dataset-land-price"))')).toBe(false);
+      await expect(page.getByLabel('Land price legend')).toContainText('1 mapped / 2 source rows');
+    }
     await page.getByRole('checkbox', { name: label, exact: true }).uncheck();
   }
   await population.check();

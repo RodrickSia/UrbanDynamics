@@ -4,8 +4,10 @@ import argparse
 import importlib
 import logging
 import os
+import sys
 
 PIPELINES = (
+    "rainwater",
     "population_hcmc",
     "flood_history",
     "flood_satellite",
@@ -19,10 +21,11 @@ STAGES = ("all", "extract", "transform", "load")
 def _run(pipeline_name: str, stage: str, options) -> None:
     if stage == "all":
         option_names = {
+            "rainwater": ("boundary", "refresh_history"),
             "flood_history": ("source", "boundary"),
             "flood_satellite": ("boundary", "catalog_only", "limit"),
             "flood_risk": ("weather_input", "history_input"),
-            "land_price": ("source", "segments"),
+            "land_price": ("source", "segments", "full_city"),
         }.get(pipeline_name, ())
         kwargs = {name: getattr(options, name) for name in option_names}
         if pipeline_name == "flood_satellite" and kwargs["limit"] is None:
@@ -58,7 +61,7 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         elif pipeline_name == "land_price":
             from src.shared.data_io import data_dir, write_json
 
-            rows, _provenance = extractor.run(options.source)
+            rows, _provenance = extractor.run(options.source, full_city=options.full_city)
             output = data_dir() / "review" / "land_price_rows.json"
             write_json(output, rows)
             logging.getLogger(__name__).info("Extracted land-price rows to %s", output)
@@ -114,8 +117,13 @@ def main() -> None:
         default="all",
         help="Stage to run (default: all)",
     )
+    run_parser.add_argument("--refresh-history", action="store_true")
+    run_parser.add_argument("--full-city", action="store_true")
 
-    args = parser.parse_args()
+    argv = sys.argv[1:]
+    if argv and argv[0] in PIPELINES:
+        argv = ["run", *argv]
+    args = parser.parse_args(argv)
     if args.command == "run":
         if args.pipeline not in PIPELINES:
             parser.error(

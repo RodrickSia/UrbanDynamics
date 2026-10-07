@@ -13,6 +13,8 @@ dependencies = [
     "numpy>=2,<3",
     "pyproj>=3.6,<4",
     "pillow>=11,<13",
+    "eclipse-sumo==1.27.1",
+    "swmm-toolkit==0.17.0",
 ]
 
 [tool.uv]

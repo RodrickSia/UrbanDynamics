@@ -34,6 +34,10 @@ def write_json(path, value):
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             json.dump(value, stream, ensure_ascii=False, allow_nan=False)
+        # Public ETL snapshots are shared with the backend's separate container
+        # user. mkstemp defaults to 0600, which prevents that user reading them.
+        if os.name != "nt":
+            os.chmod(temporary, 0o644)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
@@ -61,9 +65,11 @@ def download(url, path, max_bytes=100_000_000):
     size = 0
     digest = hashlib.sha256()
     try:
-        with session().get(url, stream=True, timeout=(20, 120)) as response:
-            response.raise_for_status()
-            with os.fdopen(handle, "wb") as stream:
+        # Own the descriptor before network I/O so a DNS/HTTP failure closes it
+        # before Windows removes the temporary file.
+        with os.fdopen(handle, "wb") as stream:
+            with session().get(url, stream=True, timeout=(20, 120)) as response:
+                response.raise_for_status()
                 for block in response.iter_content(65536):
                     size += len(block)
                     if size > max_bytes:

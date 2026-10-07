@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>UrbanDynamics · So sánh phương án công trình</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script defer src="/simulation.js"></script>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#193340;background:#f1f5f4;font-size:15px}*{box-sizing:border-box}
+    body{margin:0}header{background:#123c3a;color:white;padding:26px max(20px,calc((100vw - 1200px)/2))}
+    header p{color:#c4dfd9;margin-bottom:0}h1{font-size:27px;margin:0}h2{font-size:19px;margin:0 0 16px}h3{font-size:16px}
+    main{max-width:1240px;margin:auto;padding:22px}.panel{background:white;border:1px solid #d7e3e0;border-radius:12px;padding:20px;margin-bottom:18px}
+    .notice{background:#fff5d8;border-left:4px solid #bf8423;padding:14px;line-height:1.6;margin-bottom:18px}
+    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.two{grid-template-columns:1fr 1fr}
+    label{display:block;margin:10px 0;font-size:14px}input,select,textarea{display:block;width:100%;padding:9px;border:1px solid #b8cdca;border-radius:6px;margin-top:5px;font:inherit}input[type=checkbox]{display:inline;width:auto}
+    button{padding:10px 15px;background:#0b6e61;color:white;border:0;border-radius:6px;font:inherit;cursor:pointer;margin:4px 4px 4px 0}button.secondary{background:#e4eeeb;color:#193340}button:disabled{opacity:.5;cursor:wait}
+    #map{height:350px;border-radius:8px;background:#e8f0ee}.hint{font-size:13px;color:#526970;line-height:1.6;overflow-wrap:anywhere}.variant{border:1px solid #d7e3e0;border-top:4px solid #78928e;padding:14px;border-radius:8px}.variant:nth-child(2){border-top-color:#ce8635}.variant:nth-child(3){border-top-color:#0b8b79}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}#status{padding:12px 0;white-space:pre-wrap}#status.error{color:#a52929}#status.success{color:#09684e}
+    table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;border-bottom:1px solid #d7e3e0;padding:12px 8px}th{background:#f1f7f5}.scroll{overflow-x:auto}
+    .bar{display:flex;align-items:center;gap:12px;margin:12px 0}.bar span{width:130px;flex-shrink:0;font-size:13px}.bar i{height:24px;background:#0b8b79;display:block;border-radius:4px;min-width:1px}.bar b{white-space:nowrap;font-size:13px}
+    code{overflow-wrap:anywhere}.check{padding:10px;background:#edf5f2}ul{padding-left:22px;line-height:1.7}a{color:#0b6e61}details{margin:12px 0}summary{cursor:pointer}
+    .coefficients{grid-template-columns:repeat(4,minmax(0,1fr))}
+    @media(max-width:800px){.grid,.two{grid-template-columns:1fr}.coefficients{grid-template-columns:1fr 1fr}h1{font-size:22px}main{padding:12px}}
+    .assessment{padding:14px;background:#edf5f2;border-radius:8px;line-height:1.7}.suggestion{padding:16px;border:1px solid #c8ddd7;border-radius:8px;margin:12px 0}.suggestion p{margin:8px 0}.badge{font-weight:600;color:#0b6e61}
+    @media print{header{background:white;color:black}header p{color:black}#editor,#map-panel,.actions,#recommend-form{display:none}.panel{break-inside:avoid}body{background:white}main{padding:0}}
+  </style>
+</head>
+<a href="/simulation/integrated" style="display:block;padding:16px;background:#d5eee8;text-align:center">Mở simulation tác động tổng hợp — chung cư, SUMO, SWMM, điện/nước và bóng đổ</a>
+<body>
+<header><h1>UrbanDynamics · Tác động công trình</h1><p>Nhập công trình → dự tính tác động → đánh giá → tìm gợi ý cải thiện.</p></header>
+<main>
+  <div class="notice"><strong>Ước tính sơ bộ, chưa hiệu chỉnh.</strong> Chỉ tính diện tích và thể tích nước theo hệ số người dùng nhập. Kết quả chưa thể hiện độ sâu ngập, khu vực ngập, nhiệt hay ùn tắc.</div>
+  <section class="panel" id="map-panel">
+    <h2>1. Chọn khu đất và hình học công trình</h2>
+    <div id="map" aria-label="Bản đồ vẽ khu đất"></div>
+    <div class="actions">
+      <select id="draw-target" aria-label="Đối tượng cần vẽ" style="display:inline-block;width:auto"><option value="site">Khu đất</option><option value="development">Công trình dự định xây</option></select>
+      <button id="draw" type="button">Bắt đầu vẽ</button><button id="finish" type="button" class="secondary">Hoàn tất polygon</button><button id="cancel" type="button" class="secondary">Hủy nét vẽ</button><button id="demo" type="button" class="secondary">Nạp ví dụ giả định</button>
+    </div>
+    <p id="area" class="hint">Chưa chọn khu đất. Bấm các điểm trên bản đồ rồi chọn Hoàn tất polygon.</p>
+    <p class="hint">Bản đồ nền © OpenStreetMap contributors. Cần Internet để tải Leaflet và bản đồ nền. Ví dụ là hình học giả định tại Thủ Đức, chưa đối chiếu hiện trạng hoặc quyền xây dựng. Footprint là tùy chọn; khi vẽ, diện tích mái của phương án sẽ được cập nhật theo hình học.</p>
+    <details><summary>Nhập GeoJSON hoặc sử dụng khi bản đồ không tải</summary><textarea id="site-json" rows="5" aria-label="GeoJSON Polygon khu đất" placeholder='{"type":"Polygon","coordinates":[...]}'></textarea><button id="apply-site" type="button" class="secondary">Áp dụng khu đất</button></details>
+  </section>
+  <form id="editor">
+    <section class="panel"><h2>2. Điều kiện chung và nguồn giả định</h2><div class="grid two">
+      <div><label>Tên bài đánh giá<input id="title" required maxlength="160" value="So sánh thiết kế công trình"></label><label>Công năng<select id="building-use"><option value="school">Trường học</option><option value="residential">Chung cư / nhà ở</option><option value="office">Văn phòng</option><option value="hospital">Bệnh viện</option><option value="other">Khác</option></select></label><label>Tổng mưa của trận giả định (mm)<input id="rain" type="number" min="0" max="1000" step="any" value="60" required></label></div>
+      <div><label>Nguồn hiện trạng và thiết kế<textarea id="design-basis" rows="2" minlength="5" maxlength="1000" required placeholder="Khảo sát, bản vẽ hoặc giả định minh họa..."></textarea></label><label>Cơ sở chọn hệ số dòng chảy<textarea id="coefficient-basis" rows="2" minlength="5" maxlength="1000" required placeholder="Tài liệu, khảo sát hoặc giả định minh họa..."></textarea></label><p class="hint">Công năng và số người được lưu để đối chiếu thiết kế; phiên bản này chưa suy ra nhu cầu giao thông hoặc điện/nước từ các thông số đó.</p></div>
+    </div><div class="grid coefficients">
+      <label>Hệ số mái<input id="coef-roof" type="number" min="0" max="1" step="any" required></label><label>Hệ số sân cứng<input id="coef-paved" type="number" min="0" max="1" step="any" required></label><label>Hệ số sân thấm<input id="coef-permeable" type="number" min="0" max="1" step="any" required></label><label>Hệ số đất xanh<input id="coef-green" type="number" min="0" max="1" step="any" required></label>
+    </div><p class="hint">Hệ số từ 0 đến 1, dùng chung cho hiện trạng, công trình và các gợi ý được tính sau. Đất xanh là diện tích mặt đất, không phải tán cây chồng lên mái hoặc sân.</p></section>
+    <section class="panel"><h2>3. Hiện trạng và công trình dự định xây</h2><p class="hint">Nhập hai trạng thái. Khi có footprint, diện tích mái được lấy theo hình học đã vẽ; nhập phần sân còn lại từ thiết kế. Bốn loại bề mặt phải cộng đúng 100% khu đất. Chưa tự nhận diện hiện trạng từ ảnh vệ tinh.</p><div class="grid two" id="variant-inputs"></div></section>
+    <section class="panel"><h2>4. Giao thông và nhu cầu hạ tầng</h2><p class="hint">Nhập hệ số phù hợp công năng và thời gian sử dụng. Công suất còn lại là phần còn trống trước khi xây, sau khi đã phục vụ hiện trạng. Chưa dự báo ùn tắc hoặc thời gian chờ.</p><div class="grid">
+      <label>Chuyến đi của một người trong giờ cao điểm<input id="trip-rate" type="number" min="0" max="20" step="any" required></label>
+      <label>Tỷ lệ chuyến đi dùng xe cá nhân (%)<input id="vehicle-share" type="number" min="0" max="100" step="any" required></label>
+      <label>Số người trung bình / xe<input id="vehicle-occupancy" type="number" min="1" max="100" step="any" required></label>
+      <label>Nước (lít/người/ngày)<input id="water-rate" type="number" min="0" max="10000" step="any" required></label>
+      <label>Nước thải / nước sử dụng (%)<input id="wastewater-fraction" type="number" min="0" max="100" step="any" required></label>
+      <label>Điện giờ cao điểm (kW/người)<input id="power-rate" type="number" min="0" max="100" step="any" required></label>
+      <label>Khả năng tiếp nhận thêm chuyến xe / giờ<input id="vehicle-capacity" type="number" min="0" max="1000000" step="any" required></label>
+      <label>Nước còn cấp được (m³/ngày)<input id="water-capacity" type="number" min="0" max="1000000" step="any" required></label>
+      <label>Nước thải còn tiếp nhận được (m³/ngày)<input id="wastewater-capacity" type="number" min="0" max="1000000" step="any" required></label>
+      <label>Công suất điện còn cấp được (kW)<input id="power-capacity" type="number" min="0" max="1000000" step="any" required></label>
+    </div><label>Nguồn hệ số và công suất<textarea id="demand-basis" rows="2" minlength="5" maxlength="1000" required placeholder="Khảo sát lưu lượng, nhà cung cấp hạ tầng hoặc giả định minh họa..."></textarea></label></section>
+    <section class="panel"><h2>5. Mục tiêu đánh giá</h2><p class="hint">Đây là mục tiêu do bạn chọn, chưa phải tiêu chuẩn pháp lý. Hệ thống báo thay đổi từng chỉ số và kiểm tra các mục tiêu này cùng công suất hạ tầng đã nhập.</p><div class="grid">
+      <label>Mức tăng nước còn lại cho phép so với hiện trạng (%)<input id="target-runoff" type="number" min="0" max="1000" step="any" value="0" required></label>
+      <label>Tỷ lệ đất xanh tối thiểu (%)<input id="target-green" type="number" min="0" max="100" step="any" value="30" required></label>
+      <label>Mái + sân cứng tối đa (%)<input id="target-impervious" type="number" min="0" max="100" step="any" value="70" required></label>
+    </div><label>Cơ sở chọn mục tiêu<textarea id="target-basis" rows="2" minlength="5" maxlength="1000" required placeholder="Mục tiêu dự án, yêu cầu của planner hoặc giả định thử nghiệm..."></textarea></label></section>
+    <label class="check"><input id="ack" type="checkbox" required> Tôi đã kiểm tra dữ liệu đầu vào và hiểu đây là ước tính sơ bộ.</label>
+    <button id="run" type="submit">Dự tính tác động và đánh giá</button>
+  </form>
+  <div id="status" role="status" aria-live="polite"></div>
+  <section id="results" class="panel" hidden>
+    <h2>6. Tác động dự tính của công trình</h2><p id="result-title"></p>
+    <div id="assessment" class="assessment"></div><div id="bars"></div><div class="scroll"><table id="metrics"></table></div><h3>Thay đổi so với hiện trạng</h3><ul id="deltas"></ul>
+    <form id="recommend-form"><h2 style="margin-top:28px">7. Tìm gợi ý thiết kế cải thiện</h2><p class="hint">Hệ thống tìm thay đổi bề mặt, giữ nước và chỉ tiêu vận hành để giảm áp lực giao thông/nước/điện. Giữ nguyên footprint, số tầng và số người. Nhập giới hạn thực tế và chi phí; kết quả chưa xác nhận vị trí bố trí, hiệu quả thực tế hoặc thi công.</p>
+      <div class="grid">
+        <label>Sân cứng phải giữ tối thiểu (% khu đất)<input id="minimum-paved" type="number" min="0" max="100" step="any" required></label>
+        <label>Được đổi sân cứng sang đất xanh tối đa (% khu đất)<input id="maximum-green" type="number" min="0" max="100" step="any" required></label>
+        <label>Được đổi sân cứng sang sân thấm tối đa (% khu đất)<input id="maximum-permeable" type="number" min="0" max="100" step="any" required></label>
+        <label>Được bổ sung giữ nước tối đa (m³)<input id="maximum-storage" type="number" min="0" max="1000000" step="any" required></label>
+        <label>Ngân sách cải thiện (VND)<input id="budget" type="number" min="0" max="1000000000000000" step="any" required></label>
+        <label>Chi phí đổi sang đất xanh (VND/m²)<input id="cost-green" type="number" min="1" max="1000000000000" step="any" required></label>
+        <label>Chi phí đổi sang sân thấm (VND/m²)<input id="cost-permeable" type="number" min="1" max="1000000000000" step="any" required></label>
+        <label>Chi phí bổ sung giữ nước (VND/m³)<input id="cost-storage" type="number" min="1" max="1000000000000" step="any" required></label>
+        <label>Tỷ lệ xe cá nhân thấp nhất có thể đạt (%)<input id="minimum-vehicle-share" type="number" min="0" max="100" step="any" required></label>
+        <label>Mức tiết kiệm nước tối đa giả định (%)<input id="maximum-water-saving" type="number" min="0" max="90" step="any" required></label>
+        <label>Mức giảm điện cao điểm tối đa giả định (%)<input id="maximum-power-saving" type="number" min="0" max="90" step="any" required></label>
+        <label>Chi phí giảm 1 điểm % tỷ lệ xe cá nhân (VND)<input id="cost-transport" type="number" min="1" max="1000000000000" step="any" required></label>
+        <label>Chi phí đạt 1 điểm % tiết kiệm nước (VND)<input id="cost-water" type="number" min="1" max="1000000000000" step="any" required></label>
+        <label>Chi phí đạt 1 điểm % giảm điện cao điểm (VND)<input id="cost-power" type="number" min="1" max="1000000000000" step="any" required></label>
+      </div><label>Nguồn giới hạn và chi phí<textarea id="cost-basis" rows="2" minlength="5" maxlength="1000" required placeholder="Báo giá, khảo sát hoặc giả định thử phần mềm..."></textarea></label>
+      <label><input id="transport-feasible" type="checkbox"> Có căn cứ cho khả năng chuyển một phần chuyến đi sang phương tiện khác; đã xét khả năng tiếp nhận của phương tiện thay thế.</label>
+      <button id="recommend" type="submit">Tìm và kiểm tra gợi ý cải thiện</button>
+    </form>
+    <div id="suggestions"></div>
+    <h3>Phương pháp và dữ liệu đầu vào</h3><p id="basis" class="hint"></p><h3>Giới hạn</h3><ul id="limitations"></ul><p id="saved" class="hint"></p><div class="actions"><button id="download" type="button">Tải kết quả JSON</button><button id="print" type="button" class="secondary">In / lưu PDF</button></div>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,55 @@
+name: Prepare citywide land-price matching data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATA_DIR: etl/data
+      PYTHONPATH: etl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: etl/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: |
+            etl/data/raw/boundaries
+            etl/data/raw/land_price
+            etl/data/review/land_price_pdf_v2_*.json
+          key: land-price-source-cache-v1-${{ github.run_id }}
+          restore-keys: land-price-source-cache-v1-
+      - run: python -m pip install -r etl/requirements.txt
+      - name: Prepare the sourced analytical city boundary
+        run: python scripts/prepare-hcmc-boundary.py --cached
+      - name: Fetch roads and current ward polygons; match named intersections
+        # This tracked annex is byte-identical to the full official PDF
+        # (SHA256 a8e6fee0a6c5698b2937662d71cc858009edf0406c1f2655a4de494f479cfcb6).
+        # Explicit full-city extraction avoids an unnecessary CDN download.
+        run: python scripts/prepare-land-price-segments.py --cached --source etl/data/raw/land_price/official-annex-2026.pdf
+      - name: Publish a local GeoJSON snapshot (no production database)
+        run: >-
+          python -m src.main run land_price --full-city
+          --source etl/data/review/land_price_rows.json
+          --segments etl/data/review/land_price_auto_segments.geojson
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: land-price-citywide-${{ github.run_id }}
+          retention-days: 14
+          path: |
+            etl/data/raw/land_price
+            etl/data/review/land_price_*.json
+            etl/data/review/land_price_*.geojson
+            etl/data/inputs/land_price_wards.geojson
+            etl/data/inputs/hcmc_expanded_boundary.geojson
+            etl/data/layers/land_price.geojson

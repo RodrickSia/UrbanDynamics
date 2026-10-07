@@ -20,16 +20,8 @@ def run(rain_mm, radius_m, polygon=None):
         ):
             raise ValueError("Scenario area must use WGS84")
         floods["features"] = [f for f in floods["features"] if area.covers(shape(f["geometry"]))]
-    directory = repository.directory() / "inputs"
-    forecast = json.loads((directory / "rainfall_forecast.json").read_text(encoding="utf-8"))
-    history = json.loads((directory / "rainfall_history.json").read_text(encoding="utf-8"))
-    return {
-        "type": "FeatureCollection",
-        "features": evaluate(floods, forecast, history, rain_mm, radius_m),
-        "metadata": {
-            "scenario": True,
-            "rain_3h_mm": rain_mm,
-            "radius_m": radius_m,
-            "limitations": "Hypothetical rainfall indicator; not hydraulic flood simulation.",
-        },
-    }
+    from src.pipelines.rainwater.load import input_pair
+    forecast,history = input_pair(repository.directory())
+    return {"type": "FeatureCollection", "features": evaluate(floods, forecast, history, rain_mm, radius_m),
+            "metadata": {"scenario": True, "rain_3h_mm": rain_mm, "radius_m": radius_m,
+                         "limitations": "Hypothetical rainfall indicator; not hydraulic flood simulation."}}

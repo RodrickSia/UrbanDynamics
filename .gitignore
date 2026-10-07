@@ -13,6 +13,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
 .runtime/
 data/
 # Keep the official land-price annex available to local and CI ETL runs.

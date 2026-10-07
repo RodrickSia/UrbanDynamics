@@ -7,6 +7,8 @@ import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
 import { setBuildings3d } from '../layers/buildings3d';
+import { installLandPrice, LAND_PRICE_LAYER, type LandPriceStatus, type LandPriceProperties } from '../layers/landPrice';
+import { LandPriceLegend } from './LandPriceLegend';
 import {
   createMeasurementLayer,
   MEASUREMENT_LAYER_ID,
@@ -14,7 +16,6 @@ import {
 } from '../layers/measurementLayer';
 import { setTerrain } from '../layers/terrain';
 import { installMetricRoadWidths } from '../layers/metricRoadWidths';
-import { installLandPricePopup, setLandPriceLayer } from '../layers/landPrice';
 import { createMapInteractionHandlers } from '../utils/mapInteractions';
 import { MeasurementLabels } from './MeasurementLabels';
 import type { UrbanMapProps } from './UrbanMap.types';
@@ -29,8 +30,8 @@ export function UrbanMap(props: UrbanMapProps) {
     mode,
     buildingsEnabled,
     buildingsOpacity,
-    landPriceEnabled,
-    landPriceOpacity,
+    landPriceEnabled = false,
+    landPriceOpacity = 0.8,
     measurement,
     selection,
     userLocation,
@@ -49,6 +50,9 @@ export function UrbanMap(props: UrbanMapProps) {
   const styleReadyRef = useRef(false);
   const cameraModeRef = useRef('2d');
   const [mapRevision, setMapRevision] = useState(0);
+  const [landPriceStatus, setLandPriceStatus] = useState<LandPriceStatus>({ state: 'loading' });
+  const [landPriceSelection, setLandPriceSelection] = useState<LandPriceProperties | null>(null);
+  const [priceRetry, setPriceRetry] = useState(0);
   propsRef.current = props;
 
   useLocationMarkers(mapRef, markerConstructorRef, mapRevision, selection, userLocation);
@@ -61,13 +65,29 @@ export function UrbanMap(props: UrbanMapProps) {
   });
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current || !landPriceEnabled) return;
+    return installLandPrice(map, propsRef.current.landPriceOpacity ?? 0.8, setLandPriceStatus,
+      properties => {
+        const current = propsRef.current;
+        if (properties === null || (current.measurement.status !== 'active' &&
+          (!current.viewshed || current.viewshed.state.phase === 'idle'))) setLandPriceSelection(properties);
+      });
+  }, [landPriceEnabled, mapRevision, priceRetry]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map?.getLayer(LAND_PRICE_LAYER)) map.setPaintProperty(LAND_PRICE_LAYER, 'line-opacity', landPriceOpacity);
+  }, [landPriceOpacity, mapRevision, landPriceStatus.state]);
+
+
+  useEffect(() => {
     if (!containerRef.current || !configuration.ok) return;
     const { mapKey } = configuration;
     let disposed = false;
     let mountedMap: MapLibreMap | null = null;
     let disposeInteractions: () => void = () => undefined;
     let disposeRoadWidths: () => void = () => undefined;
-    let disposeLandPricePopup: () => void = () => undefined;
     styleReadyRef.current = false;
 
     void import('maplibre-gl')
@@ -126,11 +146,6 @@ export function UrbanMap(props: UrbanMapProps) {
           disposeRoadWidths = installMetricRoadWidths(map);
           poiVisibility.current(map, propsRef.current.poiEnabled ?? true, true);
           applyMode();
-          if (!propsRef.current.backend) setLandPriceLayer(
-            map,
-            propsRef.current.landPriceEnabled ?? false,
-            propsRef.current.landPriceOpacity ?? 0.8,
-          );
           if (!map.getLayer(MEASUREMENT_LAYER_ID)) map.addLayer(measurementLayer);
           // Custom layers survive style diffing but newly added raster/style
           // layers are appended above them. Always restore the overlay order.
@@ -145,9 +160,6 @@ export function UrbanMap(props: UrbanMapProps) {
 
         const interactions = createMapInteractionHandlers(map, () => propsRef.current, measurementLayer.projection);
         disposeInteractions = interactions.dispose;
-        disposeLandPricePopup = installLandPricePopup(map, maplibregl.Popup, () =>
-          !propsRef.current.backend && propsRef.current.measurement.status !== 'active' &&
-          (!propsRef.current.viewshed || propsRef.current.viewshed.state.phase === 'idle'));
 
         map.on('style.load', handleStyleLoad);
         map.on('click', interactions.click);
@@ -167,7 +179,6 @@ export function UrbanMap(props: UrbanMapProps) {
       disposed = true;
       disposeInteractions();
       disposeRoadWidths();
-      disposeLandPricePopup();
       styleReadyRef.current = false;
       markerConstructorRef.current = null;
       measurementLayerRef.current = null;
@@ -220,13 +231,6 @@ export function UrbanMap(props: UrbanMapProps) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReadyRef.current || !configuration.ok || props.backend) return;
-    setLandPriceLayer(map, landPriceEnabled ?? false, landPriceOpacity ?? 0.8);
-    if (map.getLayer(MEASUREMENT_LAYER_ID)) map.moveLayer(MEASUREMENT_LAYER_ID);
-  }, [configuration, landPriceEnabled, landPriceOpacity, mapRevision, props.backend]);
-
-  useEffect(() => {
-    const map = mapRef.current;
     if (!map || !styleReadyRef.current || cameraModeRef.current === mode) return;
     // Allow the new terrain/extrusion pipeline to render before beginning the
     // flight. Opacity, tile loading and basemap changes must not restart it.
@@ -265,7 +269,8 @@ export function UrbanMap(props: UrbanMapProps) {
   return (
     <>
       <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />
-      {props.backend && <BackendDataScene map={mapRef.current} bridge={props.backend}
+      {props.backend && <BackendDataScene map={mapRef.current} bridge={{ ...props.backend,
+        selections: props.backend.selections.filter(selection => selection.id !== 'land-price') }}
         interactive={measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
       {props.viewshed && <ViewshedScene map={mapRef.current} projection={measurementLayerRef.current?.projection ?? null}
         mode={mode} bridge={props.viewshed} />}
@@ -275,6 +280,8 @@ export function UrbanMap(props: UrbanMapProps) {
         measurement={measurement}
         mode={mode}
       />
+      {landPriceEnabled && <LandPriceLegend status={landPriceStatus} selected={landPriceSelection}
+        onClose={() => setLandPriceSelection(null)} onRetry={() => setPriceRetry(value => value + 1)} />}
     </>
   );
 }

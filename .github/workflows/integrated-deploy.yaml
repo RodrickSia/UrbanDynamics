@@ -1,0 +1,92 @@
+name: Deploy integrated simulation to 156
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_directory:
+        description: 'Persistent directory on configured runner, with .env and data/'
+        required: true
+        default: '/srv/urbandynamics'
+        type: string
+      api_port:
+        description: 'Localhost backend port'
+        required: true
+        default: '8001'
+        type: string
+      db_port:
+        description: 'Localhost PostgreSQL port'
+        required: true
+        default: '55432'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: integrated-deploy-156
+  cancel-in-progress: false
+jobs:
+  checks:
+    uses: ./.github/workflows/khoi-checks.yaml
+  deploy:
+    needs: checks
+    runs-on: [self-hosted, linux, urban-156]
+    timeout-minutes: 30
+    env:
+      DEPLOY_DIRECTORY: ${{ inputs.deploy_directory }}
+      KHOI_API_PORT: ${{ inputs.api_port }}
+      KHOI_DB_PORT: ${{ inputs.db_port }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage immutable source and preserve runtime data
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$DEPLOY_DIRECTORY" in /srv/*) ;; *) echo "Use a directory under /srv"; exit 1 ;; esac
+          deploy_dir=$(realpath -m "$DEPLOY_DIRECTORY")
+          case "$deploy_dir" in /srv/*) ;; *) exit 1 ;; esac
+          [[ "$KHOI_API_PORT" =~ ^[0-9]+$ && "$KHOI_DB_PORT" =~ ^[0-9]+$ ]]
+          (( KHOI_API_PORT > 1023 && KHOI_API_PORT < 65536 ))
+          (( KHOI_DB_PORT > 1023 && KHOI_DB_PORT < 65536 ))
+          test -s "$deploy_dir/.env" || { echo "Create .env on runner before deployment"; exit 1; }
+          docker info > /dev/null
+          mkdir -p "$deploy_dir/.releases" "$deploy_dir/data"
+          release_path="$deploy_dir/.releases/$(date -u +%Y%m%dT%H%M%SZ)-${GITHUB_SHA:0:12}"
+          mkdir "$release_path"
+          git archive HEAD | tar -x -C "$release_path"
+          ln -s "$deploy_dir/.env" "$release_path/.env"
+          ln -s "$deploy_dir/data" "$release_path/data"
+          echo "RELEASE_PATH=$release_path" >> "$GITHUB_ENV"
+      - name: Build and start warehouse and simulation backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RELEASE_PATH"
+          docker compose -p urbandynamics-156 -f compose.khoi.yaml up -d --build --wait warehouse backend
+      - name: Smoke real simulation and persisted snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RELEASE_PATH"
+          docker compose -p urbandynamics-156 -f compose.khoi.yaml exec -T backend python - <<'PY'
+          import requests
+          base = 'http://127.0.0.1:8000'
+          requests.get(base+'/health', timeout=10).raise_for_status()
+          response = requests.get(base+'/api/v1/scenarios/integrated/presets', timeout=10)
+          response.raise_for_status()
+          response = requests.post(base+'/api/v1/scenarios/integrated/predict', json=response.json()['default'], timeout=240)
+          response.raise_for_status()
+          result = response.json()
+          for state in result['variants'].values():
+              assert all(state['validity'].values()), 'Solver balance/count failed'
+          stored = requests.get(base+'/api/v1/scenarios/integrated/'+result['id'], timeout=10)
+          stored.raise_for_status()
+          assert stored.json() == result
+          print('SUMO/SWMM and PostGIS smoke passed:', result['id'])
+          PY
+      - name: Mark successful release
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_dir=$(realpath -m "$DEPLOY_DIRECTORY")
+          if [ -e "$deploy_dir/current" ] && [ ! -L "$deploy_dir/current" ]; then
+            echo "current exists as a regular file/directory; inspect manually"; exit 1
+          fi
+          ln -sfn "$RELEASE_PATH" "$deploy_dir/current"

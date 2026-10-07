@@ -39,3 +39,22 @@ def test_pdf_continuation_and_whole_road_are_retained(monkeypatch):
     assert result["records"][1]["segment_scope"] == "whole_road"
     assert result["records"][1]["to"] == "TRỌN ĐƯỜNG"
     assert not result["rejected"]
+
+def test_complete_pdf_supports_all_regions_and_repeated_ward_headers(monkeypatch):
+    def page(title,rows):
+        return SimpleNamespace(extract_text=lambda:title,extract_tables=lambda:[rows])
+    pages = [page('Phụ lục II\nBẢNG GIÁ ĐẤT PHƯỜNG AN KHÁNH',
+                  [['1','ROAD','FROM','TO','100','60','50']]),
+             page('Phụ lục III\nBẢNG GIÁ ĐẤT XÃ MINH THẠNH',
+                  [['1','OTHER','FROM','TO','200','120','100']]),
+             page('Phụ lục IV\nBẢNG GIÁ ĐẤT PHƯỜNG VŨNG TÀU',
+                  [['1','THÙY VÂN','FROM','TO','300','180','150']]),
+             page('Phụ lục IV\nBẢNG GIÁ ĐẤT PHƯỜNG VŨNG TÀU',
+                  [['2','','NEXT','END','400','240','200']])]
+    class Document:
+        def __enter__(self): return SimpleNamespace(pages=pages)
+        def __exit__(self,*args): pass
+    monkeypatch.setattr('src.pipelines.land_price.extract.pdfplumber.open',lambda path:Document())
+    result = parse_pdf('fixture')
+    assert result['region_counts']=={'hcmc_previous':1,'binh_duong_previous':1,'ba_ria_vung_tau_previous':2}
+    assert result['records'][-1]['road']=='THÙY VÂN'

@@ -10,6 +10,7 @@ on:
         default: population_hcmc
         options:
           - all
+          - rainwater
           - population_hcmc
           - flood_history
           - flood_satellite
@@ -92,13 +93,13 @@ jobs:
           fi
 
           prepare_boundary() {
-            if [ -s etl/data/inputs/thu_duc_boundary.geojson ]; then
+            if [ -s etl/data/inputs/hcmc_expanded_boundary.geojson ]; then
               return
             fi
             local service=etl-flood-history
-            echo "Preparing the Thu Duc boundary from the published DataSuds boundary dataset."
+            echo "Preparing the sourced expanded HCMC boundary."
             docker compose --profile "$service" build "$service"
-            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py boundary
+            docker compose --profile "$service" run --rm --entrypoint python "$service" -c "from src.shared.hcmc_boundary import run; run(cached=True)"
           }
 
           prepare_rainfall_inputs() {
@@ -106,7 +107,7 @@ jobs:
             echo "Refreshing the Open-Meteo rainfall forecast and creating history input if it is not cached."
             docker compose --profile "$service" build "$service" || return 1
             docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py weather || return 1
-            [ -s etl/data/inputs/rainfall_forecast.json ] && [ -s etl/data/inputs/rainfall_history.json ]
+            [ -s etl/data/inputs/rainwater_forecast.json ] && [ -s etl/data/inputs/rainwater_history.json ]
           }
 
           land_price_prepared=false
@@ -143,11 +144,11 @@ jobs:
             case "$pipeline" in
               flood_history|flood_satellite)
                 prepare_boundary
-                arguments=(--boundary /app/data/inputs/thu_duc_boundary.geojson)
+                arguments=(--boundary /app/data/inputs/hcmc_expanded_boundary.geojson)
                 ;;
             flood_risk)
                 prepare_rainfall_inputs || { echo "Could not prepare rainfall inputs for flood_risk." >&2; exit 1; }
-                arguments=(--weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json)
+                arguments=()
                 ;;
               land_price)
                 prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
@@ -192,17 +193,21 @@ jobs:
             if [ "${#skipped[@]}" -gt 0 ]; then
               printf 'Skipped pipelines due to missing inputs: %s\n' "${skipped[*]}" >> "$GITHUB_STEP_SUMMARY"
             fi
+          elif [ "$ETL_PIPELINE" = rainwater ]; then
+            test "$ETL_STAGE" = all || { echo "Rainwater requires stage all." >&2; exit 1; }
+            docker compose --profile etl-rainwater build etl-rainwater
+            docker compose --profile etl-rainwater run --rm etl-rainwater --once --jobs forecast history
           else
             service="etl-${ETL_PIPELINE//_/-}"
             docker compose --profile "$service" build "$service"
             case "$ETL_PIPELINE" in
               flood_history|flood_satellite)
                 prepare_boundary
-                set -- --boundary /app/data/inputs/thu_duc_boundary.geojson
+                set -- --boundary /app/data/inputs/hcmc_expanded_boundary.geojson
                 ;;
               flood_risk)
                 prepare_rainfall_inputs || { echo "Could not prepare rainfall inputs for flood_risk." >&2; exit 1; }
-                set -- --weather-input /app/data/inputs/rainfall_forecast.json --history-input /app/data/inputs/rainfall_history.json
+                set --
                 ;;
               land_price)
                 if [ "$ETL_STAGE" = all ]; then

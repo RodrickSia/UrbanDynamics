@@ -1,14 +1,21 @@
 """Validate road geometry approved by a reviewer or the configured auto-matcher."""
 from shapely.geometry import shape
+from .road_matcher import METHODS, VERSION
 
 def matched_segments(document):
     segments = {}
     for feature in document.get("features", []):
         properties = feature["properties"]
-        auto_approved = (
+        legacy_auto = (
             properties.get("auto_approved") is True
             and properties.get("match_method") == "exact_normalized_osm_name"
         )
+        spatial_auto = (properties.get("auto_approved") is True
+                        and properties.get("match_method") in METHODS
+                        and properties.get("matcher_version") == VERSION
+                        and properties.get("match_confidence") == "spatially_checked"
+                        and properties.get("ward_osm_relation_id") is not None)
+        auto_approved = legacy_auto or spatial_auto
         if properties.get("reviewed") is not True and not auto_approved:
             continue
         key = properties.get("price_record_id")
