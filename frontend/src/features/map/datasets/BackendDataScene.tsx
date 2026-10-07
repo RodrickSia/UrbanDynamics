@@ -11,6 +11,7 @@ import type { LayerOpacityState } from '../types/map';
 import { type DataSelection, type DataLayerId, type LayerReport } from './datasets';
 import { dataSourceId, datasetStyle } from './datasetStyle';
 import { floodLocationDetails } from './floodLocation';
+import { populationRasterSource, viewportProbeDelayAfterMove } from './populationRaster';
 import './data.css';
 
 export interface BackendBridge {
@@ -114,10 +115,10 @@ function DatasetSource({
         else publish('error', 'Data unavailable · retry');
       }
     };
-    const schedule = () => {
+    const schedule = (delay = 300) => {
       clearTimeout(timer);
       request?.abort();
-      timer = setTimeout(() => void probe(), 300);
+      timer = setTimeout(() => void probe(), delay);
     };
     const attach = () => {
       styleReady = true;
@@ -127,14 +128,7 @@ function DatasetSource({
         map.addSource(
           sourceId,
           raster
-            ? {
-                type: 'raster',
-                tiles: [selectedAtAttach.url],
-                tileSize: 256,
-                maxzoom: 18,
-                bounds: [102, 8, 110, 24],
-                attribution: 'WorldPop · persons per source raster cell',
-              }
+            ? populationRasterSource(selectedAtAttach.url)
             : {
                 type: 'vector',
                 tiles: [selectedAtAttach.url],
@@ -182,7 +176,8 @@ function DatasetSource({
       clearTimeout(timer);
     };
     const moved = () => {
-      if (styleReady) schedule();
+      if (styleReady)
+        schedule(viewportProbeDelayAfterMove(current.current.dataset));
     };
     const moving = () => {
       request?.abort();

@@ -10,10 +10,12 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
         id: source,
         source,
         type: 'raster',
+        // MapLibre's generic resampling is preferred; zero fade avoids tile cross-fade artifacts.
+        // https://maplibre.org/maplibre-style-spec/layers/#raster-fade-duration
         paint: {
           'raster-opacity': 0.8,
-          'raster-fade-duration': 180,
-          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
+          resampling: 'linear',
         },
       };
     case 'flood_history':
