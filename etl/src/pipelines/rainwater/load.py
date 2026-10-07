@@ -11,7 +11,12 @@ def input_pair(root=None):
             raise ValueError("Invalid rain snapshot ID")
         base = root/"inputs/rainwater/runs"/run_id
         return read_json(base/"forecast.json"),read_json(base/"history.json")
-    return read_json(root/"inputs/rainwater_forecast.json"),read_json(root/"inputs/rainwater_history.json")
+    forecast = root/"inputs/rainwater_forecast.json"
+    history = root/"inputs/rainwater_history.json"
+    if not forecast.exists() and not history.exists():
+        # Compatibility with the team's pre-citywide rainfall input contract.
+        forecast, history = root/"inputs/rainfall_forecast.json", root/"inputs/rainfall_history.json"
+    return read_json(forecast),read_json(history)
 
 def run(forecast,history):
     document = layer(forecast,history)

@@ -1,11 +1,12 @@
-from dataclasses import asdict
-import numpy as np
 from contextlib import ExitStack
+from dataclasses import asdict
+
+import numpy as np
 import rasterio
+from rasterio.enums import Resampling
 from rasterio.features import shapes
 from rasterio.mask import mask
 from rasterio.warp import transform_geom
-from rasterio.enums import Resampling
 from rasterio.vrt import WarpedVRT
 from shapely.geometry import shape, mapping
 from src.shared.data_io import collection,data_dir,read_json,write_json
@@ -17,6 +18,7 @@ import shutil
 import tempfile
 from .config import FLOOD_ASSET, MASK_ASSET, STAC_URL
 from .models import RasterCounts
+
 
 def observed_features(flood_path, exclusion_path, boundary, item):
     """Read bounded native raster windows, including disconnected island regions."""
@@ -82,10 +84,20 @@ def run(records, boundary, catalog_only=False):
         if catalog_only:
             footprint = shape(item["geometry"]).intersection(boundary)
             if not footprint.is_empty:
-                features.append({"type": "Feature", "id": item["id"], "geometry": mapping(footprint),
-                                 "properties": {"observed_at": item["properties"].get("datetime"),
-                                     "item_id": item["id"], "kind": "coverage_only",
-                                     "assets": item.get("assets", {}), "flood_pixels_verified": False}})
+                features.append(
+                    {
+                        "type": "Feature",
+                        "id": item["id"],
+                        "geometry": mapping(footprint),
+                        "properties": {
+                            "observed_at": item["properties"].get("datetime"),
+                            "item_id": item["id"],
+                            "kind": "coverage_only",
+                            "assets": item.get("assets", {}),
+                            "flood_pixels_verified": False,
+                        },
+                    }
+                )
         else:
             logging.getLogger(__name__).info('GFM process %s/%s %s',index,len(records),item['id'])
             signatures = [(p['url'],p['sha256']) for p in record.get('provenance',[])]
@@ -97,10 +109,22 @@ def run(records, boundary, catalog_only=False):
                 pixels, counts = observed_features(record["paths"][FLOOD_ASSET], record["paths"].get(MASK_ASSET), boundary, item)
                 if signatures: write_json(cache,{'features':pixels,'counts':counts})
             features.extend(pixels)
-            observations.append({"item_id": item["id"], "counts": counts, "provenance": record["provenance"]})
-    return collection("flood_satellite_catalog" if catalog_only else "flood_satellite", features,
-                      scope="boundary-filtered", source_url=STAC_URL, observations=observations,
-                      raster_verified=not catalog_only, items=len(records),
-                      mask_reference="https://extwiki.eodc.eu/GFM/PUM/Products",
-                      dry_coverage_verified=False,
-                      limitations="Satellite sampling may miss short urban floods. Excluded areas are not verified dry.")
+            observations.append(
+                {
+                    "item_id": item["id"],
+                    "counts": counts,
+                    "provenance": record["provenance"],
+                }
+            )
+    return collection(
+        "flood_satellite_catalog" if catalog_only else "flood_satellite",
+        features,
+        scope="boundary-filtered",
+        source_url=STAC_URL,
+        observations=observations,
+        raster_verified=not catalog_only,
+        items=len(records),
+        mask_reference="https://extwiki.eodc.eu/GFM/PUM/Products",
+        dry_coverage_verified=False,
+        limitations="Satellite sampling may miss short urban floods. Excluded areas are not verified dry.",
+    )

@@ -1,30 +1,59 @@
 # UrbanDynamics
 
-UrbanDynamics is organized as a monorepo with separate frontend, backend, and ETL services.
+UrbanDynamics is a monorepo for an urban map application and its data pipelines.
 
 ## Services
 
-- `frontend/` contains the web client. The initial scaffold serves a placeholder page; choose the application framework when the UI work begins.
-- `backend/` contains the FastAPI application and APIs used by the frontend.
-- `etl/` contains flood, land-price and rainfall pipelines, plus Khôi's persistent ETL service. Population remains a scaffold.
-- `infra/warehouse/` contains the PostGIS layer schema migration.
+- `frontend/`: React, TypeScript, Vite, and MapLibre map workspace.
+- `backend/`: FastAPI API used by the frontend; reads shared layers from PostGIS.
+- `etl/`: population, flood, and land-price pipeline code. Flood-risk uses
+  rainfall forecast and history files as inputs.
+- `infra/warehouse/`: PostGIS 17 image, initialization, and versioned migrations.
+- `compose.yaml`: local services and one opt-in Compose profile per ETL pipeline.
 
-## Local development
+## Local setup
 
-Copy `.env.example` to `.env`, then start the services with `docker compose up --build`. ETL services are opt-in: `docker compose --profile etl-population-hcmc run --rm etl-population-hcmc` or `docker compose --profile etl-rainwater up -d etl-rainwater` for continuous rainfall updates.
+Copy `.env.example` to `.env`, set a unique `WAREHOUSE_PASSWORD`, and set the
+frontend Goong Map Tiles key if you want to render the map. Start the application
+and warehouse with:
 
-See [docs/architecture.md](docs/architecture.md) for the initial service boundaries and [docs/development.md](docs/development.md) for repository conventions.
+```sh
+docker compose up --build
+```
 
-Khôi's flood and land-price implementation has a separate local PostGIS stack. See [the implementation guide](docs/khoi-implementation.md) and [local test report](docs/khoi-local-test-report.md). Run `.venv/Scripts/python.exe scripts/test-khoi-local.py`; API documentation is served at `http://127.0.0.1:8001/docs`.
+Only the frontend publishes a host port. Backend, PostGIS, and ETL communicate
+over the Compose network; the database hostname is `postgis` on port `5432`.
+See [ETL usage](etl/README.md) to run a pipeline and
+[warehouse operations](infra/warehouse/README.md) for migrations.
 
-For the expanded HCMC scope (including former Bình Dương, Bà Rịa–Vũng Tàu and Côn Đảo), rainfall ownership and continuous updates, use [Khôi's citywide ETL guide](docs/khoi-citywide-etl.md).
+## Documentation
 
-Building-impact screening has a standalone demo at `http://127.0.0.1:8001/simulation`: enter the existing site and proposed building, predict runoff/land-cover and traffic/utility demand, assess impacts against stated targets/capacity, then request generated improvements within a budget and constraints. No improved design is required as input. Save/reopen results and export JSON or print a report. See [the current simulation guide](docs/building-impact-prediction.md): forecasts use planner-supplied factors; hydraulic flood depth, traffic queues/travel time and thermal simulation are not implemented.
+- [Integrated building simulation: SUMO/SWMM, hourly demand, shadows and rerun recommendations](docs/integrated-building-impact.md)
+- [Citywide rainfall/flood/land-price ETL and scheduler](docs/khoi-citywide-etl.md)
+- [Combined local regression report](docs/integrated-simulation-test-report.md)
+- [Integrated deployment preparation for 156](docs/integrated-deployment.md)
 
-## CI/CD
+The shared application retains `compose.yaml`, PostGIS 17 and the team's frontend.
+For isolated simulation development, `compose.khoi.yaml` exposes the demo at
+`http://127.0.0.1:8001/simulation/integrated`. It starts with a residential building
+in Thu Duc and runs native SUMO/SWMM on explicitly synthetic networks. AI
+explanation is deferred; advanced thermal/2D/water-pressure solvers are pending.
 
-Integrated building simulation is available at `http://127.0.0.1:8001/simulation/integrated`, starting with a residential building in Thu Duc. It runs real SUMO/SWMM on explicitly synthetic networks, geometric shadows, shared hourly demand and multi-feature recommendations. See [implementation and limits](docs/integrated-building-impact.md) and [deployment preparation for 156](docs/integrated-deployment.md). AI explanation is deferred; advanced thermal/2D/water-pressure solvers remain unavailable.
+- [Architecture](docs/architecture.md)
+- [Development](docs/development.md)
+- [Flood and land-price ETL guide](docs/khoi-implementation.md)
+- [Frontend/backend API handoff](docs/frontend-backend-handoff.md)
+- [Historical local integration test report](docs/khoi-local-test-report.md)
 
-For the current demo inventory, data limits and prioritized feature plan, see [demo status and feature roadmap](docs/demo-status-and-feature-roadmap.md) (Vietnamese, updated 06/10/2026).
+## GitHub Actions
 
-GitHub Actions workflows belong in `.github/workflows/`. Workflows that deploy should target the configured self-hosted runner using repository or environment secrets; do not commit credentials or runner-specific configuration.
+- `CI` validates the database, backend, and frontend.
+- `Integration tests` runs flood, land-price, and API checks against an isolated
+  PostGIS database.
+- `Run ETL pipelines` is manually triggered and lets you choose a pipeline and
+  either the full pipeline or extraction stage.
+- `Deploy database` applies pending migrations. `Deploy` updates backend and
+  frontend in separate jobs.
+
+Deployment workflows use the protected `production` environment. Configure its
+`WAREHOUSE_PASSWORD` secret to match the production database.

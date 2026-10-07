@@ -1,6 +1,6 @@
 from datetime import datetime,timezone,timedelta
 import math
-from src.pipelines.flood_risk.rules import three_hour_windows,threshold,timestamp
+from src.pipelines.flood_risk.risk_assessment import three_hour_windows,threshold,timestamp
 from src.shared.data_io import collection
 from .config import SCOPE
 

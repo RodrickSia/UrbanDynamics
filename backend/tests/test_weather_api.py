@@ -5,7 +5,7 @@ from src.shared.database import publish
 from shapely.geometry import box,mapping
 
 def test_weather_and_service_status_api(tmp_path,monkeypatch):
-    monkeypatch.setenv('DATA_DIR',str(tmp_path)); monkeypatch.delenv('DATABASE_URL',raising=False)
+    monkeypatch.setenv('DATA_DIR',str(tmp_path)); monkeypatch.delenv('WAREHOUSE_PASSWORD',raising=False); monkeypatch.delenv('DATABASE_URL',raising=False)
     api = TestClient(app)
     assert api.get('/api/v1/weather/rain').status_code==503
     publish('rainwater',{'type':'FeatureCollection','features':[{'type':'Feature','id':'one',

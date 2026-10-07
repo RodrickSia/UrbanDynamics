@@ -4,8 +4,34 @@ x-etl: &etl
   image: urbandynamics-etl:latest
   env_file:
     - .env
+  volumes:
+    - ./etl/data:/app/data
+
+x-warehouse-env: &warehouse-env
+  WAREHOUSE_HOST: postgis
+  WAREHOUSE_PORT: "5432"
+  WAREHOUSE_DATABASE: ${WAREHOUSE_DATABASE:-urbandynamics}
+  WAREHOUSE_USER: ${WAREHOUSE_USER:-urbandynamics}
+  WAREHOUSE_PASSWORD: ${WAREHOUSE_PASSWORD:-}
 
 services:
+  postgis:
+    build:
+      context: ./infra/warehouse
+    image: urbandynamics-postgis:17-3.5
+    environment:
+      POSTGRES_DB: ${WAREHOUSE_DATABASE:-urbandynamics}
+      POSTGRES_USER: ${WAREHOUSE_USER:-urbandynamics}
+      POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD:-}
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   backend:
     build:
       context: .
@@ -13,14 +39,13 @@ services:
     env_file:
       - .env
     environment:
+      <<: *warehouse-env
       DATA_DIR: /data
       SCENARIO_DATA_DIR: /runtime/scenarios
       SIMULATION_WORK_DIR: /runtime/solvers
     volumes:
-      - ./data:/data:ro
+      - ./etl/data:/data:ro
       - simulation_runtime:/runtime
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
@@ -30,6 +55,9 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        VITE_GOONG_MAPTILES_KEY: ${VITE_GOONG_MAPTILES_KEY:-}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:
@@ -39,20 +67,102 @@ services:
   etl-population-hcmc:
     <<: *etl
     profiles: ["etl-population-hcmc"]
-    command: ["python", "-m", "src.main", "population_hcmc"]
+    environment:
+      <<: *warehouse-env
+      ETL_PIPELINE: population_hcmc
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-flood-history:
+    <<: *etl
+    profiles: ["etl-flood-history"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: flood_history
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-flood-satellite:
+    <<: *etl
+    profiles: ["etl-flood-satellite"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: flood_satellite
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-flood-risk:
+    <<: *etl
+    profiles: ["etl-flood-risk"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: flood_risk
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-land-price:
+    <<: *etl
+    profiles: ["etl-land-price"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: land_price
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  khoi-checks:
+    build:
+      context: .
+      dockerfile: infra/testing/Dockerfile
+    image: urbandynamics-khoi-checks:latest
+    profiles: ["checks"]
+    environment:
+      <<: *warehouse-env
+      POSTGIS_TESTS: "1"
+      TEST_DATABASE_URL: postgresql://${WAREHOUSE_USER:-urbandynamics}:${WAREHOUSE_PASSWORD:-}@postgis:5432/${WAREHOUSE_DATABASE:-urbandynamics}
     volumes:
-      - ./etl/data:/app/data
+      - ./test-results:/app/test-results
+    depends_on:
+      postgis:
+        condition: service_healthy
 
   etl-rainwater:
     <<: *etl
     profiles: ["etl-rainwater"]
-    command: ["python", "-m", "src.khoi_service", "--jobs", "forecast", "history"]
+    entrypoint: ["python", "-m", "src.khoi_service"]
+    command: []
     restart: unless-stopped
-    volumes:
-      - ./data:/data
     environment:
-      DATA_DIR: /data
-      HCMC_BOUNDARY: /data/inputs/hcmc_expanded_boundary.geojson
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      HCMC_BOUNDARY: /app/data/inputs/hcmc_expanded_boundary.geojson
+      RAIN_GRID_M: ${RAIN_GRID_M:-10000}
+      RAIN_BATCH_SIZE: ${RAIN_BATCH_SIZE:-10}
+      RAIN_HISTORY_START_YEAR: ${RAIN_HISTORY_START_YEAR:-2016}
+      RAIN_HISTORY_END_YEAR: ${RAIN_HISTORY_END_YEAR:-}
+      RAIN_HISTORY_STATIONS_PER_RUN: ${RAIN_HISTORY_STATIONS_PER_RUN:-4}
+      RAIN_REFRESH_SECONDS: ${RAIN_REFRESH_SECONDS:-3600}
+      RAIN_HISTORY_REFRESH_SECONDS: ${RAIN_HISTORY_REFRESH_SECONDS:-300}
+      SATELLITE_REFRESH_SECONDS: ${SATELLITE_REFRESH_SECONDS:-21600}
+      FLOOD_HISTORY_REFRESH_SECONDS: ${FLOOD_HISTORY_REFRESH_SECONDS:-604800}
+      LAND_PRICE_REFRESH_SECONDS: ${LAND_PRICE_REFRESH_SECONDS:-2592000}
+    depends_on:
+      postgis:
+        condition: service_healthy
 
 volumes:
+  postgis_data:
   simulation_runtime:

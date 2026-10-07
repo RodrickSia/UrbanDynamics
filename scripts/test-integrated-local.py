@@ -25,6 +25,8 @@ def main():
         raise SystemExit("Set POSTGRES_PASSWORD before running; no hardcoded default")
     docker = shutil.which("docker") or r"C:\Program Files\Docker\Docker\resources\bin\docker.exe"
     environment["TEST_DATABASE_URL"] = f"postgresql://urban:{quote(password, safe='')}@127.0.0.1:{environment.get('KHOI_DB_PORT', '55432')}/urban"
+    environment.update(WAREHOUSE_HOST="127.0.0.1", WAREHOUSE_PORT=environment.get('KHOI_DB_PORT', '55432'),
+                       WAREHOUSE_DATABASE="urban", WAREHOUSE_USER="urban", WAREHOUSE_PASSWORD=password, POSTGIS_TESTS="1")
     environment["SIMULATION_WORK_DIR"] = str(ROOT/".runtime"/"integrated-solvers")
     environment["PYTHONPATH"] = os.pathsep.join([str(ROOT/"etl"), str(ROOT/"backend")])
     output = ROOT/"test-results"
@@ -52,9 +54,13 @@ def main():
             # Pass the database URL through environment, never shell text/logs.
             old = environment.get("TEST_DATABASE_URL")
             environment["TEST_DATABASE_URL"] = linux_environment["TEST_DATABASE_URL"]
+            environment["WAREHOUSE_HOST"], environment["WAREHOUSE_PORT"] = "warehouse", "5432"
             step("linux-tests", [docker, "run", "--rm", "--network", "khoi-local_default", "-e", "TEST_DATABASE_URL",
+                                  "-e", "WAREHOUSE_HOST", "-e", "WAREHOUSE_PORT", "-e", "WAREHOUSE_DATABASE", "-e", "WAREHOUSE_USER",
+                                  "-e", "WAREHOUSE_PASSWORD", "-e", "POSTGIS_TESTS",
                                   "-v", f"{output}:/app/test-results", "khoi-integrated-tests"])
             environment["TEST_DATABASE_URL"] = old
+            environment["WAREHOUSE_HOST"], environment["WAREHOUSE_PORT"] = "127.0.0.1", environment.get('KHOI_DB_PORT', '55432')
         for attempt in range(30):
             try:
                 if requests.get(base+"/health", timeout=3).status_code == 200:

@@ -50,7 +50,9 @@ services:
         condition: service_healthy
   etl-service:
     build: ./etl
-    command: ["python", "-m", "src.khoi_service"]
+    entrypoint: ["python", "-m", "src.khoi_service"]
+    command: []
+    entrypoint: []
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://urban:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@warehouse:5432/urban

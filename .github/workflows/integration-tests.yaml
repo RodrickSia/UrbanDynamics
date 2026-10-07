@@ -1,0 +1,59 @@
+name: Integration tests — flood, land price, and API
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: khoi-ci-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create isolated Compose database credentials
+        shell: bash
+        run: |
+          set -eu
+          db_password=$(openssl rand -hex 32)
+          echo "::add-mask::$db_password"
+          umask 077
+          cat > .env <<EOF
+          WAREHOUSE_HOST=postgis
+          WAREHOUSE_PORT=5432
+          WAREHOUSE_DATABASE=urbandynamics_ci
+          WAREHOUSE_USER=ci
+          WAREHOUSE_PASSWORD=$db_password
+          EOF
+          mkdir -p test-results
+      - name: Build and start the main warehouse image
+        run: docker compose up -d --build --wait --wait-timeout 180 postgis
+      - name: Re-run the main migration runner
+        run: docker compose exec -T postgis /usr/local/bin/migrate-warehouse
+      - name: Run ETL and API tests over the Compose network
+        run: docker compose --profile checks run --rm khoi-checks
+      - name: Verify main migration ledger includes vector-layer migration
+        run: |
+          docker compose exec -T postgis psql --username ci --dbname urbandynamics_ci --set ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF to_regclass('public.layer_snapshots') IS NULL OR to_regclass('public.layer_features') IS NULL THEN
+              RAISE EXCEPTION 'vector layer tables are missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '001_khoi_layers.sql') <> 1 THEN
+              RAISE EXCEPTION 'vector layer migration was not recorded exactly once';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '02-population-raster.sql') <> 1 THEN
+              RAISE EXCEPTION 'population migration was not recorded exactly once';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Remove isolated database and credentials
+        if: always()
+        run: |
+          docker compose down --volumes --remove-orphans || true
+          rm -f .env
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: test-results/

@@ -8,6 +8,7 @@ from pathlib import Path
 from pyproj import CRS, Transformer
 from shapely.geometry import mapping, shape, LineString, Point
 from shapely.ops import transform
+from src.shared.database import warehouse_configured
 
 from ..engine import polygon_and_area
 from .library import parameters
@@ -36,18 +37,30 @@ def build_context(request):
     layers = {}
     for name in ("flood_history", "flood_risk", "flood_satellite", "land_price"):
         path = directory / "layers" / f"{name}.geojson"
-        if not path.exists():
+        if warehouse_configured():
+            from app.repository import features as read_features, LayerUnavailable
+            try:
+                document = read_features(name, bounds=nearby.bounds, limit=10000)
+            except LayerUnavailable:
+                layers[name] = {"status": "unavailable", "features": []}
+                continue
+            raw = json.dumps(document, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()
+            source_status = "postgis_context"
+        elif not path.exists():
             layers[name] = {"status": "unavailable", "features": []}
             continue
-        raw = path.read_bytes()
-        document = json.loads(raw)
+        else:
+            raw = path.read_bytes()
+            document = json.loads(raw)
+            source_status = "cached_context"
         features = [f for f in document.get("features", []) if f.get("geometry") and
                     shape(f["geometry"]).intersects(nearby)]
         # A nearby road price does not establish the price applicable to the site.
-        layers[name] = {"status": "cached_context", "metadata": document.get("metadata", {}),
+        layers[name] = {"status": source_status, "metadata": document.get("metadata", {}),
                         "snapshot_sha256": hashlib.sha256(raw).hexdigest(),
+                        "hash_scope": "returned warehouse context" if warehouse_configured() else "cached file bytes",
                         "features": features[:100], "matched_count": len(features),
-                        "truncated": len(features) > 100, "scope": "within 1 km; not parcel applicability"}
+                        "truncated": len(features) > 100 or document.get("metadata", {}).get("truncated", False), "scope": "within 1 km; not parcel applicability"}
     library = parameters(request.conditions.level)
     if request.conditions.rainfall_mm is not None:
         library["rainfall_mm"] = request.conditions.rainfall_mm

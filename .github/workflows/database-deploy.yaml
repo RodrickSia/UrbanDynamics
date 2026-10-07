@@ -1,0 +1,37 @@
+name: Deploy database
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    environment: production
+    env:
+      WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}
+      WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
+      WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
+    # Configure this label to match the private self-hosted runner.
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start PostGIS and apply pending migrations
+        env:
+          WAREHOUSE_MIGRATION_TARGET: compose
+        run: |
+          set -eu
+          test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
+          created_env=false
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            created_env=true
+          fi
+          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
+          docker compose up -d --wait --wait-timeout 180 postgis
+          sh infra/warehouse/scripts/migrate.sh

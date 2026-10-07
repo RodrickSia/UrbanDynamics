@@ -4,6 +4,7 @@ import os
 import tempfile
 import zipfile
 from pathlib import Path
+import psycopg
 from threading import BoundedSemaphore
 from uuid import UUID
 
@@ -69,6 +70,8 @@ def run(operation):
         raise HTTPException(503, str(error)) from None
     except StorageUnavailable:
         raise HTTPException(503, "Scenario storage unavailable; result was not saved") from None
+    except psycopg.Error:
+        raise HTTPException(503, "Simulation context warehouse unavailable") from None
     finally:
         slots.release()
 

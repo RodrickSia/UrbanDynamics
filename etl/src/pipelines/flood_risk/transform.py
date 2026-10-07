@@ -1,7 +1,9 @@
-from src.shared.data_io import collection
-from .rules import evaluate
-from .rules import timestamp
 from datetime import timedelta
+
+from src.shared.data_io import collection
+
+from .risk_assessment import evaluate, timestamp
+
 
 def run(floods, forecast, history):
     return collection("flood_risk", evaluate(floods, forecast, history), scope=floods["metadata"]["scope"],

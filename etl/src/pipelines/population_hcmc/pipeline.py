@@ -2,7 +2,7 @@
 
 import logging
 
-from src.pipelines.population_hcmc import extract
+from src.pipelines.population_hcmc import extract, load, transform
 
 
 def run() -> None:
@@ -10,7 +10,6 @@ def run() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    downloaded = extract.run()
-    logging.getLogger(__name__).info("Downloaded %s WorldPop population rasters:", len(downloaded))
-    for year, path in downloaded.items():
-        logging.getLogger(__name__).info("%s: %s", year, path)
+    raw_data = extract.run()
+    normalized_data = transform.run(raw_data)
+    load.run(normalized_data)

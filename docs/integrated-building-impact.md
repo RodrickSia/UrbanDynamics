@@ -13,7 +13,7 @@ $env:SIMULATION_WORK_DIR = '.runtime/integrated-native-solvers'
 & .venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8002
 ```
 
-Mở **http://127.0.0.1:8002/simulation/integrated**. Với `compose.khoi.yaml`, dùng cổng **8001**. Demo công thức cũ vẫn truy cập tại `/simulation`, có liên kết sang trang mới.
+Mở **http://127.0.0.1:8002/simulation/integrated**. Với stack local riêng `compose.khoi.yaml`, dùng cổng **8001**. Stack dùng chung `compose.yaml` giữ PostGIS 17, frontend React và chỉ mở port frontend: truy cập `/simulation/integrated` qua cùng host/port frontend. Nginx chuyển API/trang demo đến backend với timeout 300 giây. Demo công thức cũ vẫn truy cập tại `/simulation`, có liên kết sang trang mới.
 
 1. Chọn mẫu chung cư, sửa số căn/cư dân, hình học và thiết kế. Mẫu có 200 căn, 600 cư dân, 12 nhân viên, 80 lượt khách/ngày, 12 tầng cao 36 m. Đây là thiết kế tổng hợp, không phải công trình đã khảo sát.
 2. Vẽ footprint/khu đất hoặc nhập GeoJSON trong phần nâng cao. Mái được tính từ footprint; dùng **Tính sân cứng còn lại** để cân bằng diện tích. Phần nâng cao hỗ trợ nhiều khối/công năng, diện tích sàn thực, lịch 24 giờ, cây, hiện trạng có nguồn, thiết bị, tái dùng nước và cửa xả bể.
@@ -44,12 +44,12 @@ Parking được lưu như thông tin thiết kế, chưa có mô hình tìm ch�
 
 - Nếu thiếu baseline: khu đất trống tổng hợp 15% sân cứng, 15% thấm, 70% xanh. Có thể cung cấp `baseline.design` + `baseline.source`; hệ thống không coi dữ liệu người dùng cung cấp là đã xác minh.
 - Mạng đường/OD/hành vi xe, mạng cống/cao độ/đất, dân số ngoài khu đất/công suất dịch vụ, năng lực điện/nước và chi phí/mục tiêu đều có nhãn **synthetic**.
-- Dữ liệu flood history/risk/satellite/land price có sẵn được đọc từ cache local, lưu feature/metadata/hash trong context. Kết quả không tự tải WorldPop/DEM hay xác nhận hiện trạng thực từ OSM. Thiếu file thì báo unavailable.
+- Dữ liệu flood history/risk/satellite/land price được đọc từ PostGIS khi cấu hình warehouse, hoặc cache local; lưu feature/metadata/hash trong context. Hash PostGIS áp dụng cho phần context truy vấn trả về; hash file áp dụng cho bytes cache. Kết quả không tự tải WorldPop/DEM hay xác nhận hiện trạng thực từ OSM. Thiếu lớp thì báo unavailable; lỗi kết nối DB trả 503.
 - Mưa mặc định là **trận thiết kế tổng hợp** 42/60/78 mm trong 1 giờ, tiếp theo 2 giờ không mưa. Forecast cache được ghi nguồn/thời điểm, không tự lấy forecast hết hạn làm thời tiết hiện tại.
 - Low/base/high cùng thay mưa và tải chuyến ×0,7/1/1,3. Đây là stress cases; không phải xác suất hay confidence interval. Kiểm thử seed xác nhận cùng seed tái hiện route và delay, seed khác thay phân bố; chưa phải nghiên cứu ensemble hiệu chỉnh.
 - Trước/sau/gợi ý dùng chung baseline, điều kiện, library, seed và context hash. ZIP có `.inp`, network/route XML, report, output binary và manifest SHA256. Không chỉ lưu điểm đánh giá.
 - Run khác phiên bản model vẫn mở được; API yêu cầu dự tính mới trước khi sinh gợi ý, để tránh tính lại snapshot cũ bằng engine đã thay đổi. Điện dự phòng được kiểm tra bằng mức tăng lớn nhất tại cùng giờ trước/sau, không trừ hai đỉnh ngày ở hai thời điểm khác nhau.
-- JSON/PostGIS là append-only; mỗi lần predict/recommend có UUID riêng, gợi ý lưu `parent_id`. PostGIS được dùng khi có `DATABASE_URL`, JSON atomic khi không có. DB lỗi trả 503, không tự đổi sang kho khác.
+- JSON/PostGIS là append-only; mỗi lần predict/recommend có UUID riêng, gợi ý lưu `parent_id`. PostGIS được dùng khi có `DATABASE_URL` (local riêng) hoặc `WAREHOUSE_*` với mật khẩu (stack chung), JSON atomic khi chưa cấu hình database. DB lỗi trả 503, không tự đổi sang kho khác.
 - Artifact native ở `SIMULATION_WORK_DIR`: local `.runtime/...`; Docker named volume `/runtime/solvers`. Kho này độc lập với dữ liệu ETL chỉ đọc. Cần backup và chính sách retention theo dung lượng khi deploy; xóa artifact không xóa snapshot nhưng ZIP trả 410.
 
 ## Đánh giá và gợi ý

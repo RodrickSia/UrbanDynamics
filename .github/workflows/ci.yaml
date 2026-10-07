@@ -5,11 +5,101 @@ on:
   pull_request:
 
 jobs:
+  deployment-environment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test deployment environment generation
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
   compose-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare build environment
-        run: cp .env.example .env
+      - name: Test deployment environment generation
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Build service images
-        run: docker compose build
+        run: |
+          cp .env.example .env
+          trap 'rm -f .env' EXIT
+          docker compose \
+            --profile etl-population-hcmc \
+            --profile etl-flood-history --profile etl-flood-satellite \
+            --profile etl-flood-risk --profile etl-land-price \
+            build backend frontend etl-population-hcmc \
+            etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build PostGIS image
+        run: docker build --tag urbandynamics-postgis-ci --file infra/warehouse/Dockerfile infra/warehouse
+      - name: Start a fresh database
+        run: |
+          POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+          echo "::add-mask::$POSTGRES_PASSWORD"
+          export POSTGRES_PASSWORD
+          docker run --detach --name postgis-ci --env POSTGRES_DB=urbandynamics_ci --env POSTGRES_USER=ci --env POSTGRES_PASSWORD urbandynamics-postgis-ci
+      - name: Wait for database initialization
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker exec postgis-ci pg_isready --host 127.0.0.1 --username ci --dbname urbandynamics_ci; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs postgis-ci
+          exit 1
+      - name: Verify migrations are tracked and repeatable
+        run: |
+          docker exec postgis-ci /usr/local/bin/migrate-warehouse
+          docker exec postgis-ci psql --username ci --dbname urbandynamics_ci --set ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis') THEN
+              RAISE EXCEPTION 'postgis extension is missing';
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'postgis_raster') THEN
+              RAISE EXCEPTION 'postgis_raster extension is missing';
+            END IF;
+            IF to_regclass('population.population_raster') IS NULL THEN
+              RAISE EXCEPTION 'population raster table is missing';
+            END IF;
+            IF to_regclass('public.layer_snapshots') IS NULL OR to_regclass('public.layer_features') IS NULL THEN
+              RAISE EXCEPTION 'vector layer tables are missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '02-population-raster.sql') <> 1 THEN
+              RAISE EXCEPTION 'population migration was not tracked exactly once';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '001_khoi_layers.sql') <> 1 THEN
+              RAISE EXCEPTION 'vector layer migration was not tracked exactly once';
+            END IF;
+          END
+          $$;
+          SQL
+      - name: Remove test database container
+        if: always()
+        run: docker rm --force postgis-ci || true
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build --tag urbandynamics-backend:ci --file backend/Dockerfile .
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend image
+        run: docker build --tag urbandynamics-frontend:ci ./frontend
+      - name: Verify frontend image contains the built application
+        run: |
+          docker run --rm --add-host backend:127.0.0.1 --entrypoint sh urbandynamics-frontend:ci -ec '
+            test -s /usr/share/nginx/html/index.html
+            grep -q "/assets/" /usr/share/nginx/html/index.html
+            test -n "$(find /usr/share/nginx/html/assets -name "*.js" -print -quit)"
+            nginx -t
+          '

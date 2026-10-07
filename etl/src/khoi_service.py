@@ -12,6 +12,7 @@ import time
 import uuid
 
 from src.shared.data_io import data_dir,read_json,write_json,utc_now
+from src.shared.database import connect_to_warehouse, warehouse_configured, read_layer_document
 from src.pipelines.rainwater import config,grid,extract,load
 from src.pipelines.flood_risk.pipeline import run as flood_risk
 from src.pipelines.flood_history.pipeline import run as flood_history
@@ -23,10 +24,9 @@ LOGGER = logging.getLogger('khoi-etl')
 @contextmanager
 def leader_lock():
     """Lock across containers through PostGIS, or OS locking for local snapshots."""
-    url = os.getenv('DATABASE_URL')
-    if url:
-        import psycopg
-        with psycopg.connect(url,autocommit=True) as connection:
+    if warehouse_configured():
+        with connect_to_warehouse() as connection:
+            connection.autocommit = True
             locked = connection.execute("SELECT pg_try_advisory_lock(hashtext('khoi-etl-service'))").fetchone()[0]
             if not locked: raise RuntimeError('Another Khoi ETL service already owns the scheduler')
             try: yield
@@ -75,7 +75,7 @@ class Service:
         with self.weather_lock:
             history = extract.history_cached(self.settings,self.cells,self.grid)
             result = load.run(forecast,history)
-            if (data_dir()/'layers/flood_history.geojson').exists():
+            if self.has_flood_history():
                 result['flood_risk'] = flood_risk()
         return result
 
@@ -88,7 +88,7 @@ class Service:
                 forecast,_ = load.input_pair()
                 forecast['run_id'] = uuid.uuid4().hex
                 load.run(forecast,history)
-                if (data_dir()/'layers/flood_history.geojson').exists(): flood_risk()
+                if self.has_flood_history(): flood_risk()
         return {'ready_stations':history['ready_stations'],'total_stations':len(self.cells)}
 
     def job_flood_history(self):
@@ -96,6 +96,14 @@ class Service:
         with self.weather_lock:
             if (data_dir()/'inputs/rainwater_current.json').exists(): flood_risk()
         return result
+
+    def has_flood_history(self):
+        # Publishing to the shared warehouse does not create a local GeoJSON.
+        try:
+            read_layer_document('flood_history')
+        except FileNotFoundError:
+            return False
+        return True
 
     def job_satellite(self):
         return flood_satellite(boundary=str(self.settings.boundary),limit=100)

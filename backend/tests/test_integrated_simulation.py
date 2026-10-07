@@ -21,7 +21,7 @@ from app.services.simulation.integrated.models import IntegratedRequest, Design,
 def real_run(tmp_path_factory):
     directory = tmp_path_factory.mktemp("integrated")
     with pytest.MonkeyPatch.context() as patch:
-        patch.delenv("DATABASE_URL", raising=False)
+        patch.delenv("WAREHOUSE_PASSWORD", raising=False); patch.delenv("DATABASE_URL", raising=False)
         patch.setenv("SCENARIO_DATA_DIR", str(directory/"runs"))
         patch.setenv("SIMULATION_WORK_DIR", str(directory/"engines"))
         patch.setenv("DATA_DIR", str(directory/"no-data"))
@@ -136,7 +136,7 @@ def test_budget_and_locked_actions_return_no_feasible_candidate(real_run):
 
 
 def test_failure_returns_503_and_no_fake_prediction(monkeypatch, tmp_path):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("WAREHOUSE_PASSWORD", raising=False); monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("SCENARIO_DATA_DIR", str(tmp_path))
     def fail(*args):
         raise solvers.SolverUnavailable("Engine unavailable")
@@ -146,7 +146,10 @@ def test_failure_returns_503_and_no_fake_prediction(monkeypatch, tmp_path):
     assert not list(tmp_path.glob("*.json"))
 
 
-def test_synthetic_context_is_reproducible_without_timestamp():
+def test_synthetic_context_is_reproducible_without_timestamp(monkeypatch, tmp_path):
+    monkeypatch.delenv("WAREHOUSE_PASSWORD", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
     request = IntegratedRequest(**demo_payload())
     a, b = build_context(request), build_context(request)
     assert a["sha256"] == b["sha256"]
@@ -204,6 +207,8 @@ def test_spare_power_uses_coincident_hour_not_difference_of_daily_peaks(real_run
 
 
 def test_cached_snapshot_hash_matches_bytes_when_etl_publishes_concurrently(monkeypatch, tmp_path):
+    monkeypatch.delenv("WAREHOUSE_PASSWORD", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     layer = tmp_path/'layers'/'flood_history.geojson'
     layer.parent.mkdir()
     original = b'{"type":"FeatureCollection","features":[],"metadata":{"version":1}}'

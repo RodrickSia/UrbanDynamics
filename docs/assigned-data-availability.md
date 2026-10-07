@@ -1,6 +1,6 @@
 # Data availability for assigned layers
 
-Checked on 2026-09-30 for the Thu Duc first scope. This is source validation, not a claim that a live ETL pipeline exists. Run `node scripts/probe-assigned-sources.mjs` from the repository root to repeat the read-only checks. Local sandbox networking failed; the live results below came from an approved run outside the sandbox.
+Source availability snapshot checked on 2026-09-30 for the initial Thu Duc scope. The table records source probes from that date; it does not establish current source uptime or data freshness. Flood and land-price ETL code is now present; see [`khoi-implementation.md`](khoi-implementation.md) for the current pipeline and warehouse behavior. Run `node scripts/probe-assigned-sources.mjs` from the repository root to repeat the read-only checks. The recorded live results came from an approved network run.
 
 ## Results
 

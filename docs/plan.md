@@ -4,6 +4,8 @@
 
 **Cập nhật phạm vi simulation ngày 06/10:** dùng [kế hoạch tác động tổng hợp của building](integrated-building-impact-plan.md) cho công việc tiếp theo. Kế hoạch này bao gồm ngập/dòng chảy, giao thông, điện/nước/nước thải, xanh/nhiệt, dân cư/dịch vụ và bối cảnh giá/quy hoạch; cho phép dữ liệu tổng hợp có nhãn theo thông tin ban tổ chức mà người dùng cung cấp. Những mốc và yêu cầu dữ liệu thật trong các phần cũ bên dưới là lịch sử kế hoạch, không thay thế phạm vi mới.
 
+> Đây là tài liệu kế hoạch có mốc thời gian và mục tiêu ban đầu. Nó không phải trạng thái triển khai hiện tại; xem README và tài liệu service để biết những phần đã có trong mã nguồn.
+
 ## 1\. Mục tiêu và kiến trúc
 
 Xây dựng web hỗ trợ urban planners và nhà đầu tư khảo sát Thủ Đức trên bản đồ 3D, chọn khu vực, xem dữ liệu, so sánh địa điểm và nhận phân tích AI có dẫn nguồn. Phạm vi Thủ Đức dùng ranh giới thành phố trước thay đổi hành chính năm 2025; các phường hiện tại được hiển thị như lớp bổ sung.
@@ -110,4 +112,4 @@ GitHub Actions sẽ kiểm tra backend, frontend và ETL, build image gắn comm
 - Trên máy demo: phản hồi giao diện dưới 500 ms; API lớp đã cache đạt p95 dưới 500 ms; phân tích polygon dưới 2 giây; map đầu tiên dưới 5 giây. AI có trạng thái xử lý riêng.
 - Demo thành công khi các lớp chính và luồng phân tích hoạt động trên máy 156, có nguồn rõ ràng, và dữ liệu thiếu được hiển thị đúng.
 
-Các mặc định đã chốt: giao diện tiếng Việt, MVP đến 17/10/2026, PostGIS, AI local, máy 156, cảnh báo nguy cơ ngập có giải thích và phạm vi Thủ Đức trước mở rộng TP.HCM. Kế hoạch triển khai được lưu vào `docs/assigned-feature-plan.md`, liên kết từ README và báo cáo nguồn dữ liệu khi bắt đầu thực hiện
+Các mặc định đã chốt: giao diện tiếng Việt, MVP đến 17/10/2026, PostGIS, AI local, máy 156, cảnh báo nguy cơ ngập có giải thích và phạm vi Thủ Đức trước mở rộng TP.HCM. Tài liệu này mô tả mục tiêu và mốc dự kiến ban đầu; trạng thái thực tế được cập nhật trong README và hướng dẫn từng service.

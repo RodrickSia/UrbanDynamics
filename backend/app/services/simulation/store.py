@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 import psycopg
 from psycopg.types.json import Jsonb
+from src.shared.database import connect_to_warehouse, warehouse_configured
 
 
 class StorageUnavailable(Exception):
@@ -22,8 +23,8 @@ def save(result: dict) -> dict:
     document = {**result, "id": str(identifier), "created_at": datetime.now(timezone.utc).isoformat()}
     url = os.getenv("DATABASE_URL")
     try:
-        if url:
-            with psycopg.connect(url, connect_timeout=5) as connection:
+        if warehouse_configured():
+            with connect_to_warehouse() as connection:
                 connection.execute("SELECT pg_advisory_xact_lock(hashtext('building_scenario_schema'))")
                 connection.execute(Path(__file__).with_name("schema.sql").read_text(encoding="utf-8"))
                 connection.execute(
@@ -49,8 +50,8 @@ def save(result: dict) -> dict:
 def load(identifier: UUID) -> dict | None:
     url = os.getenv("DATABASE_URL")
     try:
-        if url:
-            with psycopg.connect(url, connect_timeout=5) as connection:
+        if warehouse_configured():
+            with connect_to_warehouse() as connection:
                 # No runs exist before the first successful scenario creation.
                 if connection.execute("SELECT to_regclass('building_scenario_runs')").fetchone()[0] is None:
                     return None

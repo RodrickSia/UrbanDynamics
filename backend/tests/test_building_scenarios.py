@@ -36,7 +36,7 @@ def payload():
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("WAREHOUSE_PASSWORD", raising=False); monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("SCENARIO_DATA_DIR", str(tmp_path / "scenarios"))
     return TestClient(app)
 
@@ -171,9 +171,17 @@ def test_demo_and_area_api_available(client):
 
 
 @pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="Requires real PostGIS")
-def test_postgis_persistence_and_site_geometry(payload, monkeypatch):
+@pytest.mark.parametrize("configuration", ["url", "warehouse"])
+def test_postgis_persistence_and_site_geometry(payload, monkeypatch, configuration):
     url = os.environ["TEST_DATABASE_URL"]
-    monkeypatch.setenv("DATABASE_URL", url)
+    if configuration == "url":
+        monkeypatch.setenv("DATABASE_URL", url)
+    else:
+        from psycopg.conninfo import conninfo_to_dict
+        settings = conninfo_to_dict(url)
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        for key, name in {"host": "HOST", "port": "PORT", "dbname": "DATABASE", "user": "USER", "password": "PASSWORD"}.items():
+            monkeypatch.setenv("WAREHOUSE_" + name, settings[key])
     client = TestClient(app)
     identifier = None
     try:

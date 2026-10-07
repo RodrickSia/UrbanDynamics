@@ -8,7 +8,7 @@ from shapely.geometry import box,mapping,shape,Point
 from src.shared.data_io import write_json,read_json
 from src.pipelines.rainwater.config import Settings
 from src.pipelines.rainwater import grid,extract,transform,load
-from src.pipelines.flood_risk.rules import threshold,evaluate
+from src.pipelines.flood_risk.risk_assessment import threshold,evaluate
 from src.khoi_service import Service,leader_lock
 
 def cell():
@@ -46,7 +46,7 @@ def test_missing_rain_is_gap_not_zero():
     doc = response(datetime(2026,10,1,tzinfo=timezone.utc),count=6)
     doc['hourly']['precipitation'][2]=None
     station = transform.normalize_response(doc,[cell()])[0]
-    from src.pipelines.flood_risk.rules import three_hour_windows
+    from src.pipelines.flood_risk.risk_assessment import three_hour_windows
     assert len(station['hourly'])==5 and len(three_hour_windows(station))==1
 
 def test_failed_download_cleans_temporary_file_and_preserves_cache(tmp_path,monkeypatch):
@@ -92,7 +92,7 @@ def test_annual_history_is_cached_and_resumes_without_redownload(tmp_path,monkey
     assert len(calls)==1
 
 def test_failed_forecast_publication_preserves_pointer(tmp_path,monkeypatch):
-    monkeypatch.setenv('DATA_DIR',str(tmp_path)); monkeypatch.delenv('DATABASE_URL',raising=False)
+    monkeypatch.setenv('DATA_DIR',str(tmp_path)); monkeypatch.delenv('WAREHOUSE_PASSWORD',raising=False); monkeypatch.delenv('DATABASE_URL',raising=False)
     load.run(forecast(),history())
     pointer = (tmp_path/'inputs/rainwater_current.json').read_bytes()
     broken = forecast(); broken['run_id']='b'*32; broken['stations'][0]['hourly']=[]
@@ -141,10 +141,27 @@ def test_scheduler_failure_keeps_last_success_and_does_not_leak_error(tmp_path,m
     assert 'password' not in json.dumps(status)
 
 def test_leader_lock_prevents_duplicate_snapshot_services(tmp_path,monkeypatch):
-    monkeypatch.setenv('DATA_DIR',str(tmp_path)); monkeypatch.delenv('DATABASE_URL',raising=False)
+    monkeypatch.setenv('DATA_DIR',str(tmp_path)); monkeypatch.delenv('WAREHOUSE_PASSWORD',raising=False); monkeypatch.delenv('DATABASE_URL',raising=False)
     with leader_lock():
         with pytest.raises((OSError,RuntimeError)):
             with leader_lock(): pass
+
+def test_forecast_updates_risk_when_history_exists_only_in_postgis(tmp_path,monkeypatch):
+    import src.khoi_service as scheduler
+    monkeypatch.setenv('DATA_DIR',str(tmp_path))
+    path = tmp_path/'boundary.json'
+    write_json(path,{'type':'Feature','geometry':mapping(box(106.7,10.7,106.8,10.8))})
+    monkeypatch.setenv('HCMC_BOUNDARY',str(path))
+    service = Service()
+    monkeypatch.setattr(scheduler.extract,'forecast',lambda *args:forecast())
+    monkeypatch.setattr(scheduler.extract,'history_cached',lambda *args:history())
+    monkeypatch.setattr(scheduler.load,'run',lambda *args:{'features':1})
+    reads = []
+    monkeypatch.setattr(scheduler,'read_layer_document',lambda name:reads.append(name) or {'features':[]})
+    monkeypatch.setattr(scheduler,'flood_risk',lambda:{'layer':'flood_risk','features':425})
+    assert not (tmp_path/'layers/flood_history.geojson').exists()
+    assert service.job_forecast()['flood_risk']['features']==425
+    assert reads==['flood_history']
 
 def test_satellite_streams_multiple_windows_without_double_count(tmp_path):
     import numpy as np

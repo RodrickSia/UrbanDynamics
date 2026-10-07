@@ -2,6 +2,10 @@
 
 Cập nhật 07/10/2026. Khôi phụ trách ngập lịch sử, ngập vệ tinh, mưa dự báo/lịch sử, cảnh báo nguy cơ ngập và bảng giá đất.
 
+Sau tích hợp branch nhóm: `compose.yaml` giữ warehouse PostGIS 17 và CLI `python -m src.main run <pipeline>`. Các lệnh cũ `python -m src.main <pipeline>` vẫn được nhận để tương thích. `rainwater` là pipeline mới có lưới toàn TP, thay phần placeholder đã xóa trong branch trước. Main Compose mount dữ liệu tại `etl/data`; đặt `DATA_DIR=etl/data` khi chuẩn bị đầu vào trên host. Chạy scheduler mưa bằng `docker compose --profile etl-rainwater up -d --build etl-rainwater` sau khi chuẩn bị ranh giới và migrate PostGIS.
+
+`compose.khoi.yaml` là stack local riêng, dùng `data/`, PostGIS 16 và port local. `scripts/test-khoi-local.py` giữ kiểm tra stack chung của nhóm; script kiểm tra ETL local mở rộng nằm ở `scripts/test-khoi-citywide-local.py`, còn simulation đầy đủ dùng `scripts/test-integrated-local.py`.
+
 ## Phạm vi và dữ liệu
 
 - Ranh giới: [OCHA/HDX COD Việt Nam](https://data.humdata.org/dataset/cod-ab-vnm), bản nguồn hiện có 34 tỉnh/thành. Polygon TP.HCM đã hợp nhất được kiểm tra bao gồm các điểm đại diện TP.HCM cũ, Bình Dương, Vũng Tàu và Côn Đảo. Đây là ranh giới phân tích; metadata giữ nguồn, giấy phép và checksum, không tuyên bố là hồ sơ địa giới pháp lý.
@@ -66,7 +70,7 @@ docker compose -p khoi-local -f compose.khoi.yaml --profile etl-service run --rm
 # Service cập nhật liên tục:
 docker compose -p khoi-local -f compose.khoi.yaml --profile etl-service up -d --build etl-service
 # Kiểm thử Windows/Linux, PostGIS và API:
-.venv/Scripts/python.exe scripts/test-khoi-local.py --linux-checks
+.venv/Scripts/python.exe scripts/test-khoi-citywide-local.py --linux-checks
 ```
 
 Nếu cache ranh giới chưa tồn tại, script tải mạng; cần Python dependencies đã cài. Khi chạy script Python trực tiếp, đặt `PYTHONPATH=etl;backend` trên Windows; các CLI trong `scripts/` có đường dẫn import riêng. `data/` là volume dùng chung, bị gitignore; máy mới tải dữ liệu nguồn, không nhận cache qua Git. Không chạy thêm scheduler dùng cùng volume nhưng thiếu cùng cơ chế khóa database.

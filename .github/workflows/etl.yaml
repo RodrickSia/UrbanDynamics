@@ -1,0 +1,93 @@
+name: Run ETL pipelines
+
+on:
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: ETL pipeline to run
+        type: choice
+        required: true
+        default: population_hcmc
+        options:
+          - population_hcmc
+          - rainwater
+          - flood_history
+          - flood_satellite
+          - flood_risk
+          - land_price
+      stage:
+        description: ETL stage to run
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - extract
+
+permissions:
+  contents: read
+
+concurrency:
+  group: etl-${{ inputs.pipeline }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: ${{ inputs.pipeline }} ETL
+    environment: production
+    env:
+      WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}
+      WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
+      WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
+    # This runner needs Docker, database access, and persistent space for WorldPop files.
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Keep ignored ETL inputs and downloads between runs on this self-hosted runner.
+          clean: false
+      - name: Run selected pipeline
+        env:
+          ETL_PIPELINE: ${{ inputs.pipeline }}
+          ETL_STAGE: ${{ inputs.stage }}
+        run: |
+          set -eu
+          test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
+          created_env=false
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            created_env=true
+          fi
+          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
+          if ! docker compose ps --status running --services | grep -Fxq postgis; then
+            echo "The PostGIS service must be running and migrated before running ETL." >&2
+            exit 1
+          fi
+          service="etl-${ETL_PIPELINE//_/-}"
+          profile="$service"
+          docker compose --profile "$profile" build "$service"
+          case "$ETL_PIPELINE" in
+            flood_history)
+              test -s etl/data/inputs/hcmc_expanded_boundary.geojson || { echo "Prepare the expanded HCMC boundary before running flood_history." >&2; exit 1; }
+              set -- --boundary /app/data/inputs/hcmc_expanded_boundary.geojson
+              ;;
+            flood_satellite)
+              test -s etl/data/inputs/hcmc_expanded_boundary.geojson || { echo "Prepare the expanded HCMC boundary before running flood_satellite." >&2; exit 1; }
+              set -- --boundary /app/data/inputs/hcmc_expanded_boundary.geojson
+              ;;
+            flood_risk)
+              test -s etl/data/inputs/rainwater_current.json || { echo "Run the citywide rainfall service before flood_risk." >&2; exit 1; }
+              set --
+              ;;
+            land_price)
+              test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
+              set -- --full-city --segments /app/data/review/land_price_reviewed.geojson
+              ;;
+            *) set -- ;;
+          esac
+          if [ "$ETL_PIPELINE" = rainwater ]; then
+            test "$ETL_STAGE" = all || { echo "Rainwater workflow runs a complete ETL pass." >&2; exit 1; }
+            docker compose --profile "$profile" run --rm "$service" --once --jobs forecast history
+          else
+            docker compose --profile "$profile" run --rm "$service" run --stage "$ETL_STAGE" "$@"
+          fi

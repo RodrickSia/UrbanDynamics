@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+*.key
+*.pem
 etl/data/
 
 # Python
@@ -19,8 +21,16 @@ test-results/
 node_modules/
 dist/
 build/
+*.tsbuildinfo
+test-results/
+playwright-report/
 
 # Editors and OS
 .DS_Store
 .idea/
 .vscode/
+
+# Local planning notes
+tasks/
+**/plan.md
+**/todo.md

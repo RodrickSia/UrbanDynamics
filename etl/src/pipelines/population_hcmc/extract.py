@@ -95,7 +95,7 @@ def download_population_raster(url: str, destination: Path) -> Path:
 
 
 def run(settings: PopulationHCMCConfig = config) -> dict[int, Path]:
-    """Download all configured years and return paths keyed by year."""
+    """Download the configured WorldPop rasters."""
     downloaded: dict[int, Path] = {}
     for year, source_url in sorted(settings.worldpop.population_paths.items()):
         destination = settings.download_dir / f"worldpop_hcmc_{year}.tif"
