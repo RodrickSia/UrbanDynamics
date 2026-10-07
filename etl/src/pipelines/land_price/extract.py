@@ -1,6 +1,7 @@
 import hashlib
 import re
 from pathlib import Path
+
 import pdfplumber
 import numpy as np
 from src.shared.data_io import data_dir, download, read_json, file_provenance

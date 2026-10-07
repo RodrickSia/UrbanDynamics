@@ -12,11 +12,7 @@ def run(rain_mm, radius_m, polygon=None):
         raise ValueError("Too many historical observations for scenario")
     if polygon:
         area = shape(polygon)
-        if (
-            area.is_empty
-            or not area.is_valid
-            or area.geom_type not in ("Polygon", "MultiPolygon")
-        ):
+        if area.is_empty or not area.is_valid or area.geom_type not in ("Polygon", "MultiPolygon"):
             raise ValueError("Scenario area must be a valid polygon")
         if not (
             -180 <= area.bounds[0] < area.bounds[2] <= 180

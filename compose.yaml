@@ -6,6 +6,7 @@ x-etl: &etl
     - .env
   volumes:
     - ./etl/data:/app/data
+    - ./scripts:/app/scripts:ro
 
 x-warehouse-env: &warehouse-env
   WAREHOUSE_HOST: postgis
@@ -33,6 +34,7 @@ services:
       start_period: 10s
 
   backend:
+    image: urbandynamics-backend:latest
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -41,11 +43,15 @@ services:
     environment:
       <<: *warehouse-env
       DATA_DIR: /data
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-}
       SCENARIO_DATA_DIR: /runtime/scenarios
       SIMULATION_WORK_DIR: /runtime/solvers
     volumes:
       - ./etl/data:/data:ro
       - simulation_runtime:/runtime
+    depends_on:
+      postgis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
@@ -118,6 +124,18 @@ services:
       <<: *warehouse-env
       DATA_DIR: /app/data
       ETL_PIPELINE: land_price
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-parcels-hcmc:
+    <<: *etl
+    profiles: ["etl-parcels-hcmc"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: parcels_hcmc
     command: ["run"]
     depends_on:
       postgis:

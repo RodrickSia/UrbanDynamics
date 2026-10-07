@@ -110,6 +110,8 @@ class Service:
 
     def job_land_price(self):
         path = data_dir()/'review/land_price_reviewed.geojson'
+        if not path.exists():
+            path = data_dir()/'review/land_price_auto_segments.geojson'
         return land_price(full_city=True,segments=str(path) if path.exists() else None,refresh_source=True)
 
     def execute(self,name):

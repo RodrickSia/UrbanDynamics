@@ -15,7 +15,13 @@ jobs:
           cache-dependency-path: |
             requirements-dev.txt
             etl/requirements.txt
-            backend/requirements.txt
+            backend/pyproject.toml
+            backend/uv.lock
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.12.6
+      - name: Build the shared warehouse test image
+        run: docker build -t khoi-ci-warehouse infra/warehouse
       - name: Start temporary PostGIS with a generated password
         shell: bash
         run: |
@@ -33,7 +39,7 @@ jobs:
             -p 127.0.0.1:5432:5432 \
             --health-cmd "pg_isready -U urban_test -d urban_test" \
             --health-interval 2s --health-timeout 5s --health-retries 30 \
-            postgis/postgis:16-3.5
+            khoi-ci-warehouse
           for attempt in {1..30}; do
             status=$(docker inspect --format '{{.State.Health.Status}}' khoi-ci-postgis)
             if [ "$status" = "healthy" ]; then exit 0; fi
@@ -42,11 +48,12 @@ jobs:
           done
           echo "PostGIS failed to become healthy"
           exit 1
-      - name: Apply vector migrations
-        run: docker exec -i khoi-ci-postgis psql -U urban_test -d urban_test -v ON_ERROR_STOP=1 < infra/warehouse/migrations/001_khoi_layers.sql
       - name: Native SUMO runtime libraries
         run: sudo apt-get update && sudo apt-get install -y libexpat1 libgomp1 libatomic1 libx11-6 libxext6 libxrender1 libgl1
-      - run: python -m pip install -r requirements-dev.txt
+      - name: Install locked backend and ETL test dependencies
+        run: |
+          uv export --project backend --frozen --no-dev --format requirements.txt --output-file /tmp/khoi-backend-requirements.txt
+          python -m pip install -r /tmp/khoi-backend-requirements.txt -r etl/requirements.txt -r requirements-dev.txt
       - run: python -m pytest -q --junitxml=test-results/khoi-ci.xml
       - name: Stop temporary database
         if: always()

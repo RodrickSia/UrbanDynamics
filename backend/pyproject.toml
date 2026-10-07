@@ -1,0 +1,28 @@
+[project]
+name = "urbandynamics-backend"
+version = "0.1.0"
+description = "FastAPI map API for the UrbanDynamics PostGIS warehouse"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.30,<1",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic-settings>=2.6,<3",
+    "requests>=2.32,<3",
+    "shapely>=2.0,<3",
+    "numpy>=2,<3",
+    "pyproj>=3.6,<4",
+    "pillow>=11,<13",
+    "eclipse-sumo==1.27.1",
+    "swmm-toolkit==0.17.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

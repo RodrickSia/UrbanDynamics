@@ -5,3 +5,5 @@ rasterio>=1.4,<2
 psycopg[binary]>=3.2,<4
 pdfplumber>=0.11,<1
 numpy>=2,<3
+mercantile>=1.2.1,<2
+mapbox-vector-tile>=2.1,<3

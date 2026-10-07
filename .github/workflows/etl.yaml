@@ -9,12 +9,14 @@ on:
         required: true
         default: population_hcmc
         options:
-          - population_hcmc
+          - all
           - rainwater
+          - population_hcmc
           - flood_history
           - flood_satellite
           - flood_risk
           - land_price
+          - parcels_hcmc
       stage:
         description: ETL stage to run
         type: choice
@@ -23,12 +25,14 @@ on:
         options:
           - all
           - extract
+          - transform
+          - load
 
 permissions:
   contents: read
 
 concurrency:
-  group: etl-${{ inputs.pipeline }}
+  group: urbandynamics-etl
   cancel-in-progress: false
 
 jobs:
@@ -63,31 +67,158 @@ jobs:
             echo "The PostGIS service must be running and migrated before running ETL." >&2
             exit 1
           fi
-          service="etl-${ETL_PIPELINE//_/-}"
-          profile="$service"
-          docker compose --profile "$profile" build "$service"
-          case "$ETL_PIPELINE" in
-            flood_history)
-              test -s etl/data/inputs/hcmc_expanded_boundary.geojson || { echo "Prepare the expanded HCMC boundary before running flood_history." >&2; exit 1; }
-              set -- --boundary /app/data/inputs/hcmc_expanded_boundary.geojson
-              ;;
-            flood_satellite)
-              test -s etl/data/inputs/hcmc_expanded_boundary.geojson || { echo "Prepare the expanded HCMC boundary before running flood_satellite." >&2; exit 1; }
-              set -- --boundary /app/data/inputs/hcmc_expanded_boundary.geojson
-              ;;
+          migration_query="SELECT to_regclass('public.layer_snapshots') IS NOT NULL AND to_regclass('public.layer_features') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '001_khoi_layers.sql')"
+          if ! docker compose exec -T postgis sh -c \
+            'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"' \
+            sh "$migration_query" | grep -Fxq t; then
+            echo "::error::The vector-layer migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+            exit 1
+          fi
+          if [ "$ETL_PIPELINE" = parcels_hcmc ]; then
+            if [ "$ETL_STAGE" != all ] && [ "$ETL_STAGE" != extract ] && \
+              [ "$ETL_STAGE" != transform ] && [ "$ETL_STAGE" != load ]; then
+              echo "::error::Unsupported parcel ETL stage: $ETL_STAGE" >&2
+              exit 1
+            fi
+            parcel_migration_query="to_regclass('parcels.land_plot') IS NOT NULL AND to_regclass('parcels.loaded_tile') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$parcel_migration_query" | grep -Fxq t; then
+              echo "::error::The parcel migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          elif [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; then
+            echo "::error::The transform and load stages are currently supported only for parcels_hcmc." >&2
+            exit 1
+          fi
+
+          prepare_boundary() {
+            if [ -s etl/data/inputs/hcmc_expanded_boundary.geojson ]; then
+              return
+            fi
+            local service=etl-flood-history
+            echo "Preparing the sourced expanded HCMC boundary."
+            docker compose --profile "$service" build "$service"
+            docker compose --profile "$service" run --rm --entrypoint python "$service" -c "from src.shared.hcmc_boundary import run; run(cached=True)"
+          }
+
+          prepare_rainfall_inputs() {
+            local service=etl-flood-risk
+            echo "Refreshing the Open-Meteo rainfall forecast and creating history input if it is not cached."
+            docker compose --profile "$service" build "$service" || return 1
+            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-khoi-data.py weather || return 1
+            [ -s etl/data/inputs/rainwater_forecast.json ] && [ -s etl/data/inputs/rainwater_history.json ]
+          }
+
+          land_price_prepared=false
+          prepare_land_price_segments() {
+            if [ "$land_price_prepared" = true ]; then
+              return 0
+            fi
+            local service=etl-land-price
+            docker compose --profile "$service" build "$service" || return 1
+            test -s etl/data/raw/land_price/official-annex-2026.pdf || {
+              echo "::error::The checked-in land-price annex PDF is missing." >&2
+              return 1
+            }
+            if [ ! -s etl/data/review/land_price_rows.json ] || \
+              [ etl/data/raw/land_price/official-annex-2026.pdf -nt etl/data/review/land_price_rows.json ]; then
+              echo "Extracting rows from the checked-in official land-price annex."
+              docker compose --profile "$service" run --rm "$service" run --stage extract || return 1
+            fi
+            echo "Matching land-price rows to OSM roads automatically."
+            local -a osm_args=()
+            if [ -s etl/data/raw/land_price/osm_roads.json ]; then
+              echo "Using the cached OSM road extract."
+              osm_args=(--cached)
+            fi
+            docker compose --profile "$service" run --rm --entrypoint python "$service" /app/scripts/prepare-land-price-segments.py "${osm_args[@]}" || return 1
+            test -s etl/data/review/land_price_auto_segments.geojson
+            land_price_prepared=true
+          }
+
+          run_pipeline() {
+            local pipeline="$1"
+            local service="etl-${pipeline//_/-}"
+            local -a arguments=()
+            case "$pipeline" in
+              flood_history|flood_satellite)
+                prepare_boundary
+                arguments=(--boundary /app/data/inputs/hcmc_expanded_boundary.geojson)
+                ;;
             flood_risk)
-              test -s etl/data/inputs/rainwater_current.json || { echo "Run the citywide rainfall service before flood_risk." >&2; exit 1; }
-              set --
-              ;;
-            land_price)
-              test -s etl/data/review/land_price_reviewed.geojson || { echo "Review land-price rows and segments before publishing." >&2; exit 1; }
-              set -- --full-city --segments /app/data/review/land_price_reviewed.geojson
-              ;;
-            *) set -- ;;
-          esac
-          if [ "$ETL_PIPELINE" = rainwater ]; then
-            test "$ETL_STAGE" = all || { echo "Rainwater workflow runs a complete ETL pass." >&2; exit 1; }
-            docker compose --profile "$profile" run --rm "$service" --once --jobs forecast history
+                prepare_rainfall_inputs || { echo "Could not prepare rainfall inputs for flood_risk." >&2; exit 1; }
+                arguments=()
+                ;;
+              land_price)
+                prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
+                arguments=(--source /app/data/review/land_price_rows.json --segments /app/data/review/land_price_auto_segments.geojson)
+                ;;
+            esac
+            docker compose --profile "$service" build "$service"
+            echo "Running pipeline: $pipeline"
+            docker compose --profile "$service" run --rm "$service" run --stage all "${arguments[@]}"
+          }
+
+          if [ "$ETL_PIPELINE" = all ]; then
+            if [ "$ETL_STAGE" != all ]; then
+              echo "::error::The all pipeline selection runs the complete ETL only; select stage all." >&2
+              exit 1
+            fi
+            prepare_boundary
+            rainfall_ready=true
+            if ! prepare_rainfall_inputs; then
+              rainfall_ready=false
+              echo "::warning::Could not fetch rainfall inputs; flood_risk will be skipped."
+            fi
+            land_price_ready=true
+            if ! prepare_land_price_segments; then
+              land_price_ready=false
+              echo "::warning::Could not prepare automatic land-price road matches; land_price will be skipped."
+            fi
+            skipped=()
+            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
+              if [ "$pipeline" = flood_risk ] && [ "$rainfall_ready" != true ]; then
+                echo "::warning::Skipping flood_risk: forecast/history inputs could not be prepared."
+                skipped+=(flood_risk)
+                continue
+              fi
+              if [ "$pipeline" = land_price ] && [ "$land_price_ready" != true ]; then
+                echo "::warning::Skipping land_price: automatic OSM road matches are not available."
+                skipped+=(land_price)
+                continue
+              fi
+              run_pipeline "$pipeline"
+            done
+            if [ "${#skipped[@]}" -gt 0 ]; then
+              printf 'Skipped pipelines due to missing inputs: %s\n' "${skipped[*]}" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          elif [ "$ETL_PIPELINE" = rainwater ]; then
+            test "$ETL_STAGE" = all || { echo "Rainwater requires stage all." >&2; exit 1; }
+            docker compose --profile etl-rainwater build etl-rainwater
+            docker compose --profile etl-rainwater run --rm etl-rainwater --once --jobs forecast history
           else
-            docker compose --profile "$profile" run --rm "$service" run --stage "$ETL_STAGE" "$@"
+            service="etl-${ETL_PIPELINE//_/-}"
+            docker compose --profile "$service" build "$service"
+            case "$ETL_PIPELINE" in
+              flood_history|flood_satellite)
+                prepare_boundary
+                set -- --boundary /app/data/inputs/hcmc_expanded_boundary.geojson
+                ;;
+              flood_risk)
+                prepare_rainfall_inputs || { echo "Could not prepare rainfall inputs for flood_risk." >&2; exit 1; }
+                set --
+                ;;
+              land_price)
+                if [ "$ETL_STAGE" = all ]; then
+                  prepare_land_price_segments || { echo "Could not prepare automatic land-price road matches." >&2; exit 1; }
+                  set -- --source /app/data/review/land_price_rows.json --segments /app/data/review/land_price_auto_segments.geojson
+                else
+                  test -s etl/data/raw/land_price/official-annex-2026.pdf || { echo "::error::The checked-in land-price annex PDF is missing." >&2; exit 1; }
+                  set --
+                fi
+                ;;
+              *) set -- ;;
+            esac
+            docker compose --profile "$service" run --rm "$service" run --stage "$ETL_STAGE" "$@"
           fi

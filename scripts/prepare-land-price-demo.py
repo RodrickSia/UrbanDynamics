@@ -2,14 +2,20 @@
 
 No new geometry is inferred. This subset does not cover the whole interval.
 """
+
 import sys
 from pathlib import Path
+
 from shapely.geometry import MultiLineString, mapping
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT/"etl"))
+ETL_SOURCE = ROOT / "etl"
+if not ETL_SOURCE.is_dir():
+    ETL_SOURCE = ROOT
+sys.path.insert(0, str(ETL_SOURCE))
 from src.shared.data_io import data_dir, read_json, write_json
 from src.pipelines.flood_history.transform import normalize
+
 
 def run():
     rows = read_json(data_dir()/"review/land_price_rows.json")
@@ -22,22 +28,26 @@ def run():
     expected_page = 234 if 'official-full' in rows.get('local_source_name','') or 'cdnchinhphu.vn' in rows['source_url'] else 36
     if actual != (152900,91700,76500) or record['pdf_page'] != expected_page:
         raise ValueError("Price row changed; repeat PDF review")
-    source = read_json(data_dir()/"raw/land_price/osm_roads.json")
-    ways = {w["id"]:w for w in source["elements"]}
-    selected = [ways[i] for i in (242014077,691374898)]
-    reviewed = read_json(ROOT/"docs/samples/land-price-tran-nao-reviewed.geojson")
+    source = read_json(data_dir() / "raw/land_price/osm_roads.json")
+    ways = {w["id"]: w for w in source["elements"]}
+    selected = [ways[i] for i in (242014077, 691374898)]
+    reviewed = read_json(ROOT / "docs/samples/land-price-tran-nao-reviewed.geojson")
     approved_coordinates = reviewed["features"][0]["geometry"]["coordinates"]
     lines = []
     for way in selected:
         if way["tags"]["name"] != "Trần Não":
             raise ValueError("OSM road identity changed; repeat review")
-        coordinates = [(p["lon"],p["lat"]) for p in way["geometry"]]
+        coordinates = [(p["lon"], p["lat"]) for p in way["geometry"]]
         # Two reviewed carriageway subsets north of Luong Dinh Cua and south
         # of the former Xa Lo Ha Noi junction. Reject changed extents.
-        if not all(106.728 < x < 106.733 and 10.78532 < y < 10.7956 for x,y in coordinates):
+        if not all(
+            106.728 < x < 106.733 and 10.78532 < y < 10.7956 for x, y in coordinates
+        ):
             raise ValueError("OSM geometry changed; repeat extent review")
         lines.append(coordinates)
-    if mapping(MultiLineString(lines))["coordinates"] != tuple(tuple(tuple(p) for p in line) for line in approved_coordinates):
+    if mapping(MultiLineString(lines))["coordinates"] != tuple(
+        tuple(tuple(p) for p in line) for line in approved_coordinates
+    ):
         raise ValueError("OSM coordinates differ from reviewed fixture; repeat review")
     properties = {"price_record_id":record["id"], "reviewed":True, "price_values_reviewed":True,
                   "geometry_coverage":"partial_published_segment", "osm_way_ids":[w["id"] for w in selected],
