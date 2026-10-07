@@ -23,6 +23,7 @@ const DATASET_ORDER: DataLayerId[] = [
   'flood-satellite',
   'flood',
   'land-price',
+  'parcels',
 ];
 export function LayerPanel(props: LayerPanelProps) {
   const panelRef = useRef<HTMLElement>(null);

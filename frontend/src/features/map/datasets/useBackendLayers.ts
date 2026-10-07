@@ -50,7 +50,7 @@ export function useBackendLayers(layers: LayerState) {
     void getLayerCatalog(controller.signal)
       .then(async (result) => {
         const values: Partial<Record<DataLayerId, CatalogState>> = {};
-        const ids = ['flood', 'flood-history', 'flood-satellite', 'land-price'] as const;
+        const ids = ['flood', 'flood-history', 'flood-satellite', 'land-price', 'parcels'] as const;
         for (const id of ids) {
           const entry: CatalogLayer | undefined = result.find((row) => row.id === DATASETS[id]);
           values[id] = {
@@ -89,7 +89,7 @@ export function useBackendLayers(layers: LayerState) {
       .catch(() =>
         save(
           Object.fromEntries(
-            ['flood', 'flood-history', 'flood-satellite', 'land-price'].map((id) => [
+            ['flood', 'flood-history', 'flood-satellite', 'land-price', 'parcels'].map((id) => [
               id,
               { status: 'error', available: false },
             ]),

@@ -3,6 +3,7 @@ import {
   CloudRain,
   Layers3,
   MapPin,
+  MapPinned,
   Route,
   Satellite,
   UsersRound,
@@ -20,6 +21,7 @@ const ICONS: Partial<Record<UrbanLayerDefinition['id'], LucideIcon>> = {
   'flood-satellite': Satellite,
   flood: CloudRain,
   'land-price': Route,
+  parcels: MapPinned,
   poi: MapPin,
   'buildings-3d': Box,
 };

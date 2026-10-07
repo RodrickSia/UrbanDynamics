@@ -97,6 +97,7 @@ WGS84/EPSG:4326 and `[longitude, latitude]` order. Bboxes use
 | Satellite flood classifications | `/api/v1/floods/satellite` |
 | Rainfall-threshold risk indicators | `/api/v1/floods/risk`, `/api/v1/urban/flood` |
 | Official land-price reference data | `/api/v1/land-prices`, `/api/v1/urban/land-price`, `/api/v1/layers/land_price/tiles/{z}/{x}/{y}.pbf` |
+| HCMC land parcels | `/api/v1/layers/parcels/features`, `/api/v1/layers/parcels/tiles/{z}/{x}/{y}.pbf` |
 
 The `population` layer contains persons per source raster cell (nominally
 100 m), not people per square kilometre. Raster PNG tiles support
@@ -144,6 +145,10 @@ Interpret the flood products according to their metadata:
   inspection. Prices are official reference VND/m², not transaction prices.
   The catalog renderer owns this overlay; the standalone Land price adapter is
   used only without a backend bridge, avoiding duplicate layers and popups.
+- HCMC parcels use the backend vector-tile source and catalog availability.
+  The layer begins requesting/rendering tiles at zoom 16, avoids per-pan
+  GeoJSON/count probes, and opens the parcel's allowlisted cadastral attributes
+  on click. Its source attributes do not establish ownership or legal status.
 - Raster/MVT sources load only when enabled. Opacity updates do not recreate
   sources. Year/palette/date changes replace the relevant source; style changes
   restore overlays below symbols, buildings and measurement/Viewshed custom
@@ -225,12 +230,12 @@ same-origin Compose proxy, so CORS is not needed for that path.
   bundle, and three neighbouring zoom-16 PNGs at 106.8/10.875, each 256×256 with
   no transparent edge pixels. Requests took about 2.7–2.9 seconds through the
   tunnel; this is not evidence that broader performance optimization is complete.
-- The subsequent merge of `feat/nguyen-hcmc-parcels` is code-only. Before deploying
-  that merge, run the protected database migration workflow for
+- The `feat/nguyen-hcmc-parcels` frontend integration was added afterward. Before
+  deploying the parcels backend, run the protected database migration workflow for
   `03-parcels-hcmc.sql`, then explicitly load parcel data as needed. The new
   repository readiness query requires `parcels.loaded_tile`. No production
-  migration or parcel ETL was run as part of this merge; existing frontend
-  controls do not yet expose a parcels toggle.
+  migration or parcel ETL was run as part of the merge. The toggle stays disabled
+  until the backend catalog reports loaded parcel tiles.
 
 ### Dataset rendering and location fixes — 2026-10-06
 

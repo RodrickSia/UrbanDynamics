@@ -1,6 +1,11 @@
 /** Public dataset API. Never use backend-internal hosts returned in TileJSON. */
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? '';
-export type VectorDataset = 'flood_history' | 'flood_satellite' | 'flood_risk' | 'land_price';
+export type VectorDataset =
+  | 'flood_history'
+  | 'flood_satellite'
+  | 'flood_risk'
+  | 'land_price'
+  | 'parcels';
 export type Dataset = VectorDataset | 'population';
 export type Palette = 'pseudocolor' | 'greyscale' | 'fire';
 export type Bounds = [number, number, number, number];
@@ -99,7 +104,11 @@ export function tileUrl(
   const path =
     dataset === 'population'
       ? `/api/v1/population/${year}/tiles/{z}/{x}/{y}.png${queryString({ palette, render: '2' })}`
-      : `/api/v1/layers/${dataset}/tiles/{z}/{x}/{y}.pbf${queryString(dataset === 'land_price' ? {} : { ...dates, ...(dataset === 'flood_history' ? { schema: '2' } : {}) })}`;
+      : `/api/v1/layers/${dataset}/tiles/{z}/{x}/{y}.pbf${queryString(
+          dataset === 'land_price' || dataset === 'parcels'
+            ? {}
+            : { ...dates, ...(dataset === 'flood_history' ? { schema: '2' } : {}) },
+        )}`;
   return `${API_BASE_URL}${path}`;
 }
 export async function getFeatures(
@@ -110,7 +119,7 @@ export async function getFeatures(
 ): Promise<FeatureSummary> {
   const result = await requestJson(
     `/api/v1/layers/${dataset}/features${queryString({
-      ...(dataset === 'land_price' ? {} : dates),
+      ...(dataset === 'land_price' || dataset === 'parcels' ? {} : dates),
       bbox: bounds?.join(','),
       limit: '1',
     })}`,

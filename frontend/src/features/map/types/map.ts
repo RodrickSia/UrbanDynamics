@@ -101,6 +101,7 @@ export type UrbanLayerId =
   | 'rain'
   | 'planning'
   | 'land-price'
+  | 'parcels'
   | 'road-density'
   | 'green-area';
 

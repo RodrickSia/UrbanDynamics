@@ -71,6 +71,17 @@ function DatasetSource({
         return;
       }
       const selected = current.current;
+      if (selected.dataset === 'parcels') {
+        publish(
+          tileError ? 'error' : 'ready',
+          tileError
+            ? 'Parcel tiles unavailable · retry'
+            : map.getZoom() < 16
+              ? 'Zoom in to level 16 to view parcel boundaries'
+              : 'Click a parcel to inspect its attributes',
+        );
+        return;
+      }
       if (
         selected.dataset === 'population' &&
         (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) > 4
@@ -127,7 +138,7 @@ function DatasetSource({
             : {
                 type: 'vector',
                 tiles: [selectedAtAttach.url],
-                minzoom: 0,
+                minzoom: selectedAtAttach.dataset === 'parcels' ? 16 : 0,
                 maxzoom: 18,
                 attribution: 'UrbanDynamics · published datasets',
               },
@@ -135,9 +146,14 @@ function DatasetSource({
       }
       if (!map.getLayer(sourceId)) {
         // Preserve readable overlay order even if population is enabled last.
-        const order = ['population', 'flood', 'flood-satellite', 'land-price', 'flood-history'].map(
-          (id) => `dataset-${id}`,
-        );
+        const order = [
+          'population',
+          'parcels',
+          'flood',
+          'flood-satellite',
+          'land-price',
+          'flood-history',
+        ].map((id) => `dataset-${id}`);
         const before = map
           .getStyle()
           .layers.find(
@@ -212,7 +228,8 @@ function applyOpacity(map: MapLibreMap, selection: DataSelection, opacity: numbe
         : selection.dataset === 'land_price'
           ? 'line'
           : 'fill';
-  map.setPaintProperty(id, `${type}-opacity`, type === 'fill' ? opacity * 0.6 : opacity);
+  const multiplier = selection.dataset === 'parcels' ? 0.35 : type === 'fill' ? 0.6 : 1;
+  map.setPaintProperty(id, `${type}-opacity`, opacity * multiplier);
 }
 const FIELDS: Record<string, string> = {
   location: 'Reported location',
@@ -241,6 +258,16 @@ const FIELDS: Record<string, string> = {
   review_note: 'Coverage note',
   source_url: 'Official source',
   pdf_page: 'Annex page',
+  uniq_id: 'Parcel ID',
+  tinh: 'Province / city',
+  quan: 'District',
+  phuong: 'Ward',
+  to_ban_do: 'Map sheet',
+  thua: 'Plot number',
+  mdsdd: 'Land-use code',
+  loai_dat_qh: 'Planned land use',
+  quyet_dinh: 'Decision',
+  do_an: 'Plan',
   population: 'People / source cell',
 };
 export function BackendDataScene({

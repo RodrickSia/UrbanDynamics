@@ -99,6 +99,16 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
     supportsOpacity: true,
   },
   {
+    id: 'parcels',
+    label: 'Land parcels',
+    description: 'Cadastral plot boundaries and available parcel attributes.',
+    category: 'planning',
+    enabledByDefault: false,
+    status: 'loading',
+    supportsTimeRange: false,
+    supportsOpacity: true,
+  },
+  {
     id: 'road-density',
     label: 'Road density',
     description: 'Road-network density and connectivity.',

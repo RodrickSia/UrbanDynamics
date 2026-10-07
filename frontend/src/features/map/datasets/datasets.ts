@@ -7,6 +7,7 @@ export const DATASETS = {
   'flood-history': 'flood_history',
   'flood-satellite': 'flood_satellite',
   'land-price': 'land_price',
+  parcels: 'parcels',
 } as const satisfies Partial<Record<UrbanLayerId, Dataset>>;
 export type DataLayerId = keyof typeof DATASETS;
 export const DATA_LAYER_IDS = Object.keys(DATASETS) as DataLayerId[];

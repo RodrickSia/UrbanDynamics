@@ -106,6 +106,15 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           </DatasetNote>
         </>
       )}
+      {id === 'parcels' && (
+        <>
+          <Legend color="#3da8ae" label="Cadastral plot" />
+          <DatasetNote>
+            Boundaries appear from zoom level 16. Source attributes describe the mapped parcel and
+            do not verify ownership or legal status.
+          </DatasetNote>
+        </>
+      )}
       {data.catalog[id]?.stale && (
         <small className="dataset-warning">Source expired · historical values</small>
       )}

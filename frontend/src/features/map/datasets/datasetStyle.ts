@@ -73,5 +73,16 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
           'line-opacity': 0.8,
         },
       };
+    case 'parcels':
+      return {
+        ...common,
+        type: 'fill',
+        minzoom: 16,
+        paint: {
+          'fill-color': '#3da8ae',
+          'fill-opacity': 0.18,
+          'fill-outline-color': '#005b65',
+        },
+      };
   }
 }
