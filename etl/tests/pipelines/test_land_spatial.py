@@ -1,4 +1,6 @@
 import pytest
+import importlib.util
+from pathlib import Path
 from shapely.geometry import LineString, box, mapping, shape
 from src.pipelines.land_price.road_matcher import match, clip_unique_path
 from src.pipelines.land_price.road_sources import relation_polygon
@@ -170,3 +172,25 @@ def test_subdivision_failure_does_not_create_a_complete_chunk(monkeypatch, tmp_p
     with pytest.raises(RuntimeError):
         road_sources.road_chunk((106,10,107,11), cached=True)
     assert not list(tmp_path.rglob('bbox-v1-*.json'))
+
+
+def test_wards_only_cli_never_fetches_or_publishes_roads(monkeypatch, tmp_path, capsys):
+    script = Path(__file__).resolve().parents[3]/'scripts/prepare-land-price-segments.py'
+    spec = importlib.util.spec_from_file_location('prepare_land_price_segments', script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    source, _, _ = inputs()
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(module, 'extract', lambda *a, **k:(source, {}))
+    calls = []
+    def fetch_wards(boundary, cached):
+        calls.append((boundary, cached))
+        return {'features':[{}], 'metadata':{'license':'ODbL 1.0'}}
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Wards-only mode must not fetch roads')
+    monkeypatch.setattr(module, 'fetch_wards', fetch_wards)
+    monkeypatch.setattr(module, 'prepare', forbidden)
+    module.run(cached=True, wards_only=True)
+    assert calls == [(tmp_path/'inputs/hcmc_expanded_boundary.geojson', True)]
+    assert 'ward_boundary_count' in capsys.readouterr().out
+    assert not (tmp_path/'review/land_price_auto_segments.geojson').exists()
