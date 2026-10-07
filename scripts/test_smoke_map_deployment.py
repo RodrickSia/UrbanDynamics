@@ -53,6 +53,24 @@ class DeploymentSmokeTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'population'):
             check_deployment(self.fetch)
 
+    def test_parcels_probe_real_native_zoom_and_details(self):
+        def parcel_fetch(path):
+            documents = {
+                '/api/v1/layers': {'layers': [{'id': 'parcels', 'available': True}]},
+                '/api/v1/layers/parcels/features?limit=1': {'type': 'FeatureCollection', 'features': [
+                    {'id': 42, 'geometry': {'coordinates': [[[[106.7,10.8]]]]}}]},
+                '/api/v1/layers/parcels/tilejson.json': {'tiles': ['/tiles']},
+                '/api/v1/parcels/42': {'land_use': {'color': '#d6604d'}, 'price': {'status': 'unavailable'}},
+            }
+            if path in documents:
+                return 200, 'application/json', json.dumps(documents[path]).encode()
+            if path.endswith('?schema=2'):
+                return 200, 'application/vnd.mapbox-vector-tile', b'tile-fixture'
+            return self.fetch(path)
+        result = check_deployment(parcel_fetch)['vector_layers']['parcels']
+        self.assertEqual(result['detail_status'], 'ok')
+        self.assertEqual(result['tile_levels'][16]['status'], 200)
+
 
 if __name__ == '__main__':
     unittest.main()

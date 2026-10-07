@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+from time import perf_counter
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -61,6 +62,27 @@ def check_deployment(fetch):
         results[name] = {'sample_features': len(features['features']), 'tile_status': status}
         if name == 'land_price':
             results[name]['matched_rows'] = tilejson.get('metadata', {}).get('matched_rows')
+        if name == 'parcels' and features['features']:
+            feature = features['features'][0]
+            detail = document(f"/api/v1/parcels/{feature['id']}")
+            require(detail.get('land_use', {}).get('color') and detail.get('price', {}).get('status'),
+                    'Parcel details missing color or price status')
+            point = feature['geometry']['coordinates']
+            while isinstance(point[0], list):
+                point = point[0]
+            longitude, latitude = point[:2]
+            levels = {}
+            for zoom in (12, 14, 16):
+                tx = math.floor((longitude + 180) / 360 * 2**zoom)
+                ty = math.floor((1 - math.asinh(math.tan(math.radians(latitude))) / math.pi) / 2 * 2**zoom)
+                started = perf_counter()
+                status, mime, tile = fetch(root + f'/tiles/{zoom}/{tx}/{ty}.pbf?schema=2')
+                require(status == 204 or (status == 200 and tile and 'application/vnd.mapbox-vector-tile' in mime),
+                        f'Parcel zoom {zoom} tile failed')
+                if zoom == 16:
+                    require(status == 200, 'Known parcel is absent from its native tile')
+                levels[zoom] = {'status': status, 'bytes': len(tile), 'elapsed_ms': round((perf_counter()-started)*1000)}
+            results[name].update(detail_status='ok', tile_levels=levels)
     return {'status': 'ok', 'population_years': years, 'vector_layers': results,
             'unavailable_layers': unavailable}
 
