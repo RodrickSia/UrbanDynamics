@@ -43,6 +43,8 @@ def run(source, segments):
                            "publication_match_mode": "automatic" if auto_approved else "reviewed",
                            "match_method": segment_properties.get("match_method"),
                            "geometry_coverage": segment_properties.get("geometry_coverage", "reviewed_published_segment"),
+                           "source_segment_coverage": segment_properties.get("source_segment_coverage"),
+                           "city_boundary_clipped": segment_properties.get("city_boundary_clipped", False),
                            "osm_way_ids": segment_properties.get("osm_way_ids", []),
                            "geometry_source_url": segment_properties.get("geometry_source_url"),
                            "geometry_license": segment_properties.get("geometry_license"),

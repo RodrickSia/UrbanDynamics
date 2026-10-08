@@ -10,7 +10,7 @@ from app.routers import floods, land_prices, layers, population, scenarios, urba
 
 app = FastAPI(
     title="UrbanDynamics Data API",
-    summary="Map-ready population, flood, and official land-price data from PostGIS.",
+    summary="Map-ready population, flood, and official reference-price data from PostGIS.",
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",

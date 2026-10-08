@@ -1,9 +1,13 @@
 import pytest
-from shapely.geometry import LineString, box, mapping, shape
+import importlib.util
+from pathlib import Path
+from shapely.geometry import GeometryCollection, Point, LineString, box, mapping, shape
+from shapely.errors import GEOSException
 from src.pipelines.land_price.road_matcher import match, clip_unique_path
 from src.pipelines.land_price.road_sources import relation_polygon
 from src.pipelines.land_price.transform import run as prices
-from src.pipelines.land_price import pipeline, road_sources, road_matcher
+from src.pipelines.land_price import pipeline, road_sources
+from src.pipelines.land_price import road_matcher
 
 
 def inputs():
@@ -142,3 +146,97 @@ def test_source_failure_does_not_publish_a_partial_snapshot(monkeypatch, tmp_pat
     with pytest.raises(RuntimeError, match='Source unavailable'):
         pipeline.run(full_city=True)
     assert not published
+
+
+def test_overloaded_road_query_subdivides_and_caches_complete_result(monkeypatch, tmp_path):
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    calls = []
+    def source(query):
+        calls.append(query)
+        if len(calls) == 1:
+            raise RuntimeError('Server overloaded')
+        return {'elements':[{'id':1}], 'osm3s':{'timestamp_osm_base':'fixture-time'}}, 'https://fixture'
+    monkeypatch.setattr(road_sources, 'request', source)
+    result = road_sources.road_chunk((106,10,107,11), cached=True)
+    assert result['elements'] == [{'id':1}]
+    assert len(calls) == 5
+    assert len(result['queries']) == 4
+    assert result['source_endpoints'] == ['https://fixture']
+    assert road_sources.road_chunk((106,10,107,11), cached=True) == result
+    assert len(calls) == 5
+
+
+def test_subdivision_failure_does_not_create_a_complete_chunk(monkeypatch, tmp_path):
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    def unavailable(query):
+        raise RuntimeError('Unavailable')
+    monkeypatch.setattr(road_sources, 'request', unavailable)
+    with pytest.raises(RuntimeError):
+        road_sources.road_chunk((106,10,107,11), cached=True)
+    assert not list(tmp_path.rglob('bbox-v1-*.json'))
+
+
+def test_wards_only_cli_never_fetches_or_publishes_roads(monkeypatch, tmp_path, capsys):
+    script = Path(__file__).resolve().parents[3]/'scripts/prepare-land-price-segments.py'
+    spec = importlib.util.spec_from_file_location('prepare_land_price_segments', script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    source, _, _ = inputs()
+    monkeypatch.setenv('DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(module, 'extract', lambda *a, **k:(source, {}))
+    calls = []
+    def fetch_wards(boundary, cached):
+        calls.append((boundary, cached))
+        return {'features':[{}], 'metadata':{'license':'ODbL 1.0'}}
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Wards-only mode must not fetch roads')
+    monkeypatch.setattr(module, 'fetch_wards', fetch_wards)
+    monkeypatch.setattr(module, 'prepare', forbidden)
+    module.run(cached=True, wards_only=True)
+    assert calls == [(tmp_path/'inputs/hcmc_expanded_boundary.geojson', True)]
+    assert 'ward_boundary_count' in capsys.readouterr().out
+    assert not (tmp_path/'review/land_price_auto_segments.geojson').exists()
+
+
+def test_computed_point_collections_are_not_overlaid_twice():
+    road = LineString([(0,0),(200,0)])
+    start = GeometryCollection([Point(50,1e-10)])
+    end = GeometryCollection([Point(150,1e-10)])
+    result, _, _ = clip_unique_path(road,start,end,computed_intersections=True)
+    assert result.length == pytest.approx(100)
+
+
+def test_osm_overlay_failure_keeps_one_row_pending_without_losing_valid_rows(monkeypatch):
+    source, roads, wards = inputs()
+    source['records'].append({**source['records'][0], 'id':'second'})
+    original = road_matcher.clip_unique_path
+    calls = []
+    def unstable(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise GEOSException('Unstable overlay')
+        return original(*args, **kwargs)
+    monkeypatch.setattr(road_matcher, 'clip_unique_path', unstable)
+    result, pending = match(source, roads, wards)
+    assert len(result['features']) == 1
+    assert result['features'][0]['id'] == 'second'
+    assert pending[0]['unmatched_reason'] == 'osm_geometry_overlay_error'
+
+
+def test_published_segment_is_clipped_to_approved_city_scope_and_labelled_partial():
+    source, roads, wards = inputs()
+    city = box(106.70,10.80,106.705,10.81)
+    result, pending = match(source,roads,wards,city_geometry=city)
+    assert not pending
+    feature = result['features'][0]
+    assert city.covers(shape(feature['geometry']))
+    assert feature['properties']['geometry_coverage'] == 'partial_city_clipped_segment'
+    assert feature['properties']['source_segment_coverage'] == 'between_named_intersections_within_ward'
+    assert feature['properties']['city_boundary_clipped'] is True
+
+
+def test_segment_outside_approved_city_is_pending():
+    source, roads, wards = inputs()
+    result, pending = match(source,roads,wards,city_geometry=box(106.9,10.8,107,10.9))
+    assert not result['features']
+    assert pending[0]['unmatched_reason'] == 'outside_city_boundary'
