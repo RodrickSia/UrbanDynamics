@@ -91,7 +91,7 @@ def tilejson(request: Request, year: int = Path(ge=1900, le=2200)):
         "scheme": "xyz",
         "tiles": [
             f"{str(request.base_url).rstrip('/')}/api/v1/population/{year}/tiles/"
-            "{z}/{x}/{y}.png?palette=pseudocolor"
+            "{z}/{x}/{y}.png?palette=pseudocolor&render=2"
         ],
         "format": "png",
         "minzoom": 0,
@@ -121,7 +121,7 @@ def tile(
         return Response(status_code=204, headers={"Cache-Control": "public, max-age=86400"})
     content = render_population_tile(samples, palette)
     loaded_at = source["loaded_at"] or "unknown"
-    etag = f'W/"population-{year}-{loaded_at}-{palette}-{z}-{x}-{y}"'
+    etag = f'W/"population-v2-{year}-{loaded_at}-{palette}-{z}-{x}-{y}"'
     if request.headers.get("if-none-match") == etag:
         return Response(
             status_code=304,

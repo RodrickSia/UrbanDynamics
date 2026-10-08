@@ -34,11 +34,13 @@ const pointWithoutElevation: MeasurementPoint = {
 };
 
 vi.mock('../components/UrbanMap', () => ({
-  UrbanMap: ({ measurement, onMeasurementPoint }: {
+  UrbanMap: ({ measurement, onMeasurementPoint, poiEnabled }: {
+    poiEnabled?: boolean;
     measurement: MeasurementState;
     onMeasurementPoint: (point: MeasurementPoint) => void;
   }) => (
     <div className="map-canvas" data-testid="mock-measurement-count">
+      <span data-testid="poi-state">{String(poiEnabled)}</span>
       {measurement.points.length}
       <button type="button" onClick={() => onMeasurementPoint(pointOne)}>Add first point</button>
       <button type="button" onClick={() => onMeasurementPoint(pointTwo)}>Add second point</button>
@@ -57,6 +59,19 @@ describe('distance measurement workflow', () => {
     vi.unstubAllEnvs();
   });
 
+  it('toggles POI independently and retains the choice across 2D/3D', async () => {
+    const user=userEvent.setup();render(<App />);
+    await user.click(screen.getByRole('button',{name:'Open data layers'}));
+    const poi=screen.getByRole('checkbox',{name:'Points of interest'});
+    expect(poi).toBeChecked();
+    await user.click(poi);
+    expect(screen.getByTestId('poi-state')).toHaveTextContent('false');
+    await user.click(screen.getByRole('button',{name:'Switch to 3D'}));
+    expect(screen.getByTestId('poi-state')).toHaveTextContent('false');
+    await user.click(poi);
+    expect(screen.getByTestId('poi-state')).toHaveTextContent('true');
+  });
+
   it('keeps a multi-point measurement when switching between 2D and 3D', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -71,6 +86,7 @@ describe('distance measurement workflow', () => {
     expect(within(toolbar).queryByText('Horizontal total')).not.toBeInTheDocument();
     expect(within(toolbar).queryByText('Last segment')).not.toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: 'Done' })).toBeEnabled();
+    expect(within(toolbar).getByRole('button', { name: 'Clear measurement' }).querySelector('svg')?.getAttribute('class')).toMatch(/trash/i);
 
     await user.click(screen.getByRole('button', { name: 'Switch to 3D' }));
     expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');
@@ -121,5 +137,25 @@ describe('distance measurement workflow', () => {
     expect(within(toolbar).getByRole('combobox')).toHaveValue('imperial');
     await user.click(within(toolbar).getByRole('button', { name:'Clear measurement' }));
     expect(screen.queryByRole('region', { name:'Area measurement' })).not.toBeInTheDocument();
+  });
+  it('opens Viewshed as the third tool in 3D without deleting existing measurement anchors', async () => {
+    const user=userEvent.setup();render(<App/>);
+    await user.click(screen.getByRole('button',{name:'Measurement tools'}));
+    await user.click(await screen.findByRole('button',{name:'Measure distance'}));
+    await user.click(screen.getByRole('button',{name:'Add first point'}));
+    await user.click(screen.getByRole('button',{name:'Add second point'}));
+    await user.click(screen.getByRole('button',{name:'Measurement tools'}));
+    await user.click(await screen.findByRole('button',{name:'Viewshed'}));
+    expect(screen.getByRole('button',{name:'Switch to 2D'})).toBeInTheDocument();
+    expect(screen.getByRole('region',{name:'Viewshed analysis'})).toHaveTextContent('place the observer');
+    expect(screen.queryByRole('region',{name:'Distance measurement'})).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');
+    expect(screen.queryByRole('button',{name:'Done'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Delete selected viewshed'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'New'})).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button',{name:'Close viewshed editing'}));
+    expect(screen.queryByRole('region',{name:'Viewshed analysis'})).not.toBeInTheDocument();
+    expect(screen.getByRole('region',{name:'Distance measurement'})).toHaveTextContent('Measurement complete');
+    expect(screen.getByTestId('mock-measurement-count')).toHaveTextContent('2');
   });
 });

@@ -2,6 +2,11 @@ import type { UrbanLayerDefinition } from '../types/map';
 
 export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   {
+    id: 'poi', label: 'Points of interest', description: 'Place icons and names on the basemap.',
+    category: 'built-environment', enabledByDefault: true, status: 'available',
+    supportsTimeRange: false, supportsOpacity: false,
+  },
+  {
     id: 'buildings-3d',
     label: '3D buildings',
     description: 'Building extrusions from the Goong vector source when available.',
@@ -13,8 +18,8 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   },
   {
     id: 'population',
-    label: 'Population density',
-    description: 'Population distribution by area.',
+    label: 'Population',
+    description: 'WorldPop persons per source raster cell (100 m nominal).',
     category: 'built-environment',
     enabledByDefault: false,
     status: 'not-connected',
@@ -44,12 +49,24 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   {
     id: 'flood',
     label: 'Flood risk',
-    description: 'Observed flooding and risk by area.',
+    description: 'Rainfall threshold indicators, not simulated flood extent.',
     category: 'environment',
     enabledByDefault: false,
     status: 'not-connected',
     supportsTimeRange: true,
     supportsOpacity: true,
+  },
+  {
+    id: 'flood-history', label: 'Flood history',
+    description: 'Reported observations; absence of reports does not imply no flooding.',
+    category: 'environment', enabledByDefault: false, status: 'not-connected',
+    supportsTimeRange: true, supportsOpacity: true,
+  },
+  {
+    id: 'flood-satellite', label: 'Flood satellite',
+    description: 'Satellite pixels classified as flooded, not flood depth.',
+    category: 'environment', enabledByDefault: false, status: 'not-connected',
+    supportsTimeRange: true, supportsOpacity: true,
   },
   {
     id: 'rain',
@@ -78,6 +95,16 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
     category: 'planning',
     enabledByDefault: false,
     status: 'available',
+    supportsTimeRange: false,
+    supportsOpacity: true,
+  },
+  {
+    id: 'parcels',
+    label: 'Land parcels',
+    description: 'Cadastral plot boundaries and available parcel attributes.',
+    category: 'planning',
+    enabledByDefault: false,
+    status: 'loading',
     supportsTimeRange: false,
     supportsOpacity: true,
   },

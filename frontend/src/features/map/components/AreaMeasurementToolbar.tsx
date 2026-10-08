@@ -25,7 +25,7 @@ export function AreaMeasurementToolbar({ measurement, mode, onUnitsChange, onUnd
       <Pentagon aria-hidden="true" size={19} />
       <div>
         <strong>{current.valid ? formatArea(current.areaSquareMeters,units)
-          : measurement.points.length ? `${measurement.points.length} vertices` : 'Click the map to start'}</strong>
+          : measurement.points.length ? `${measurement.points.length} vertices` : 'Place vertices'}</strong>
         {current.valid && <span>Perimeter {formatLength(current.perimeterMeters,units)}</span>}
         <span className="area-mode">{current.valid ? current.calculationMode === 'planar' ? '3D plane' : 'Horizontal projection' : current.reason}</span>
         {current.valid && !current.elevationAvailable && <span>Elevation unavailable</span>}
@@ -38,8 +38,8 @@ export function AreaMeasurementToolbar({ measurement, mode, onUnitsChange, onUnd
       </select>
       <button type="button" className="secondary-button measurement-icon-action" aria-label="Undo last vertex" title="Undo last vertex"
         disabled={!measurement.points.length} onClick={onUndo}><Undo2 size={16} aria-hidden="true" /></button>
-      <button type="button" className="secondary-button" aria-label="New measurement" onClick={onNew}>
-        <RotateCcw size={15} aria-hidden="true" /> New measurement
+      <button type="button" className="secondary-button measurement-icon-action" aria-label="New measurement" title="New measurement" onClick={onNew}>
+        <RotateCcw size={15} aria-hidden="true" />
       </button>
       <button type="button" className="primary-button" aria-label="Done" onClick={onDone}
         disabled={!committed.valid || measurement.status === 'complete'}><Check size={16} aria-hidden="true" /> Done</button>

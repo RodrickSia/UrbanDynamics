@@ -1,16 +1,18 @@
-import { Pentagon, Ruler } from 'lucide-react';
+import { Eye, Pentagon, Ruler } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap, motionDuration, useGSAP } from '../motion';
 import type { MeasurementKind, MeasurementState } from '../types/map';
 import { MotionIconButton } from './MotionIconButton';
 
-export function MeasurementSelector({ measurement, onSelect }: {
+export function MeasurementSelector({ measurement, onSelect, viewshedActive = false, onViewshed }: {
   measurement: MeasurementState;
   onSelect: (kind: MeasurementKind) => void;
+  viewshedActive?: boolean;
+  onViewshed?: () => void;
 }) {
   const [open,setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const active = measurement.status !== 'idle';
+  const active = measurement.status !== 'idle' && !viewshedActive;
   useGSAP(() => {
     if (!open) return;
     gsap.fromTo('.measurement-picker', { autoAlpha:0, x:12, scale:0.94 },
@@ -37,7 +39,7 @@ export function MeasurementSelector({ measurement, onSelect }: {
         rootRef.current?.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus();
       }
     }}>
-    <MotionIconButton className={`corner-action glass-surface ${active ? 'is-active' : ''}`}
+    <MotionIconButton className={`corner-action glass-surface ${active || viewshedActive ? 'is-active' : ''}`}
       aria-label="Measurement tools" aria-expanded={open} onClick={() => setOpen(value => !value)}>
       <Ruler size={19} aria-hidden="true" />
     </MotionIconButton>
@@ -50,6 +52,10 @@ export function MeasurementSelector({ measurement, onSelect }: {
         aria-pressed={active && measurement.kind === 'area'} onClick={() => select('area')}>
         <Pentagon size={19} aria-hidden="true" />
       </MotionIconButton>
+      {onViewshed && <MotionIconButton className="corner-action" aria-label="Viewshed" title="Viewshed"
+        aria-pressed={viewshedActive} onClick={() => { onViewshed(); setOpen(false); rootRef.current?.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus(); }}>
+        <Eye size={19} aria-hidden="true" />
+      </MotionIconButton>}
     </div>}
   </div>;
 }

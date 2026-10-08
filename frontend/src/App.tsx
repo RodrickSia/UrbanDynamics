@@ -8,6 +8,8 @@ import { SearchBox } from './features/map/components/SearchBox';
 import { UrbanMap } from './features/map/components/UrbanMap';
 import { getMapConfiguration } from './features/map/config/mapConfig';
 import { useMapWorkspace } from './features/map/hooks/useMapWorkspace';
+import { ViewshedPanel } from './features/map/viewshed/ViewshedPanel';
+import { useBackendLayers } from './features/map/datasets/useBackendLayers';
 
 export default function App() {
   const configuration = useMemo(
@@ -15,19 +17,24 @@ export default function App() {
     [],
   );
   const workspace = useMapWorkspace();
+  const backend = useBackendLayers(workspace.layers);
 
   return (
     <main className="app-shell theme-light">
       <section
         className="map-workspace"
+        data-layers-open={workspace.rightPanel === 'layers'}
         aria-label="Interactive urban map"
         onPointerDownCapture={workspace.handleMapPointerDown}
       >
         <UrbanMap
+          backend={{selections:backend.selections,opacity:workspace.opacityByLayer,revision:backend.revision,report:backend.report}}
+          viewshed={{state:workspace.viewsheds,onAction:workspace.handleViewshedAction,onStatus:workspace.setViewshedStatus}}
           configuration={configuration}
           mapStyle={workspace.mapStyle}
           mode={workspace.mode}
           buildingsEnabled={Boolean(workspace.layers['buildings-3d'])}
+          poiEnabled={workspace.layers.poi ?? true}
           buildingsOpacity={workspace.opacityByLayer['buildings-3d'] ?? 0.8}
           landPriceEnabled={Boolean(workspace.layers['land-price'])}
           landPriceOpacity={workspace.opacityByLayer['land-price'] ?? 0.8}
@@ -64,6 +71,7 @@ export default function App() {
 
         {workspace.rightPanel === 'layers' && (
           <LayerPanel
+            backend={backend}
             layers={workspace.layers}
             opacityByLayer={workspace.opacityByLayer}
             onClose={workspace.closeRightPanel}
@@ -82,6 +90,8 @@ export default function App() {
         />
 
         <MapControls
+          viewshedActive={workspace.viewsheds.phase !== 'idle'}
+          onViewshed={() => workspace.handleViewshedAction({type:'start'})}
           mode={workspace.mode}
           onToggleMeasurementComponents={workspace.toggleMeasurementComponents}
           measurement={workspace.measurement}
@@ -98,6 +108,9 @@ export default function App() {
           onCompleteMeasurement={workspace.completeMeasurement}
           onClearSelection={workspace.clearSelection}
         />
+
+        {workspace.viewsheds.phase !== 'idle' && <ViewshedPanel state={workspace.viewsheds}
+          onAction={workspace.handleViewshedAction} status={workspace.mode==='3d'?workspace.viewshedStatus:'Switch to 3D to see this analysis'}/>}
 
         <div className="sr-only" aria-live="polite">
           {workspace.mapStatus}

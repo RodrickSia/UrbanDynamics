@@ -1,4 +1,4 @@
-import { Check, RotateCcw, Ruler, TriangleRight, X } from 'lucide-react';
+import { Check, RotateCcw, Ruler, Trash2, TriangleRight } from 'lucide-react';
 import { useRef } from 'react';
 
 import { gsap, motionDuration, useGSAP } from '../motion';
@@ -82,7 +82,7 @@ export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNe
           <Check aria-hidden="true" size={16} /> Done
         </button>
         <button type="button" className="secondary-button measurement-icon-action" onClick={onClear} aria-label="Clear measurement" title="Clear measurement">
-          <X aria-hidden="true" size={16} />
+          <Trash2 aria-hidden="true" size={16} />
         </button>
       </div>
     </aside>

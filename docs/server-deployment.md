@@ -53,3 +53,14 @@ npx playwright test --config playwright.deploy.config.ts
 
 This verifies browser map behavior in addition to HTTP availability. Keep all
 backend-only credentials out of frontend build variables and source files.
+
+The deploy job also runs `scripts/smoke_map_deployment.py` through the frontend
+port. It requires backend health/readiness, API discovery, a loaded population
+catalog, an HCMC population sample and a valid PNG tile. For each published map
+vector layer it checks GeoJSON, TileJSON and the MVT endpoint (204 is a valid
+empty tile). Unpublished layers are listed explicitly, not treated as loaded.
+All probes are read-only. After opening a tunnel, the same check can run locally:
+
+```sh
+python scripts/smoke_map_deployment.py http://127.0.0.1:51873
+```

@@ -91,5 +91,14 @@ def run(download_dir: Path, settings: ParcelsHCMCConfig = config) -> None:
             if loaded % 50 == 0:
                 logger.info("Loaded %s tiles (%s already present)", loaded, skipped)
     finally:
-        connection.close()
+        # A failed/resumed load must also publish every committed tile. Concurrent
+        # refresh lets map readers keep using the previous complete view.
+        try:
+            if loaded or skipped:
+                with connection.cursor() as cursor:
+                    cursor.execute(sql.SQL('REFRESH MATERIALIZED VIEW CONCURRENTLY {}').format(
+                        _qualified(settings.database_schema, 'plot')))
+                    cursor.execute(sql.SQL('ANALYZE {}').format(_qualified(settings.database_schema, 'plot')))
+        finally:
+            connection.close()
     logger.info("Parcel load finished: loaded %s, skipped %s", loaded, skipped)

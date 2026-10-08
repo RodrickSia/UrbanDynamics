@@ -1,4 +1,6 @@
 import type { MapConfiguration, MapStyleId } from '../config/mapConfig';
+import type { ViewshedBridge } from '../viewshed/ViewshedScene';
+import type { BackendBridge } from '../datasets/BackendDataScene';
 import type {
   MapControlRequest,
   MapFocusRequest,
@@ -11,6 +13,9 @@ import type {
 } from '../types/map';
 
 export interface UrbanMapProps {
+  backend?: BackendBridge;
+  poiEnabled?: boolean;
+  viewshed?: ViewshedBridge;
   configuration: MapConfiguration;
   mapStyle: MapStyleId;
   mode: MapMode;

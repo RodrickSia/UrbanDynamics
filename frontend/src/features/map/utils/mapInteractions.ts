@@ -22,6 +22,7 @@ export function createMapInteractionHandlers(
   return {
     click(event: MapMouseEvent) {
       const current = getCurrent();
+      if (current.viewshed && current.viewshed.state.phase !== 'idle') return;
       if (current.measurement.status === 'active') {
         cancelAnimationFrame(previewFrame);
         const point = resolveMeasurementPoint(
@@ -39,9 +40,12 @@ export function createMapInteractionHandlers(
         }
         return;
       }
-      const visibleFeatures = map
-        .queryRenderedFeatures(event.point)
-        .filter((feature) => feature.layer.id !== MEASUREMENT_LAYER_ID)
+      const renderedFeatures = map.queryRenderedFeatures(event.point);
+      // Dataset inspection owns this click only outside measurement/Viewshed.
+      if (current.backend?.selections.some(layer => layer.dataset === 'population') ||
+        renderedFeatures.some(feature => feature.layer.id.startsWith('dataset-'))) return;
+      const visibleFeatures = renderedFeatures
+        .filter((feature) => feature.layer.id !== MEASUREMENT_LAYER_ID && !feature.layer.id.startsWith('dataset-'))
         .slice(0, 5)
         .map((feature, index) => {
           const featureName = feature.properties?.name;

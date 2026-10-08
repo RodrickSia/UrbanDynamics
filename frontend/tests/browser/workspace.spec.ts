@@ -27,6 +27,9 @@ test.beforeEach(async ({ page }) => {
     layers: [
       { id: 'background', type: 'background', paint: { 'background-color': '#233440' } },
       { id: 'provider-road', type: 'line', source: 'roads', paint: { 'line-width': 4, 'line-color': '#ccddee' } },
+      { id: 'poi-scalerank-1', type: 'symbol', source: 'roads' },
+      { id: 'poi-hidden', type: 'symbol', source: 'roads', layout: {visibility:'none'} },
+      { id: 'highway-name-major', type: 'symbol', source: 'roads' },
       { id: 'road-street', type: 'line', source: 'composite', 'source-layer': 'streets',
         paint: { 'line-width': 18, 'line-color': '#ccddee' } },
     ],
@@ -40,6 +43,20 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate('window.workspace.map().jumpTo({center:[106.7,10.8],zoom:17})');
   await page.evaluate('window.workspace.mode("3d")');
   await page.waitForFunction('!window.workspace.map().isMoving() && window.workspace.map().queryTerrainElevation([106.7,10.8]) === 80');
+});
+
+test('POI toggle survives basemap swaps and preserves provider-hidden POIs and road labels', async ({page})=>{
+  await page.evaluate('window.workspace.poi(false)');
+  await expect.poll(()=>page.evaluate(`window.workspace.map().getLayoutProperty('poi-scalerank-1','visibility')`)).toBe('none');
+  await page.evaluate(`window.workspace.style('satellite')`);
+  await page.waitForFunction(`window.workspace.map().getLayer('satellite-imagery') && window.workspace.map().isStyleLoaded()`);
+  await page.evaluate(`window.workspace.style('standard')`);
+  await page.waitForFunction(`window.workspace.map().getLayer('poi-scalerank-1') && window.workspace.map().isStyleLoaded()`);
+  expect(await page.evaluate(`window.workspace.map().getLayoutProperty('poi-scalerank-1','visibility')`)).toBe('none');
+  expect(await page.evaluate(`window.workspace.map().getLayoutProperty('highway-name-major','visibility')`)).not.toBe('none');
+  await page.evaluate('window.workspace.poi(true)');
+  await expect.poll(()=>page.evaluate(`window.workspace.map().getLayoutProperty('poi-scalerank-1','visibility')`)).toBe('visible');
+  expect(await page.evaluate(`window.workspace.map().getLayoutProperty('poi-hidden','visibility')`)).toBe('none');
 });
 
 test('3D preview and fixed anchors survive satellite and standard style swaps', async ({ page }) => {

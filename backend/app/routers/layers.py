@@ -85,9 +85,10 @@ def layer_tilejson(layer: str, request: Request):
         "scheme": "xyz",
         "tiles": [
             f"{str(request.base_url).rstrip('/')}/api/v1/layers/{layer}/tiles/{{z}}/{{x}}/{{y}}.pbf"
+            + ("?schema=2" if layer in ("flood_history", "parcels") else "")
         ],
-        "minzoom": 0,
-        "maxzoom": 18,
+        "minzoom": 12 if layer == 'parcels' else 0,
+        "maxzoom": 16 if layer == 'parcels' else 18,
         "vector_layers": [{"id": "features", "fields": repository.LAYER_INFO[layer]["fields"]}],
         "metadata": metadata,
     }
@@ -123,7 +124,8 @@ def layer_vector_tile(
     if not tile:
         return Response(status_code=204, headers={"Cache-Control": "public, max-age=300"})
     updated = snapshot.get("updated_at", snapshot.get("ingested_at", "unknown"))
-    etag = f'W/"{layer}-{updated}-{start or "all"}-{end or "all"}-{z}-{x}-{y}"'
+    schema = "v2-" if layer in ('flood_history', 'parcels') else ""
+    etag = f'W/"{schema}{layer}-{updated}-{start or "all"}-{end or "all"}-{z}-{x}-{y}"'
     if request.headers.get("if-none-match") == etag:
         return Response(
             status_code=304, headers={"ETag": etag, "Cache-Control": "public, max-age=300"}

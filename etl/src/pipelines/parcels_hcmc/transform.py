@@ -1,11 +1,14 @@
 """Decode a land-plot vector tile into WGS84 polygons."""
 
 import json
+import math
 from pathlib import Path
 
 import mapbox_vector_tile
 import mercantile
 from mapbox_vector_tile.Mapbox import vector_tile_pb2 as vector_tile
+from shapely.geometry import box, mapping, shape
+from shapely import make_valid
 
 from src.pipelines.parcels_hcmc.models import LandPlot
 
@@ -18,19 +21,19 @@ def _text(properties: dict, key: str) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
-    return text or None
+    return None if text.lower() in ('', 'null', 'none', 'nan') else text
 
 
 def _to_wgs84(geometry: dict, z: int, x: int, y: int, extent: int) -> dict:
     bounds = mercantile.bounds(x, y, z)
     sx = (bounds.east - bounds.west) / extent
-    sy = (bounds.north - bounds.south) / extent
 
     def convert(coordinates):
         if isinstance(coordinates[0], (int, float)):
             longitude = bounds.west + coordinates[0] * sx
-            latitude = bounds.north - coordinates[1] * sy
-            return [round(longitude, 6), round(latitude, 6)]
+            world_y = (y + coordinates[1] / extent) / 2**z
+            latitude = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * world_y))))
+            return [round(longitude, 9), round(latitude, 9)]
         return [convert(part) for part in coordinates]
 
     return {"type": geometry["type"], "coordinates": convert(geometry["coordinates"])}
@@ -64,6 +67,13 @@ def decode_tile(path: Path) -> list[LandPlot]:
             geometry = feature.get("geometry") or {}
             if geometry.get("type") not in _POLYGON_TYPES:
                 continue
+            clipped = make_valid(shape(geometry)).intersection(box(0, 0, extent, extent))
+            if clipped.is_empty or clipped.area == 0:
+                continue
+            if clipped.geom_type == 'GeometryCollection':
+                from shapely.ops import unary_union
+                clipped = unary_union([part for part in clipped.geoms if part.geom_type in _POLYGON_TYPES])
+            geometry = mapping(clipped)
             properties = {
                 key: value
                 for key, value in (feature.get("properties") or {}).items()

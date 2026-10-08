@@ -1,0 +1,2 @@
+# Vector tiles are protobuf bytes, even when Git's text heuristic finds no NUL.
+*.pbf binary
