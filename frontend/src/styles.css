@@ -1240,7 +1240,7 @@ input:focus-visible {
 .land-price-legend {
   position: absolute;
   z-index: 5;
-  right: 1rem;
+  left: 1rem;
   bottom: 1rem;
   width: min(22rem, calc(100vw - 2rem));
   max-height: 65vh;
