@@ -153,9 +153,11 @@ def test_shared_types_confirmation_and_lock_protection(client, plan):
 def test_study_area_clips_proposals_without_changing_reference(client, plan):
     plan = draw(client, add_type(client, plan), rectangle())
     baseline = deepcopy(plan["scenarios"][0])
+    reference = deepcopy(plan["baseline"])
     command(client, plan, "study_area", {"geometry": rectangle(east=106.761)}, status=422)
     plan = command(client, plan, "study_area", {"geometry": rectangle(east=106.761), "confirm": True})
     assert plan["scenarios"][0] == baseline
+    assert plan["baseline"] == reference
     assert plan["scenarios"][1]["zones"][0]["area_m2"] == pytest.approx(plan["area_m2"], abs=.1)
     assert plan["scenarios"][1]["can_undo"] is False
 
@@ -174,3 +176,13 @@ def test_reshape_preserves_holes_and_rejects_open_rings(client, plan):
     assert len(plan["scenarios"][1]["zones"][0]["geometry"]["coordinates"]) == 2
     geometry["coordinates"][0].pop()
     command(client, plan, "draw", {"geometry": geometry, "type_id": zone["type_id"], "policy": "replace"}, status=422)
+
+
+def test_explicit_zero_controls_are_distinct_from_unknown(client, plan):
+    plan = command(client, plan, "add_type", {"type": {"code": "P", "name": "Open space proposal",
+                   "color": "#4d9156", "coverage": 0, "far": 0, "max_floors": 0}})
+    plan = draw(client, plan)
+    report = client.get(f"/api/v1/zoning/plans/{plan['id']}/indicators?scenario_id={plan['scenarios'][1]['id']}").json()
+    assert report["rows"][0]["far_bound_m2"] == 0
+    assert report["rows"][0]["footprint_bound_m2"] == 0
+    assert plan["types"][0]["max_height"] is None

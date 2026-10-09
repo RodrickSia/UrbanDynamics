@@ -26,6 +26,7 @@ def create(data: PlanInput):
         "revision": 1, "created_at": captured, "updated_at": captured,
         "status": "draft", "jurisdiction": "HCMC pilot", "types": [],
         "baseline": {"version": new_id(), "captured_at": captured,
+                     "study_area": geojson(area),
                      "status": "unverified", "source": "No authoritative zoning snapshot imported"},
         "scenarios": [
             {"id": new_id(), "name": "Existing", "kind": "reference", "locked": True, "zones": []},
