@@ -1,6 +1,6 @@
 # Zoning plan editor — first milestone
 
-Implements the supplied ArcGIS Urban–inspired business specification's 2D MVP.
+Implements the supplied [business specification](zoning-business-specification.md)'s 2D MVP.
 Plans and Indicators are icon buttons below search; scenario tabs use the existing
 glass surface, teal tokens and reduced-motion-aware animation. No Projects entry.
 
@@ -42,3 +42,39 @@ verified height/setback/terrain inputs. They are not represented as completed to
 
 References: [zoning](https://doc.esri.com/en/arcgis-urban/latest/help/help-zoning.html)
 and [scenarios](https://doc.esri.com/en/arcgis-urban/latest/help/help-scenarios.html).
+
+## Run and verify
+
+Start the API with the repository's Python dependencies installed and `backend`
+and `etl` on `PYTHONPATH`: `python -m uvicorn app.main:app --host 127.0.0.1 --port 8087`.
+For isolated browser verification set `ZONING_DATA_DIR` to a disposable local
+directory and leave warehouse credentials unset. This exercises SQLite; production
+uses PostgreSQL automatically when the warehouse connection is configured.
+
+From `frontend` run:
+
+```text
+npm run build
+npm run lint
+npm test -- --maxWorkers=2
+npx playwright test --config playwright.zoning.config.ts
+```
+
+The zoning browser config uses port 5178 and proxies to the local API on 8087.
+It mocks only the basemap/dataset context; plan create/read/write calls use the real
+API. Its tests live outside the regular map fixture suite, which needs no backend.
+Backend: `python -m pytest backend/tests/test_zoning.py backend/tests/test_map_api.py -q`.
+
+## User workflow
+
+Plans → New plan → draw study area → Create plan → Add zoning type → Draw zone →
+Preview → Confirm zoning. Overlap handling is selected explicitly before preview.
+Select a zone for its regulations, assignment, delete or vertex editing. Drag a
+vertex; click a midpoint to insert; Shift-click a vertex to remove. Shift-click
+multiple zones of the same type to merge; draw a crossing line to split. Undo/redo
+applies to geometry changes in the current unlocked proposal scenario.
+
+The plus beside the scenario tabs duplicates the active scenario. Options rename,
+lock/unlock or delete proposals. Indicators compares areas against another scenario,
+shows unknown source controls and independent FAR/coverage bounds. The panel can be
+collapsed while drawing. Confirmed changes save immediately to the backend.

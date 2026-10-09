@@ -1,6 +1,7 @@
 import type { MapConfiguration, MapStyleId } from '../config/mapConfig';
 import type { ViewshedBridge } from '../viewshed/ViewshedScene';
 import type { BackendBridge } from '../datasets/BackendDataScene';
+import type { ZoningBridge } from '../../zoning/types';
 import type {
   MapControlRequest,
   MapFocusRequest,
@@ -13,6 +14,7 @@ import type {
 } from '../types/map';
 
 export interface UrbanMapProps {
+  zoning?: ZoningBridge;
   backend?: BackendBridge;
   poiEnabled?: boolean;
   viewshed?: ViewshedBridge;
