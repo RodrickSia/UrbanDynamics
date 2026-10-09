@@ -23,12 +23,13 @@ test('renders priced vector segments, opens details, and restores the layer afte
   await page.goto('/tests/browser/workspace.html');
   await page.waitForFunction('window.workspace?.map()?.isStyleLoaded()');
   await page.evaluate('window.workspace.map().jumpTo({center:[106.7,10.8],zoom:16}); window.workspace.measurement({status:"idle",points:[],preview:null}); window.workspace.landPrice(true)');
-  await expect(page.getByLabel('Land price legend')).toContainText('1 mapped / 2 source rows');
+  await expect(page.getByLabel('Land price legend')).toContainText('Official reference land price');
+  await expect(page.getByLabel('Land price legend')).not.toContainText('source rows');
   await page.waitForFunction('window.workspace.map().getLayer("urban-land-price-lines") && window.workspace.map().queryRenderedFeatures({layers:["urban-land-price-lines"]}).length > 0');
   const point = await page.evaluate('window.workspace.map().project([106.7,10.8])') as {x:number;y:number};
   await page.mouse.click(point.x, point.y);
   await expect(page.getByRole('region', {name:'Land price details',exact:true})).toContainText('100.000.000 ₫/m²');
-  await expect(page.getByRole('region', {name:'Land price details',exact:true})).toContainText('Spatial match · not manually reviewed');
+  await expect(page.getByRole('region', {name:'Land price details',exact:true})).not.toContainText('Spatial match · not manually reviewed');
   await page.evaluate('window.workspace.opacity(.4)');
   await expect.poll(() => page.evaluate('window.workspace.map().getPaintProperty("urban-land-price-lines","line-opacity")')).toBe(.4);
   await page.evaluate('window.workspace.style("satellite")');
