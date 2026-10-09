@@ -22,6 +22,8 @@ import type { UrbanMapProps } from './UrbanMap.types';
 import { ViewshedScene } from '../viewshed/ViewshedScene';
 import { createPoiVisibility } from '../layers/poi';
 import { BackendDataScene } from '../datasets/BackendDataScene';
+import { ZoningScene } from '../../zoning/ZoningScene';
+import { ZoningLabels } from '../../zoning/ZoningLabels';
 
 export function UrbanMap(props: UrbanMapProps) {
   const {
@@ -70,7 +72,7 @@ export function UrbanMap(props: UrbanMapProps) {
     return installLandPrice(map, propsRef.current.landPriceOpacity ?? 0.8, setLandPriceStatus,
       properties => {
         const current = propsRef.current;
-        if (properties === null || (current.measurement.status !== 'active' &&
+        if (properties === null || (!current.zoning?.active && current.measurement.status !== 'active' &&
           (!current.viewshed || current.viewshed.state.phase === 'idle'))) setLandPriceSelection(properties);
       });
   }, [landPriceEnabled, mapRevision, priceRetry]);
@@ -271,7 +273,9 @@ export function UrbanMap(props: UrbanMapProps) {
       <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />
       {props.backend && <BackendDataScene map={mapRef.current} bridge={{ ...props.backend,
         selections: props.backend.selections.filter(selection => selection.id !== 'land-price') }}
-        interactive={measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
+        interactive={!props.zoning?.active && measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
+      {props.zoning && <ZoningScene map={mapRef.current} bridge={props.zoning}/>}
+      {props.zoning && <ZoningLabels map={mapRef.current} bridge={props.zoning}/>}
       {props.viewshed && <ViewshedScene map={mapRef.current} projection={measurementLayerRef.current?.projection ?? null}
         mode={mode} bridge={props.viewshed} />}
       <MeasurementLabels
@@ -280,7 +284,7 @@ export function UrbanMap(props: UrbanMapProps) {
         measurement={measurement}
         mode={mode}
       />
-      {landPriceEnabled && <LandPriceLegend status={landPriceStatus} selected={landPriceSelection}
+      {landPriceEnabled && !props.zoning?.active && <LandPriceLegend status={landPriceStatus} selected={landPriceSelection}
         onClose={() => setLandPriceSelection(null)} onRetry={() => setPriceRetry(value => value + 1)} />}
     </>
   );
