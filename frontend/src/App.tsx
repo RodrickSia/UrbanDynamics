@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { LayerPanel } from './features/map/components/LayerPanel';
 import { MapControls } from './features/map/components/MapControls';
@@ -21,6 +21,7 @@ export default function App() {
   const workspace = useMapWorkspace();
   const backend = useBackendLayers(workspace.layers);
   const zoning = useZoning();
+  const [searchPanelHeight, setSearchPanelHeight] = useState(0);
   const activateZoning = () => {
     workspace.cancelMeasurement();
     workspace.handleViewshedAction({ type: 'done' });
@@ -82,10 +83,12 @@ export default function App() {
             isOpen={workspace.isSearchOpen}
             onOpenChange={workspace.setIsSearchOpen}
             onSelectPlace={workspace.selectPlace}
+            onWorkspaceHeightChange={setSearchPanelHeight}
           />
         </div>
 
-        <ZoningWorkspace workspace={zoning} onActivate={activateZoning} hidden={workspace.isSearchOpen}/>
+        <ZoningWorkspace workspace={zoning} onActivate={activateZoning}
+          searchOpen={workspace.isSearchOpen} searchPanelHeight={searchPanelHeight}/>
 
         {workspace.rightPanel === 'layers' && (
           <LayerPanel
