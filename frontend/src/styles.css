@@ -5,15 +5,17 @@
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --accent: #005b65;
-  --accent-strong: #005763;
-  --accent-muted: rgba(0, 109, 121, 0.1);
+  --accent: #0b5fa8;
+  --accent-strong: #0a4f8a;
+  --accent-muted: rgba(11, 95, 168, 0.12);
+  --accent-border: rgba(11, 95, 168, 0.32);
+  --button-surface: rgba(232, 243, 253, 0.88);
   --surface: rgba(250, 253, 253, 0.78);
   --surface-solid: rgba(248, 252, 252, 0.88);
   --surface-raised: rgba(255, 255, 255, 0.86);
-  --surface-soft: rgba(16, 75, 82, 0.06);
-  --border: rgba(26, 66, 72, 0.14);
-  --border-strong: rgba(26, 66, 72, 0.22);
+  --surface-soft: rgba(24, 83, 139, 0.06);
+  --border: rgba(35, 75, 115, 0.16);
+  --border-strong: rgba(35, 75, 115, 0.26);
   --text: #15292d;
   --text-secondary: #30484d;
   --text-muted: #3e555a;
@@ -123,7 +125,7 @@ input:focus-visible {
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
-  color: var(--text-secondary);
+  color: var(--accent-strong);
   background: transparent;
   cursor: pointer;
 }
@@ -156,7 +158,7 @@ input:focus-visible {
 }
 
 .search-module.is-open .search-shell {
-  border-color: rgba(8, 127, 140, 0.38);
+  border-color: var(--accent-border);
 }
 
 .search-shell input {
@@ -191,7 +193,7 @@ input:focus-visible {
 .search-workspace,
 .right-workspace {
   scrollbar-width: thin;
-  scrollbar-color: rgba(8, 127, 140, 0.4) rgba(26, 66, 72, 0.06);
+  scrollbar-color: var(--accent-border) var(--surface-soft);
 }
 
 .search-workspace::-webkit-scrollbar,
@@ -207,7 +209,7 @@ input:focus-visible {
 .search-workspace::-webkit-scrollbar-thumb,
 .right-workspace::-webkit-scrollbar-thumb {
   border-radius: 1rem;
-  background: rgba(8, 127, 140, 0.4);
+  background: var(--accent-border);
 }
 
 .search-section-heading {
@@ -322,8 +324,8 @@ input:focus-visible {
 }
 
 .area-weather-card:hover {
-  border-color: rgba(8, 127, 140, 0.3);
-  background: rgba(8, 127, 140, 0.07);
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
 }
 
 .area-weather-copy {
@@ -564,7 +566,7 @@ input:focus-visible {
   place-items: center;
   padding: 0;
   border: 0;
-  color: var(--text-secondary);
+  color: var(--accent-strong);
   background: transparent;
   cursor: pointer;
 }
@@ -584,9 +586,9 @@ input:focus-visible {
 
 .navigation-action,
 .corner-action {
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-border);
   border-radius: var(--radius-control);
-  background: var(--surface);
+  background: var(--button-surface);
 }
 
 .mode-icon {
@@ -715,7 +717,7 @@ input:focus-visible {
 }
 
 .layer-item input:checked + .switch {
-  border-color: rgba(8, 127, 140, 0.5);
+  border-color: var(--accent-border);
   background: var(--accent-muted);
 }
 
@@ -801,7 +803,7 @@ input:focus-visible {
   transform-origin: right center;
 }
 .measurement-picker .corner-action { border-radius: var(--radius-control); background: transparent; box-shadow: none; }
-.measurement-picker [aria-pressed="true"] { background: rgba(0, 103, 118, 0.12); color: var(--accent-strong); }
+.measurement-picker [aria-pressed="true"] { background: var(--accent-muted); color: var(--accent-strong); }
 .measurement-unit-select {
   min-height: 2.25rem;
   max-width: 6.5rem;
@@ -885,8 +887,8 @@ input:focus-visible {
 }
 
 .measurement-actions [aria-pressed="true"] {
-  background: rgba(242, 142, 58, 0.16);
-  border-color: rgba(224, 123, 38, 0.5);
+  background: var(--accent-muted);
+  border-color: var(--accent-border);
 }
 
 .secondary-button,
@@ -903,9 +905,9 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  background: transparent;
+  border: 1px solid var(--accent-border);
+  color: var(--accent-strong);
+  background: var(--button-surface);
 }
 
 .primary-button {
@@ -976,7 +978,7 @@ input:focus-visible {
   padding: 0 0.65rem;
   border: 0;
   border-radius: var(--radius-control);
-  color: var(--text-secondary);
+  color: var(--accent-strong);
   font-size: 0.7rem;
   white-space: nowrap;
   background: transparent;
@@ -985,7 +987,7 @@ input:focus-visible {
 
 .time-range-popover button:hover,
 .time-range-popover button[aria-pressed="true"] {
-  color: var(--text);
+  color: var(--accent-strong);
   background: var(--accent-muted);
 }
 
@@ -1004,7 +1006,7 @@ input:focus-visible {
   padding: 0.35rem;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
-  color: var(--text-secondary);
+  color: var(--accent-strong);
   font-size: 0.68rem;
   background: transparent;
   cursor: pointer;
@@ -1012,8 +1014,8 @@ input:focus-visible {
 
 .basemap-picker button:hover:not(:disabled),
 .basemap-picker button[aria-pressed="true"] {
-  border-color: rgba(8, 127, 140, 0.38);
-  color: var(--text);
+  border-color: var(--accent-border);
+  color: var(--accent-strong);
   background: var(--accent-muted);
 }
 

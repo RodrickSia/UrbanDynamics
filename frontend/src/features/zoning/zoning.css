@@ -1,6 +1,6 @@
 .zoning-nav { position: absolute; z-index: 45; top: 5rem; left: 1rem; display: grid; overflow: hidden; border-radius: var(--radius-control); }
 .zoning-nav[data-search-open="true"] { top: calc(5.6rem + var(--search-panel-height)); }
-.zoning-nav-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; color: var(--text-secondary); background: transparent; cursor: pointer; }
+.zoning-nav-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; color: var(--accent-strong); background: transparent; cursor: pointer; }
 .zoning-nav-button + .zoning-nav-button { border-top: 1px solid var(--border); }
 .zoning-nav-button:hover:not(:disabled) { color: var(--accent); background: var(--accent-muted); }
 .zoning-nav-button[aria-pressed="true"], .zoning-scenario-tabs button[aria-pressed="true"] { color: var(--accent-strong); background: var(--accent-muted); }
@@ -19,10 +19,10 @@
 .zoning-ui input[type="range"] { padding: 0; accent-color: var(--accent); }
 .zoning-ui input[type="color"] { padding: .25rem; min-height: 2.55rem; }
 .zoning-ui textarea { resize: vertical; min-height: 4rem; }
-.zoning-ui button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: .5rem .7rem; background: var(--surface-raised); cursor: pointer; font: inherit; min-height: 2.25rem; }
+.zoning-ui button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: 1px solid var(--accent-border); border-radius: var(--radius-control); padding: .5rem .7rem; color: var(--accent-strong); background: var(--button-surface); cursor: pointer; font: inherit; min-height: 2.25rem; }
 .zoning-ui button:hover:not(:disabled) { background: var(--accent-muted); }
 .zoning-ui button:disabled, .zoning-nav-button:disabled { cursor: default; opacity: .45; }
-.zoning-ui .quiet-icon-button { padding: .25rem; min-width: 2rem; min-height: 2rem; border: 0; border-radius: var(--radius-control); background: transparent; }
+.zoning-ui .quiet-icon-button { padding: .25rem; min-width: 2rem; min-height: 2rem; border: 0; border-radius: var(--radius-control); color: var(--accent-strong); background: transparent; }
 .zoning-ui .zoning-primary { background: var(--accent-strong); color: white; border-color: var(--accent-strong); }
 .zoning-ui .zoning-primary:hover:not(:disabled) { background: var(--accent); }
 .zoning-ui select:focus-visible, .zoning-ui textarea:focus-visible, .zoning-ui summary:focus-visible { outline: .15rem solid var(--accent); outline-offset: .15rem; }
@@ -34,7 +34,7 @@
 .zoning-plan-list, .zoning-type-list, .zoning-findings { list-style: none; padding: 0; margin: .75rem 0; }
 .zoning-plan-list li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .zoning-plan-list li > button:first-child { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; background: transparent; padding: .85rem .5rem; }
-.zoning-ui .zoning-plan-delete { flex: 0 0 auto; width: 2.3rem; padding: .4rem; border: 0; background: transparent; color: var(--text-secondary); }
+.zoning-ui .zoning-plan-delete { flex: 0 0 auto; width: 2.3rem; padding: .4rem; border: 0; background: transparent; color: var(--warning); }
 .zoning-ui .zoning-plan-delete:hover:not(:disabled), .zoning-ui .zoning-delete-action:hover:not(:disabled) { color: var(--warning); }
 .zoning-ui .zoning-delete-action { width: 100%; margin-top: 1.5rem; color: var(--warning); border-color: var(--border); background: transparent; }
 .zoning-plan-list span { color: var(--text-secondary); }

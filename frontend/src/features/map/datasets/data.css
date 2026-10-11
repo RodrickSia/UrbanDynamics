@@ -71,11 +71,11 @@
 .dataset-status button,
 .dataset-date-actions button,
 .dataset-retry {
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--accent-border);
   border-radius: 0.5rem;
   padding: 0.35rem 0.65rem;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.3);
+  color: var(--accent-strong);
+  background: var(--button-surface);
   font: inherit;
   cursor: pointer;
 }
@@ -219,7 +219,7 @@
   height: 2rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  color: var(--text-secondary);
+  color: var(--accent-strong);
   background: rgba(255, 255, 255, 0.25);
 }
 .dataset-row-icon svg {

@@ -50,7 +50,7 @@
 .parcel-formula strong { color: var(--text); }
 .parcel-loading, .parcel-empty { padding: 32px 0; font-size: 13px; }
 .parcel-skeleton { display: block; height: 80px; background: var(--surface-soft); border-radius: var(--radius-control); margin-bottom: 15px; }
-.parcel-retry { display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-raised); cursor: pointer; }
+.parcel-retry { display: inline-flex; gap: 6px; align-items: center; padding: 8px 12px; border: 1px solid var(--accent-border); border-radius: var(--radius-control); color: var(--accent-strong); background: var(--button-surface); cursor: pointer; }
 .parcel-candidates { padding: 0; list-style: none; font-size: 12px; }
 .parcel-candidates li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; }
 @media (max-width: 480px) {
