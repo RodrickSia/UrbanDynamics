@@ -8,7 +8,7 @@
   color: var(--text);
   max-height: calc(100dvh - 9rem);
   overflow: auto;
-  border-radius: 20px;
+  border-radius: var(--radius-panel);
 }
 .maplibregl-canvas.is-viewshed-placing {
   cursor: crosshair;
@@ -81,7 +81,7 @@
   min-width: 0;
   width: 100%;
   border: 1px solid #607c8038;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 0.5rem;
   background: #ffffff65;
   color: inherit;
