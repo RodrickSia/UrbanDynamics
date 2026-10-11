@@ -181,7 +181,7 @@ input:focus-visible {
   top: calc(100% + 0.6rem);
   left: 0;
   width: 100%;
-  max-height: min(34rem, calc(100vh - 6rem));
+  max-height: min(34rem, calc(100dvh - 13rem));
   overflow: auto;
   padding: 0.5rem;
   border-radius: 1rem;

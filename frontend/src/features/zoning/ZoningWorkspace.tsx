@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, ChartPie, Clapperboard, Copy, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, UnlockKeyhole, X } from 'lucide-react';
 import { MotionIconButton } from '../map/components/MotionIconButton';
 import { gsap, motionDuration, useGSAP } from '../map/motion';
@@ -10,8 +10,8 @@ import { ZoningToolbar } from './ZoningToolbar';
 import type { ZoningWorkspace as Workspace } from './useZoning';
 import './zoning.css';
 
-export function ZoningWorkspace({ workspace: w, onActivate, hidden }: {
-  workspace: Workspace; onActivate: () => void; hidden: boolean;
+export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPanelHeight }: {
+  workspace: Workspace; onActivate: () => void; searchOpen: boolean; searchPanelHeight: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [dialog, setDialog] = useState<'add_scenario' | 'rename_scenario' | 'delete_scenario' | 'rename_plan' | null>(null);
@@ -21,12 +21,13 @@ export function ZoningWorkspace({ workspace: w, onActivate, hidden }: {
     if (!w.panel) return;
     gsap.fromTo('.zoning-panel', { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: motionDuration(.25), ease: 'power2.out', clearProps: 'transform,opacity' });
   }, { scope: ref, dependencies: [w.panel], revertOnUpdate: true });
-  return <div ref={ref} className="zoning-workspace" hidden={hidden}>
-    <nav className="zoning-nav glass-surface" aria-label="Planning workspace">
-      <MotionIconButton className="zoning-nav-button" title="Plans" aria-label="Plans" aria-pressed={w.panel === 'plans'} disabled={w.busy} onClick={() => { if (w.panel === 'plans') w.close(); else { onActivate(); setCollapsed(false); w.setPanel('plans'); } }}><Clapperboard size={23}/></MotionIconButton>
-      <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { onActivate(); setCollapsed(false); w.setPanel('indicators'); } }}><ChartPie size={23}/></MotionIconButton>
+  return <div ref={ref} className="zoning-workspace">
+    <nav className="zoning-nav glass-surface" aria-label="Planning workspace"
+      data-search-open={searchOpen} style={{ '--search-panel-height': `${searchPanelHeight}px` } as CSSProperties}>
+      <MotionIconButton className="zoning-nav-button" title="Plans" aria-label="Plans" aria-pressed={w.panel === 'plans'} disabled={w.busy} onClick={() => { if (w.panel === 'plans') w.close(); else { onActivate(); setCollapsed(false); w.setPanel('plans'); } }}><Clapperboard aria-hidden="true" size={19}/></MotionIconButton>
+      <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { onActivate(); setCollapsed(false); w.setPanel('indicators'); } }}><ChartPie aria-hidden="true" size={19}/></MotionIconButton>
     </nav>
-    {w.panel && <>
+    {w.panel && !searchOpen && <>
       {collapsed && <button className="zoning-expand glass-surface" aria-label="Expand zoning panel" onClick={() => setCollapsed(false)}><PanelLeftOpen size={20}/></button>}
       <aside hidden={collapsed} className="zoning-panel glass-panel zoning-ui" aria-label={w.panel === 'plans' ? 'Plans panel' : 'Indicators panel'}>
         <header>{w.plan && <button className="quiet-icon-button" aria-label="Back to plans" disabled={w.busy} onClick={() => { w.back(); w.setPanel('plans'); }}><ArrowLeft size={18}/></button>}
