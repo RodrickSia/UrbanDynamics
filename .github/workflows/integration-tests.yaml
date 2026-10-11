@@ -30,7 +30,7 @@ jobs:
         run: docker compose exec -T postgis /usr/local/bin/migrate-warehouse
       - name: Run ETL and API tests over the Compose network
         run: docker compose --profile checks run --rm khoi-checks
-      - name: Verify main migration ledger includes vector-layer migration
+      - name: Verify shared schema migrations
         run: |
           docker compose exec -T postgis psql --username ci --dbname urbandynamics_ci --set ON_ERROR_STOP=1 <<'SQL'
           DO $$
@@ -43,6 +43,12 @@ jobs:
             END IF;
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '02-population-raster.sql') <> 1 THEN
               RAISE EXCEPTION 'population migration was not recorded exactly once';
+            END IF;
+            IF to_regclass('buildings.footprint') IS NULL OR to_regclass('buildings.snapshot_metadata') IS NULL THEN
+              RAISE EXCEPTION 'buildings footprint tables are missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql') <> 1 THEN
+              RAISE EXCEPTION 'buildings footprint migration was not recorded exactly once';
             END IF;
           END
           $$;
