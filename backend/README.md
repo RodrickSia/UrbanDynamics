@@ -34,13 +34,22 @@ with depth and source attributes; satellite polygons mean positive flood
 pixels, not verified dry areas; flood risk polygons are heuristic rain
 indicators around historical events, not simulated flood extent or depth.
 Land-price GeoJSON and vector tiles come from the same PostGIS snapshot. The
-land-price layer currently contains official 2026 An Khánh ward reference
+original land-price demo contained official 2026 An Khánh ward reference
 prices matched by normalized road name to OpenStreetMap road geometry.
-Coverage is partial; automatic matches use whole named-road geometry and are
-not clipped to the annex's intersection-to-intersection price segments. These
+Actual coverage depends on the loaded ETL snapshot. Coverage can be partial;
+legacy name-only matches use whole named-road geometry and are not clipped to
+the annex's intersection-to-intersection price segments. These
 are statutory reference prices, not transaction or asking prices. Feature
 properties include the source URL, effective date, unit, matching mode,
 geometry coverage, and annex page where available.
+
+Parcel details can return a `provisional` road-price association up to 40 m
+from the parcel when the published road segment is unique and spatially checked.
+For source land-use code `L`, explicit apartment-planning metadata can supply
+the Residential category with `classification_basis: planning` and low
+confidence. Provisional associations expose only the reference unit price;
+`estimated_land_total_vnd` remains null. Missing or ambiguous road prices also
+remain null.
 
 Population values are persons per source raster cell. The service does not
 claim population density per square kilometer. The source rasters are stored

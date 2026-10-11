@@ -99,6 +99,47 @@ def test_same_road_different_segment_prices_remain_ambiguous():
     assert result['status'] == 'ambiguous'
 
 
+@pytest.mark.parametrize('road_distance_m', [5, 26])
+def test_apartment_planning_gives_l_plot_only_a_low_confidence_unit_reference(road_distance_m):
+    parcel = {'uniq_id': 'known', 'mdsdd': 'L', 'area_m2': 5893.07,
+              'loai_dat_qh': 'Đất chung cư phức hợp: 5874.19 m2; Đất giao thông: 25.01 m2'}
+    result = parcels.price_reference(parcel, [{**road(), 'distance_m': road_distance_m}])
+    assert result['status'] == 'provisional'
+    assert result['price_category'] == 'Residential'
+    assert result['classification_basis'] == 'planning'
+    assert result['classification_confidence'] == 'low'
+    assert result['valuation_confidence'] == 'low'
+    assert result['unit_price_vnd_m2'] == 10_000_000
+    assert result['estimated_land_total_vnd'] is None
+    assert parcels.price_reference(parcel, [])['unit_price_vnd_m2'] is None
+    assert parcels.price_reference({**parcel, 'conflicting_land_use': True}, [road()])['unit_price_vnd_m2'] is None
+
+
+def test_l_plot_without_clear_apartment_planning_keeps_null_price():
+    for planning in (None, 'Đất giao thông: 25.01 m2', 'Đất chung cư phức hợp',
+                     'Đất chung cư phức hợp: 5874.19 m2; Đất thương mại: 100 m2'):
+        result = parcels.price_reference({'mdsdd': 'L', 'area_m2': 5893.07,
+                                          'loai_dat_qh': planning}, [road()])
+        assert result['unit_price_vnd_m2'] is None
+        assert result['estimated_land_total_vnd'] is None
+
+
+def test_opposite_side_road_price_is_provisional_only_when_unique_and_checked():
+    parcel = {'uniq_id': 'known', 'mdsdd': 'ODT', 'area_m2': 100}
+    result = parcels.price_reference(parcel, [{**road(), 'distance_m': 28}])
+    assert result['status'] == 'provisional'
+    assert result['unit_price_vnd_m2'] == 10_000_000
+    assert result['estimated_land_total_vnd'] is None
+    assert result['valuation_confidence'] == 'low'
+    ambiguous = parcels.price_reference(parcel, [
+        {**road(), 'distance_m': 28},
+        {**road(road='Another road'), 'feature_id': 'road-2', 'distance_m': 32},
+    ])
+    assert ambiguous['status'] == 'ambiguous'
+    assert ambiguous['unit_price_vnd_m2'] is None
+    assert parcels.price_reference(parcel, [{**road(), 'distance_m': 41}])['unit_price_vnd_m2'] is None
+
+
 def test_planning_breakdown_keeps_source_areas_without_fabricating_percentages():
     rows = parcels.planning_breakdown('Đất ở: 180.9 m2; Đất giao thông: 10.8 m2; Unknown')
     assert rows == [{'label': 'Đất ở', 'area_m2': 180.9}, {'label': 'Đất giao thông', 'area_m2': 10.8}]
