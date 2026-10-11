@@ -39,7 +39,12 @@ def run(settings: BuildingsFootprintConfig = config, refresh: bool = False) -> P
         north,
     )
 
-    connection = duckdb.connect()
+    connection = duckdb.connect(
+        config={
+            "threads": str(settings.duckdb_threads),
+            "memory_limit": settings.duckdb_memory_limit,
+        }
+    )
     try:
         connection.execute("LOAD httpfs")
         connection.execute("LOAD spatial")

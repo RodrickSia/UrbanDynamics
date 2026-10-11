@@ -30,6 +30,8 @@ class BuildingsFootprintConfig(BaseModel):
     )
     bbox: tuple[float, float, float, float] = (106.327727, 8.631498, 107.56973, 11.502677)
     batch_size: int = Field(default=5000, ge=100, le=50000)
+    duckdb_threads: int = Field(default=4, ge=1, le=32)
+    duckdb_memory_limit: str = "3GB"
     database_schema: str = "buildings"
     footprint_table: str = "footprint"
     metadata_table: str = "snapshot_metadata"

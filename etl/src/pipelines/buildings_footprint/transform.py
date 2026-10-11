@@ -51,7 +51,12 @@ def run(
     boundary = _boundary_wkt(settings.boundary_path)
     logger.info("Clipping Overture candidates to the expanded HCMC boundary")
 
-    connection = duckdb.connect()
+    connection = duckdb.connect(
+        config={
+            "threads": str(settings.duckdb_threads),
+            "memory_limit": settings.duckdb_memory_limit,
+        }
+    )
     try:
         connection.execute("LOAD spatial")
         connection.execute("SET enable_geoparquet_conversion = true")
