@@ -8,14 +8,14 @@ jobs:
   deployment-environment:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test deployment environment generation
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
   compose-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Test deployment environment generation
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Build service images
@@ -34,7 +34,7 @@ jobs:
   database:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build PostGIS image
         run: docker build --tag urbandynamics-postgis-ci --file infra/warehouse/Dockerfile infra/warehouse
       - name: Start a fresh database
@@ -93,7 +93,7 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
         with:
           version: 0.12.6
@@ -106,7 +106,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build frontend image
         run: docker build --tag urbandynamics-frontend:ci ./frontend
       - name: Verify frontend image contains the built application
