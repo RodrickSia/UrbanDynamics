@@ -26,7 +26,7 @@ export function PlansPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
       <footer><button type="button" onClick={w.cancel} disabled={w.busy}>Cancel</button><button className="zoning-primary" disabled={w.busy || !sketchGeometry(w.sketch)}>Create plan</button></footer>
     </form> : <>
       <button className="zoning-primary zoning-wide" disabled={w.busy} onClick={() => {
-        w.begin('study'); w.zoomTo({ type: 'Polygon', coordinates: [[[106.735, 10.80], [106.79, 10.80], [106.79, 10.855], [106.735, 10.855], [106.735, 10.80]]] });
+        w.begin('study'); w.zoomTo({ type: 'Polygon', coordinates: [[[106.755, 10.817], [106.770, 10.817], [106.770, 10.832], [106.755, 10.832], [106.755, 10.817]]] });
       }}><Plus size={17}/>New plan</button>
       {w.loading && <p role="status">Loading plans…</p>}
       {!w.loading && !w.plans.length && <div className="zoning-empty"><h3>A place for your next proposal</h3><p>Draw a study area, define zoning rules, and explore alternative scenarios.</p></div>}

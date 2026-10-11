@@ -170,7 +170,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
   }, [map, bridge.active]);
 
   useEffect(() => {
-    if (!map || !bridge.active || !bridge.parcelAvailable) return;
+    if (!map || !bridge.active || !bridge.parcelAvailable || (!bridge.plan && bridge.sketch.tool !== 'study')) return;
     const attach = () => {
       if (!map.getSource(PARCEL_SOURCE)) map.addSource(PARCEL_SOURCE, { type: 'vector', tiles: [parcelTiles],
         minzoom: PARCEL_MIN_ZOOM, maxzoom: PARCEL_MAX_NATIVE_ZOOM });
@@ -179,12 +179,14 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     };
     if (map.isStyleLoaded()) attach();
     map.on('style.load', attach);
+    map.on('idle', attach);
     return () => {
       map.off('style.load', attach);
+      map.off('idle', attach);
       if (map.getLayer(PARCEL_LINE)) map.removeLayer(PARCEL_LINE);
       if (map.getSource(PARCEL_SOURCE)) map.removeSource(PARCEL_SOURCE);
     };
-  }, [map, bridge.active, bridge.parcelAvailable, parcelTiles]);
+  }, [map, bridge.active, bridge.parcelAvailable, bridge.plan, bridge.sketch.tool, parcelTiles]);
 
   useEffect(() => {
     if (!map) return;
@@ -204,7 +206,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
     const width = map.getContainer().clientWidth;
     map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], {
-      padding: width > 900 ? { left: 410, right: 100, top: 140, bottom: 300 } : 80,
+      padding: width > 900 ? { left: 100, right: 410, top: 140, bottom: 300 } : 80,
       maxZoom: 18, duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600,
     });
   }, [map, bridge.focus]);

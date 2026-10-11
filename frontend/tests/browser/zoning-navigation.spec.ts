@@ -60,9 +60,74 @@ test('planning buttons match map controls and slide below expanded search', asyn
   await expect(planPanel).toBeVisible();
   await expect.poll(async () => {
     const panelBox = await planPanel.boundingBox();
-    return !!panelBox && panelBox.x === 0 && panelBox.y === 0 && panelBox.height >= 899;
+    return !!panelBox && panelBox.x + panelBox.width === 320 && panelBox.y === 0 && panelBox.height >= 899;
   }).toBe(true);
+  await expect(page.getByRole('button', { name: 'Collapse zoning panel' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/zoning-panel-right-320.png' });
   expect(errors).toEqual([]);
+});
+
+test('study-area outlines appear, follow the toggle, and disappear when the active plan is deleted', async ({ page }) => {
+  const studyArea = { type: 'Polygon', coordinates: [[[106.76, 10.82], [106.764, 10.82],
+    [106.764, 10.824], [106.76, 10.824], [106.76, 10.82]]] };
+  const plan = { id: 'fixture-plan', name: 'Fixture plan', revision: 1, area_m2: 1000,
+    study_area: studyArea, description: '', horizon: null, status: 'draft', updated_at: new Date().toISOString(),
+    baseline: { version: 'fixture', captured_at: new Date().toISOString(), status: 'ready', source: 'Fixture' },
+    types: [], scenarios: [{ id: 'existing', name: 'Existing', kind: 'reference', locked: true, zones: [] },
+      { id: 'proposal', name: 'Scenario A', kind: 'proposal', locked: false, zones: [] }] };
+  let deleted = false;
+  await page.route('https://tiles.goong.io/**', route => route.fulfill({ json: {
+    version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#cbdcd7' } }],
+  } }));
+  await page.route('**/api/v1/layers', route => route.fulfill({ json: { layers: [{ id: 'parcels', available: true }] } }));
+  await page.route('**/parcels/tiles/**', route => route.fulfill({ status: 204 }));
+  await page.route('**/api/v1/zoning/plans**', route => {
+    if (route.request().method() === 'DELETE') { deleted = true; return route.fulfill({ status: 204 }); }
+    if (route.request().url().endsWith('/fixture-plan')) return route.fulfill({ json: plan });
+    return route.fulfill({ json: { plans: deleted ? [] : [plan] } });
+  });
+  await page.goto('/tests/browser/data-layers.html');
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await page.getByRole('button', { name: 'New plan', exact: true }).click();
+  const outlines = page.getByRole('checkbox', { name: 'Show parcel outlines', exact: true });
+  await expect(outlines).toBeChecked();
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline') && window.dataMap.getZoom() >= 12);
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-plan-parcels-outline', 'line-opacity'))).toBe(.9);
+  await page.evaluate(() => window.dataMap.setStyle({ version: 8, sources: {},
+    layers: [{ id: 'replacement', type: 'background', paint: { 'background-color': '#d5e4df' } }] }));
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
+  await outlines.uncheck();
+  await expect.poll(() => page.evaluate(() => window.dataMap.getPaintProperty('zoning-plan-parcels-outline', 'line-opacity'))).toBe(0);
+  await outlines.check();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline'));
+  await page.locator('.zoning-plan-list li > button:first-child').click();
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
+  const scenarioBox = await page.locator('.zoning-scenario-bar').boundingBox();
+  const navigationBox = await page.locator('.navigation-cluster').boundingBox();
+  expect(scenarioBox!.x + scenarioBox!.width).toBeLessThanOrEqual(navigationBox!.x);
+  await page.screenshot({ path: 'test-results/zoning-panel-right-desktop.png' });
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.screenshot({ path: 'test-results/zoning-panel-right-plan-320.png' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.getByRole('button', { name: 'Add zoning type' }).click();
+  const editor = page.getByRole('dialog', { name: 'New zoning type' });
+  await editor.getByLabel('Code', { exact: true }).click();
+  const catalog = editor.getByRole('region', { name: 'Zoning code catalog' });
+  await expect(catalog.getByRole('button', { name: /^RES Residential/ })).toBeVisible();
+  await catalog.getByRole('button', { name: /^RES Residential/ }).click();
+  await expect(editor.getByLabel('Code', { exact: true })).toHaveValue('RES');
+  await expect(editor.getByLabel('Name', { exact: true })).toHaveValue('Residential / Khu ở');
+  await editor.getByLabel('Code', { exact: true }).fill('ODT');
+  await catalog.getByRole('button', { name: /^ODT Đất ở tại đô thị/ }).click();
+  await expect(editor.getByLabel('Description')).toContainText('Đất dùng làm nhà ở');
+  await expect(editor.getByLabel('Source / design basis')).toContainText('draft zoning type');
+  await editor.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Delete plan', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+  await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline') && !window.dataMap.getSource('zoning-plan-parcels'));
+  expect(deleted).toBe(true);
 });
 
 test('study-area drawing snaps to a visible road and Ctrl temporarily disables it', async ({ page }) => {

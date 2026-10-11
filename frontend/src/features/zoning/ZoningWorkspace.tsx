@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { ArrowLeft, ChartPie, Clapperboard, Copy, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, UnlockKeyhole, X } from 'lucide-react';
+import { ArrowLeft, ChartPie, Clapperboard, Copy, LockKeyhole, MoreHorizontal, Plus, UnlockKeyhole, X } from 'lucide-react';
 import { MotionIconButton } from '../map/components/MotionIconButton';
 import { gsap, motionDuration, useGSAP } from '../map/motion';
 import { ActionDialog } from './Dialog';
@@ -16,23 +16,20 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
   const ref = useRef<HTMLDivElement>(null);
   const [dialog, setDialog] = useState<'add_scenario' | 'rename_scenario' | 'delete_scenario' | 'rename_plan' | null>(null);
   const [menu, setMenu] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
   useGSAP(() => {
     if (!w.panel) return;
-    gsap.fromTo('.zoning-panel', { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: motionDuration(.25), ease: 'power2.out', clearProps: 'transform,opacity' });
+    gsap.fromTo('.zoning-panel', { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: motionDuration(.32), ease: 'power3.out', clearProps: 'transform,opacity' });
   }, { scope: ref, dependencies: [w.panel], revertOnUpdate: true });
   return <div ref={ref} className="zoning-workspace">
     <nav className="zoning-nav glass-surface" aria-label="Planning workspace"
       data-search-open={searchOpen} style={{ '--search-panel-height': `${searchPanelHeight}px` } as CSSProperties}>
-      <MotionIconButton className="zoning-nav-button" title="Plans" aria-label="Plans" aria-pressed={w.panel === 'plans'} disabled={w.busy} onClick={() => { if (w.panel === 'plans') w.close(); else { onActivate(); setCollapsed(false); w.setPanel('plans'); } }}><Clapperboard aria-hidden="true" size={19}/></MotionIconButton>
-      <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { onActivate(); setCollapsed(false); w.setPanel('indicators'); } }}><ChartPie aria-hidden="true" size={19}/></MotionIconButton>
+      <MotionIconButton className="zoning-nav-button" title="Plans" aria-label="Plans" aria-pressed={w.panel === 'plans'} disabled={w.busy} onClick={() => { if (w.panel === 'plans') w.close(); else { onActivate(); w.setPanel('plans'); } }}><Clapperboard aria-hidden="true" size={19}/></MotionIconButton>
+      <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { onActivate(); w.setPanel('indicators'); } }}><ChartPie aria-hidden="true" size={19}/></MotionIconButton>
     </nav>
     {w.panel && !searchOpen && <>
-      {collapsed && <button className="zoning-expand glass-surface" aria-label="Expand zoning panel" onClick={() => setCollapsed(false)}><PanelLeftOpen size={20}/></button>}
-      <aside hidden={collapsed} className="zoning-panel glass-panel zoning-ui" aria-label={w.panel === 'plans' ? 'Plans panel' : 'Indicators panel'}>
+      <aside className="zoning-panel glass-panel zoning-ui" data-has-plan={!!w.plan} aria-label={w.panel === 'plans' ? 'Plans panel' : 'Indicators panel'}>
         <header>{w.plan && <button className="quiet-icon-button" aria-label="Back to plans" disabled={w.busy} onClick={() => { w.back(); w.setPanel('plans'); }}><ArrowLeft size={18}/></button>}
           <div><span className="eyebrow">{w.panel === 'plans' ? 'Plans' : 'Indicators'}</span><h2>{w.plan?.name ?? 'Zoning workspace'}</h2></div>
-          <button className="quiet-icon-button" aria-label="Collapse zoning panel" title="Collapse panel to draw on the map" onClick={() => setCollapsed(true)}><PanelLeftClose size={18}/></button>
           <button className="quiet-icon-button" aria-label="Close zoning workspace" disabled={w.busy} onClick={w.close}><X size={18}/></button>
         </header>
         {w.error && <div className="zoning-error" role="alert"><p>{w.error}</p>{w.plan && <button disabled={w.busy} onClick={() => void w.openPlan(w.plan!.id)}>Reload saved plan</button>}</div>}
