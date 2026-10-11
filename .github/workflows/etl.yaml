@@ -18,6 +18,7 @@ on:
           - land_price
           - parcels_hcmc
           - buildings_footprint
+          - buildings_footprint_gba
       stage:
         description: ETL stage to run
         type: choice
@@ -96,8 +97,20 @@ jobs:
               echo "::error::The buildings-footprint migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
               exit 1
             fi
-          elif [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; then
-            echo "::error::The transform and load stages are currently supported only for parcels_hcmc and buildings_footprint." >&2
+          fi
+          if [ "$ETL_PIPELINE" = buildings_footprint_gba ] || [ "$ETL_PIPELINE" = all ]; then
+            gba_migration_query="to_regclass('buildings.gba_lod1') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$gba_migration_query" | grep -Fxq t; then
+              echo "::error::The GBA buildings migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          fi
+          if [ "$ETL_PIPELINE" != parcels_hcmc ] && [ "$ETL_PIPELINE" != buildings_footprint ] && \
+             [ "$ETL_PIPELINE" != buildings_footprint_gba ] && [ "$ETL_PIPELINE" != all ] && \
+             { [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; }; then
+            echo "::error::The transform and load stages are currently supported only for parcels_hcmc and building-footprint pipelines." >&2
             exit 1
           fi
 
@@ -169,6 +182,15 @@ jobs:
             docker compose --profile "$service" run --rm "$service" run --stage all "${arguments[@]}"
           }
 
+          require_gba_disk_space() {
+            mkdir -p etl/data
+            available_kib=$(df -Pk etl/data | awk 'NR==2 {print $4}')
+            if [ "$available_kib" -lt 20000000 ]; then
+              echo "::error::GBA LoD1 needs about 14 GiB of source data plus transform/load space; only $((available_kib / 1024)) MiB is available." >&2
+              exit 1
+            fi
+          }
+
           if [ "$ETL_PIPELINE" = all ]; then
             if [ "$ETL_STAGE" != all ]; then
               echo "::error::The all pipeline selection runs the complete ETL only; select stage all." >&2
@@ -186,7 +208,7 @@ jobs:
               echo "::warning::Could not prepare automatic land-price road matches; land_price will be skipped."
             fi
             skipped=()
-            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price buildings_footprint; do
+            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price buildings_footprint buildings_footprint_gba; do
               if [ "$pipeline" = flood_risk ] && [ "$rainfall_ready" != true ]; then
                 echo "::warning::Skipping flood_risk: forecast/history inputs could not be prepared."
                 skipped+=(flood_risk)
@@ -196,6 +218,9 @@ jobs:
                 echo "::warning::Skipping land_price: automatic OSM road matches are not available."
                 skipped+=(land_price)
                 continue
+              fi
+              if [ "$pipeline" = buildings_footprint_gba ]; then
+                require_gba_disk_space
               fi
               run_pipeline "$pipeline"
             done
@@ -207,6 +232,9 @@ jobs:
             docker compose --profile etl-rainwater build etl-rainwater
             docker compose --profile etl-rainwater run --rm etl-rainwater --once --jobs forecast history
           else
+            if [ "$ETL_PIPELINE" = buildings_footprint_gba ]; then
+              require_gba_disk_space
+            fi
             service="etl-${ETL_PIPELINE//_/-}"
             docker compose --profile "$service" build "$service"
             case "$ETL_PIPELINE" in

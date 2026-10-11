@@ -41,7 +41,7 @@ The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
 stage choices for most pipelines, plus `transform` / `load` for parcels and
 building footprints. Its **all** choice runs eligible full pipelines
 sequentially in this order: population, flood history, flood satellite, flood
-risk, land price, and HCMC building footprints. If rainfall inputs are missing,
+risk, land price, HCMC Overture footprints, and HCMC GBA LoD1 buildings. If rainfall inputs are missing,
 it downloads forecast/history from Open-Meteo. Land-price source rows and OSM
 road candidates are prepared automatically. Selecting all pipelines requires
 stage `all`. Parcel and buildings-footprint ETL support separate
@@ -60,6 +60,32 @@ cached under `etl/data/buildings_footprint/`; use `--refresh` to fetch the
 pinned release again. Extraction and transformation can also run separately
 with `--stage extract` and `--stage transform`; `--stage load` loads normalized
 Parquet without contacting Overture.
+
+Fetch the GlobalBuildingAtlas LoD1 models for HCMC independently:
+
+```sh
+docker compose --profile etl-buildings-footprint-gba run --rm etl-buildings-footprint-gba run --stage all
+```
+
+This uses the pinned `GBA.LoD1` HCMC tile (`asiawest/e105_n15_e110_n10`),
+joins the published height and variance estimates to its building polygons,
+transforms the tile from EPSG:3857, and clips it to the same expanded HCMC
+boundary used by the Overture pipeline. The source files are large (about
+14.6 GB combined); downloads resume from partial files and are cached under
+`etl/data/buildings_footprint_gba/`. Use `--refresh` to fetch the pinned files
+again. The stages can be run separately: `extract` downloads, `transform`
+clips and joins heights, and `load` publishes the saved GeoJSON to PostGIS.
+The `all` ETL workflow includes this pipeline, so selecting `all` also fetches
+the large GBA tile.
+
+GBA records are stored separately in `buildings.gba_lod1`; they never replace
+the Overture snapshot in `buildings.footprint`. Height estimates and their
+variance are approximate model outputs, not surveyed measurements. The
+`GBA.LoD1` data is distributed under CC BY-NC 4.0, which restricts commercial
+use. The `05-buildings-gba-lod1.sql` and
+`06-buildings-gba-feature-id.sql` migrations create and key its table;
+apply migrations through the protected database deployment workflow before
+running this pipeline.
 
 ## Warehouse and data
 
