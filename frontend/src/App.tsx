@@ -20,7 +20,7 @@ export default function App() {
   );
   const workspace = useMapWorkspace();
   const backend = useBackendLayers(workspace.layers);
-  const zoning = useZoning();
+  const zoning = useZoning(backend.catalog.parcels?.available === true);
   const [searchPanelHeight, setSearchPanelHeight] = useState(0);
   const activateZoning = () => {
     workspace.cancelMeasurement();
@@ -42,7 +42,8 @@ export default function App() {
         <UrbanMap
           zoning={{ active: zoning.active, plan: zoning.plan, scenario: zoning.scenario,
             selected: zoning.selected, sketch: zoning.sketch, preview: zoning.preview,
-            opacity: zoning.opacity, visible: zoning.visible, busy: zoning.busy,
+            opacity: zoning.opacity, visible: zoning.visible, showParcels: zoning.showParcels,
+            parcelAvailable: zoning.parcelAvailable, busy: zoning.busy,
             onPick: zoning.pick, onSketch: zoning.setSketch, onFinish: () => void zoning.finish(),
             onCancel: zoning.cancel, focus: zoning.focus }}
           backend={{selections:backend.selections,opacity:workspace.opacityByLayer,revision:backend.revision,report:backend.report}}

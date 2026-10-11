@@ -272,7 +272,8 @@ export function UrbanMap(props: UrbanMapProps) {
     <>
       <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />
       {props.backend && <BackendDataScene map={mapRef.current} bridge={{ ...props.backend,
-        selections: props.backend.selections.filter(selection => selection.id !== 'land-price') }}
+        selections: props.backend.selections.filter(selection => selection.id !== 'land-price' &&
+          !(props.zoning?.active && selection.id === 'parcels')) }}
         interactive={!props.zoning?.active && measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
       {props.zoning && <ZoningScene map={mapRef.current} bridge={props.zoning}/>}
       {props.zoning && <ZoningLabels map={mapRef.current} bridge={props.zoning}/>}

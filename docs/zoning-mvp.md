@@ -3,6 +3,9 @@
 Implements the supplied [business specification](zoning-business-specification.md)'s 2D MVP.
 Plans and Indicators are icon buttons below search; scenario tabs use the existing
 glass surface, teal tokens and reduced-motion-aware animation. No Projects entry.
+The Plans workspace opens as a full-height left sidebar. Saved plans can be deleted
+after confirmation; deletion requires the current revision and removes the whole
+plan document, including scenarios.
 
 ## Delivery and contract
 
@@ -20,6 +23,19 @@ accepts small HCMC-area studies (10 m²–25 km²), at most 500 zones and 2,000 
 per input geometry. No automatic conversion from parcel use or prices into zoning.
 Reference geometry is empty until an authoritative import workflow exists; its
 snapshot records that explicitly. Proposed numeric controls never imply approval.
+During study-area and zoning drawing, vertices and edges snap within 10 screen pixels
+to visible parcel outlines, zoning geometry, and road/water vector features exposed
+by the active basemap. Holding Ctrl temporarily disables snapping. Road polygons
+are used only when supplied by a vector layer; the repository does not contain an
+authoritative right-of-way polygon dataset. Satellite imagery alone supplies no
+road or water vectors.
+
+The optional Show parcel outlines control draws no parcel fill or parcel detail UI.
+After a plan is created, `/api/v1/zoning/plans/{id}/parcels/tiles/{z}/{x}/{y}.pbf`
+clips parcel geometry against its saved study area in PostGIS before vector-tile
+encoding. Outside parcels and ordinary parcel overlays are hidden in the zoning
+workspace. Plan parcel tiles require the parcel warehouse; local SQLite-only
+development shows no parcel outlines.
 
 Production storage uses the existing PostgreSQL connection and a separate JSONB
 plan table. Local development uses transactional SQLite under DATA_DIR (or

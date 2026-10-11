@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { zoningRequest } from './api';
+import { deleteZoningPlan, zoningRequest } from './api';
 import { sketchGeometry } from './geometry';
 import type { Command, Plan, PlanSummary, PolygonGeometry, Preview, Sketch, Tool } from './types';
 
 const EMPTY_SKETCH: Sketch = { tool: null, points: [], geometry: null };
 
-export function useZoning() {
+export function useZoning(parcelAvailable = false) {
   const [panel, setPanel] = useState<'plans' | 'indicators' | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -17,6 +17,7 @@ export function useZoning() {
   const [policy, setPolicyState] = useState<'preserve' | 'replace'>('preserve');
   const [opacity, setOpacity] = useState(.35);
   const [visible, setVisible] = useState(true);
+  const [showParcels, setShowParcels] = useState(true);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -77,6 +78,14 @@ export function useZoning() {
     const next = await run(() => zoningRequest<Plan>('', { name, description, horizon, study_area: geometry }));
     if (next) { setPlan(next); setScenarioId(next.scenarios[1].id); cancel(); zoomTo(next.study_area); void refresh(); }
   };
+  const deletePlan = async (id: string, revision: number) => {
+    const result = await run(() => deleteZoningPlan(id, revision).then(() => true));
+    if (result) {
+      if (plan?.id === id) { setPlan(null); setScenarioId(null); setSelected([]); cancel(); }
+      setPlans(current => current.filter(item => item.id !== id));
+    }
+    return result;
+  };
   const buildCommand = (): Command | null => {
     const geometry = sketchGeometry(sketch);
     if (!plan || !scenario || !geometry) { setError('Add enough points to complete the shape'); return null; }
@@ -117,7 +126,7 @@ export function useZoning() {
   const close = () => { if (!busy) { setPanel(null); cancel(); } };
   return { panel, setPanel, active, close, plan, plans, scenario, chosenType, typeId, setTypeId, selected, pick,
     sketch, setSketch, begin, cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
-    visible, setVisible, busy, loading, error, setError, focus, zoomTo, openPlan, execute, create, refresh, selectScenario,
+    visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,
     back: () => { setPlan(null); setSelected([]); cancel(); void refresh(); },
   };
 }

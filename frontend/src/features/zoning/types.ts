@@ -47,7 +47,8 @@ export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | null;
 export interface Sketch { tool: Tool; points: Position[]; geometry: SketchGeometry | null }
 export interface ZoningBridge {
   active: boolean; plan: Plan | null; scenario: Scenario | null; selected: string[];
-  sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; busy: boolean;
+  sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; showParcels: boolean;
+  parcelAvailable: boolean; busy: boolean;
   onPick: (id: string | null, multiple: boolean) => void;
   onSketch: (sketch: Sketch) => void;
   onFinish: () => void; onCancel: () => void;

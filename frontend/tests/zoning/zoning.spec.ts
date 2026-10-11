@@ -13,7 +13,8 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.route('https://satellite.goong.io/**', route => route.fulfill({ contentType: 'image/png',
     body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK1cAAAAASUVORK5CYII=', 'base64') }));
   // Only unrelated dataset discovery is stubbed. Every plan command reaches FastAPI.
-  await page.route('**/api/v1/layers', route => route.fulfill({ json: { layers: [] } }));
+  await page.route('**/api/v1/layers', route => route.fulfill({ json: { layers: [{ id: 'parcels', available: true }] } }));
+  await page.route('**/parcels/tiles/**', route => route.fulfill({ status: 204 }));
   await page.goto('/tests/browser/data-layers.html');
   await page.waitForFunction('window.dataMap?.isStyleLoaded()');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
@@ -24,6 +25,12 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   for (const p of [[106.76, 10.82], [106.764, 10.82], [106.764, 10.824], [106.76, 10.824]]) await mapClick(page, p);
   await page.getByRole('button', { name: 'Create plan', exact: true }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
+  expect(await page.evaluate(() => {
+    const map = window.dataMap;
+    return { fill: !!map.getLayer('zoning-plan-parcels-fill'), ordinary: !!map.getLayer('dataset-parcels'),
+      tiles: (map.getSource('zoning-plan-parcels') as { serialize: () => { tiles: string[] } }).serialize().tiles };
+  })).toMatchObject({ fill: false, ordinary: false, tiles: [expect.stringContaining('/parcels/tiles/')] });
   await page.getByRole('button', { name: 'Add zoning type' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Code', { exact: true }).fill('MU');
@@ -63,7 +70,7 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.screenshot({ path: 'test-results/zoning-indicators-desktop.png' });
   await page.reload();
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.getByRole('button', { name: new RegExp(name) }).click();
+  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
   await expect(page.getByRole('button', { name: 'Phase 1', exact: true })).toBeVisible();
   await expect(page.getByText('Saved · revision 5', { exact: true })).toBeVisible();
   await page.waitForFunction('window.dataMap.getLayer("zoning-fill") && window.dataMap.getZoom() > 14 && !window.dataMap.isMoving()');
@@ -76,6 +83,22 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
     await page.screenshot({ path: `test-results/zoning-plans-${width}.png` });
   }
   expect(errors).toEqual([]);
+});
+
+test('deleting a plan from the sidebar removes its saved scenarios', async ({ page, request }) => {
+  await page.route('https://tiles.goong.io/**', route => route.fulfill({ json: { version: 8, sources: {},
+    layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#cbdcd7' } }] } }));
+  await page.route('**/api/v1/layers', route => route.fulfill({ json: { layers: [] } }));
+  const plan = await (await request.post('/api/v1/zoning/plans', { data: { name: `Delete browser ${Date.now()}`,
+    study_area: { type: 'Polygon', coordinates: [[[106.76, 10.82], [106.764, 10.82],
+      [106.764, 10.824], [106.76, 10.824], [106.76, 10.82]]] } } })).json();
+  await page.goto('/tests/browser/data-layers.html');
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  const row = page.locator('.zoning-plan-list li').filter({ hasText: plan.name });
+  await row.getByRole('button', { name: `Delete plan ${plan.name}` }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+  await expect(row).toHaveCount(0);
+  expect((await request.get(`/api/v1/zoning/plans/${plan.id}`)).status()).toBe(404);
 });
 
 test('vertex editing, split/merge, undo and exclusive measurement ownership', async ({ page, request }) => {
@@ -100,7 +123,7 @@ test('vertex editing, split/merge, undo and exclusive measurement ownership', as
   await page.goto('/tests/browser/data-layers.html');
   await page.waitForFunction('window.dataMap?.isStyleLoaded()');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.getByRole('button', { name: new RegExp(plan.name) }).click();
+  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: plan.name }).click();
   await page.waitForFunction('window.dataMap.getLayer("zoning-fill") && window.dataMap.getZoom() > 14 && !window.dataMap.isMoving()');
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
   await mapClick(page, [106.761, 10.822]);

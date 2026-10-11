@@ -1,6 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Response
+from psycopg import Error as DatabaseError
+from src.shared.database import warehouse_configured
+
+from app.services import parcels
 from pydantic import ValidationError
 from shapely.errors import GEOSException
 
@@ -46,6 +50,30 @@ def create_plan(data: PlanInput):
 @router.get("/{identifier}")
 def get_plan(identifier: UUID):
     return execute(lambda: engine.present(require_plan(identifier)))
+
+
+@router.delete("/{identifier}", status_code=204)
+def delete_plan(identifier: UUID, revision: int = Query(ge=1)):
+    if not execute(lambda: store.delete(identifier, revision)):
+        raise HTTPException(404, "Plan not found")
+    return Response(status_code=204)
+
+
+@router.get("/{identifier}/parcels/tiles/{z}/{x}/{y}.pbf")
+def plan_parcels_tile(identifier: UUID, z: int, x: int, y: int, revision: int = Query(ge=1)):
+    if not 0 <= z <= 18 or not 0 <= x < 2**z or not 0 <= y < 2**z:
+        raise HTTPException(404, "Tile coordinates are outside the XYZ matrix")
+    plan = execute(lambda: require_plan(identifier))
+    if plan["revision"] != revision:
+        raise HTTPException(409, "Plan changed. Reload its parcels.")
+    if not warehouse_configured():
+        raise HTTPException(503, "Plan parcels require the PostGIS warehouse")
+    try:
+        tile = parcels.plan_vector_tile(plan["study_area"], z, x, y)
+    except (OSError, ValueError, DatabaseError):
+        raise HTTPException(503, "Plan parcels temporarily unavailable") from None
+    return Response(tile, media_type="application/vnd.mapbox-vector-tile", status_code=200 if tile else 204,
+                    headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.post("/{identifier}/commands")

@@ -156,3 +156,31 @@ def vector_tile(z, x, y):
             ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile
         """, (z, x, y, tolerance, min_area, Jsonb(COLORS))).fetchone()
     return bytes(row[0]) if row and row[0] else b''
+
+
+def plan_vector_tile(study_area, z, x, y):
+    """Clip parcel polygons to a saved plan before vector-tile encoding."""
+    if z < MIN_ZOOM:
+        return b''
+    resolution = 40075016.68557849 / (512 * 2**z)
+    min_area = (resolution * 2)**2 if z < 16 else 0
+    tolerance = resolution * 0.3 if z < 16 else 0
+    with connect_to_warehouse() as connection:
+        connection.execute("SET LOCAL statement_timeout = '5s'")
+        row = connection.execute("""
+            WITH bounds AS (SELECT ST_TileEnvelope(%s,%s,%s) AS geom),
+            study AS (SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326),3857) AS geom),
+            clipped AS (
+                SELECT p.id,
+                       ST_CollectionExtract(ST_Intersection(
+                           ST_SimplifyPreserveTopology(p.geom_web,%s),s.geom),3) AS geom
+                FROM parcels.plot p, bounds b, study s
+                WHERE p.geom_web && b.geom AND p.geom_web && s.geom
+                  AND ST_Intersects(p.geom_web,s.geom) AND p.area_web >= %s
+            ), tile AS (
+                SELECT p.id AS feature_id,
+                       ST_AsMVTGeom(p.geom,b.geom,4096,64,true) AS geom
+                FROM clipped p, bounds b WHERE NOT ST_IsEmpty(p.geom)
+            ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile
+        """, (z, x, y, json.dumps(study_area), tolerance, min_area)).fetchone()
+    return bytes(row[0]) if row and row[0] else b''

@@ -59,9 +59,57 @@ test('planning buttons match map controls and slide below expanded search', asyn
   const planPanel = page.getByLabel('Plans panel');
   await expect(planPanel).toBeVisible();
   await expect.poll(async () => {
-    const navBox = await nav.boundingBox();
     const panelBox = await planPanel.boundingBox();
-    return !!navBox && !!panelBox && panelBox.y >= navBox.y + navBox.height;
+    return !!panelBox && panelBox.x === 0 && panelBox.y === 0 && panelBox.height >= 899;
   }).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('study-area drawing snaps to a visible road and Ctrl temporarily disables it', async ({ page }) => {
+  let created: { study_area: { coordinates: number[][][] } } | null = null;
+  await page.route('https://tiles.goong.io/**', route => route.fulfill({ json: {
+    version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#cbdcd7' } }],
+  } }));
+  await page.route('**/api/v1/layers', route => route.fulfill({ json: { layers: [] } }));
+  await page.route('**/api/v1/zoning/plans', route => {
+    if (route.request().method() === 'POST') {
+      created = route.request().postDataJSON();
+      return route.fulfill({ status: 422, json: { detail: 'Captured drawing' } });
+    }
+    return route.fulfill({ json: { plans: [] } });
+  });
+  await page.goto('/tests/browser/data-layers.html');
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await page.getByRole('button', { name: 'New plan', exact: true }).click();
+  await page.evaluate(() => {
+    const map = (window as unknown as { dataMap: import('maplibre-gl').Map }).dataMap;
+    map.jumpTo({ center: [106.762, 10.822], zoom: 16 });
+    map.addSource('test-roads', { type: 'geojson', data: { type: 'Feature', properties: {},
+      geometry: { type: 'LineString', coordinates: [[106.76, 10.821], [106.766, 10.821]] } } });
+    map.addLayer({ id: 'road-centerline-test', source: 'test-roads', type: 'line', paint: { 'line-width': 2 } });
+  });
+  await page.waitForTimeout(500);
+  const hitCount = await page.evaluate(() => {
+    const map = (window as unknown as { dataMap: import('maplibre-gl').Map }).dataMap;
+    const point = map.project([106.762, 10.82103]);
+    return map.queryRenderedFeatures([[point.x - 10, point.y - 10], [point.x + 10, point.y + 10]],
+      { layers: ['road-centerline-test'] }).length;
+  });
+  expect(hitCount).toBeGreaterThan(0);
+  await page.getByLabel('Plan name', { exact: true }).fill('Snap test');
+  const click = async (coordinates: [number, number]) => {
+    const point = await page.evaluate(p => (window as unknown as { dataMap: import('maplibre-gl').Map }).dataMap.project(p), coordinates);
+    await page.mouse.click(point.x, point.y);
+  };
+  await click([106.762, 10.82103]);
+  await page.keyboard.down('Control');
+  await click([106.763, 10.82103]);
+  await page.keyboard.up('Control');
+  await click([106.764, 10.824]);
+  await click([106.760, 10.824]);
+  await page.getByRole('button', { name: 'Create plan' }).click();
+  await expect.poll(() => created).not.toBeNull();
+  const ring = created!.study_area.coordinates[0];
+  expect(ring[0][1]).toBeCloseTo(10.821, 5);
+  expect(ring[1][1]).toBeCloseTo(10.82103, 5);
 });
