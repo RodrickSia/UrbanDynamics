@@ -1,11 +1,17 @@
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Geometry, Position } from 'geojson';
 import { useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../../services/api';
+import { PARCEL_MAX_NATIVE_ZOOM, PARCEL_MIN_ZOOM, parcelOutline } from '../map/datasets/parcelStyle';
 import { editVertex, rings, sketchGeometry } from './geometry';
+import { nearestSnap, snapSource, type SnapGeometry } from './snapping';
 import type { PolygonGeometry, ZoningBridge } from './types';
 
 const SOURCE = 'zoning-editor';
 const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
+const PARCEL_SOURCE = 'zoning-plan-parcels';
+const PARCEL_LINE = 'zoning-plan-parcels-outline';
+const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 function feature(geometry: Geometry, properties: Record<string, unknown>): Feature { return { type: 'Feature', geometry, properties }; }
 
@@ -37,12 +43,17 @@ function data(bridge: ZoningBridge): FeatureCollection {
 
 export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: ZoningBridge }) {
   const current = useRef(bridge);
+  const parcelTiles = bridge.plan
+    ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}`
+    : `${API_BASE_URL}/api/v1/layers/parcels/tiles/{z}/{x}/{y}.pbf?schema=2`;
   useEffect(() => { current.current = bridge; }, [bridge]);
   useEffect(() => {
     if (!map || !bridge.active) return;
     let dragging: { ring: number; index: number; restorePan: boolean } | null = null;
     let suppressClick = false;
     let releaseFrame = 0;
+    let snapFrame = 0;
+    let pendingSnap: MapMouseEvent | null = null;
     const doubleClick = map.doubleClickZoom.isEnabled();
     const boxZoom = map.boxZoom.isEnabled();
     map.doubleClickZoom.disable();
@@ -55,17 +66,36 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'] } });
       if (!map.getLayer(VERTEX)) map.addLayer({ id: VERTEX, source: SOURCE, type: 'circle', filter: ['==', '$type', 'Point'],
         paint: { 'circle-color': ['get', 'color'], 'circle-radius': 5, 'circle-stroke-color': '#005b65', 'circle-stroke-width': 2 } });
+      if (!map.getSource(SNAP_SOURCE)) map.addSource(SNAP_SOURCE, { type: 'geojson', data: EMPTY });
+      if (!map.getLayer(SNAP_LAYER)) map.addLayer({ id: SNAP_LAYER, source: SNAP_SOURCE, type: 'circle',
+        paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#005b65', 'circle-stroke-width': 2.5 } });
     };
     const query = (e: MapMouseEvent, layer: string) => map.getLayer(layer) ? map.queryRenderedFeatures(e.point, { layers: [layer] }) : [];
-    const snap = (e: MapMouseEvent): Position => {
-      const candidates = current.current.plan ? rings(current.current.plan.study_area).flat() : [];
-      for (const z of current.current.scenario?.zones ?? []) candidates.push(...rings(z.geometry).flat());
-      let closest: Position = [e.lngLat.lng, e.lngLat.lat], distance = 8;
-      for (const position of candidates) {
-        const p = map.project([position[0], position[1]]), d = Math.hypot(p.x - e.point.x, p.y - e.point.y);
-        if (d < distance) { distance = d; closest = position; }
+    const snapCandidate = (e: MapMouseEvent) => {
+      if (e.originalEvent.ctrlKey) return null;
+      const candidates: SnapGeometry[] = [];
+      if (current.current.plan) candidates.push({ geometry: current.current.plan.study_area, source: 'zoning' });
+      for (const zone of current.current.scenario?.zones ?? []) candidates.push({ geometry: zone.geometry, source: 'zoning' });
+      const layers = map.getStyle().layers.filter(layer =>
+        layer.id === PARCEL_LINE ? current.current.showParcels : snapSource(layer) !== null);
+      if (layers.length) {
+        const { x, y } = e.point;
+        const features = map.queryRenderedFeatures([[x - 10, y - 10], [x + 10, y + 10]],
+          { layers: layers.map(layer => layer.id) }).slice(0, 40);
+        for (const item of features) {
+          const source = snapSource(item.layer);
+          if (source) candidates.push({ geometry: item.geometry, source });
+        }
       }
-      return closest;
+      return nearestSnap(e.point, candidates, position => map.project([position[0], position[1]]), 10);
+    };
+    const snap = (e: MapMouseEvent): Position => snapCandidate(e)?.coordinate ?? [e.lngLat.lng, e.lngLat.lat];
+    const showSnap = (e: MapMouseEvent) => {
+      const source = map.getSource(SNAP_SOURCE) as GeoJSONSource | undefined;
+      if (!source) return;
+      const candidate = current.current.sketch.tool ? snapCandidate(e) : null;
+      source.setData(candidate ? { type: 'FeatureCollection',
+        features: [feature({ type: 'Point', coordinates: candidate.coordinate }, {})] } : EMPTY);
     };
     const click = (e: MapMouseEvent) => {
       const b = current.current;
@@ -97,6 +127,10 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
       map.dragPan.disable();
     };
     const move = (e: MapMouseEvent) => {
+      pendingSnap = e;
+      if (current.current.sketch.tool && !snapFrame) {
+        snapFrame = requestAnimationFrame(() => { snapFrame = 0; if (pendingSnap) showSnap(pendingSnap); });
+      }
       const b = current.current;
       if (!dragging || !b.sketch.geometry || b.sketch.geometry.type === 'LineString') return;
       suppressClick = true;
@@ -114,6 +148,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     };
     const key = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest('input, textarea, select, button, dialog') || current.current.busy) return;
+      if (e.key === 'Control') (map.getSource(SNAP_SOURCE) as GeoJSONSource | undefined)?.setData(EMPTY);
       if (e.key === 'Escape') current.current.onCancel();
       if (e.key === 'Enter' && current.current.sketch.tool) { e.preventDefault(); current.current.onFinish(); }
       if (e.key === 'Backspace' && current.current.sketch.tool && !current.current.sketch.geometry) {
@@ -124,19 +159,42 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     map.on('style.load', attach); map.on('click', click); map.on('mousedown', down); map.on('mousemove', move); map.on('mouseup', up);
     window.addEventListener('mouseup', up); window.addEventListener('keydown', key);
     return () => {
-      up(); cancelAnimationFrame(releaseFrame); if (doubleClick) map.doubleClickZoom.enable();
+      up(); cancelAnimationFrame(releaseFrame); cancelAnimationFrame(snapFrame); if (doubleClick) map.doubleClickZoom.enable();
       if (boxZoom) map.boxZoom.enable();
       map.off('style.load', attach); map.off('click', click); map.off('mousedown', down); map.off('mousemove', move); map.off('mouseup', up);
       window.removeEventListener('mouseup', up); window.removeEventListener('keydown', key);
-      for (const id of [VERTEX, LINE, FILL]) if (map.getLayer(id)) map.removeLayer(id);
-      if (map.getSource(SOURCE)) map.removeSource(SOURCE);
+      for (const id of [SNAP_LAYER, VERTEX, LINE, FILL]) if (map.getLayer(id)) map.removeLayer(id);
+      for (const id of [SNAP_SOURCE, SOURCE]) if (map.getSource(id)) map.removeSource(id);
       map.getCanvas().style.cursor = '';
     };
   }, [map, bridge.active]);
 
   useEffect(() => {
+    if (!map || !bridge.active || !bridge.parcelAvailable) return;
+    const attach = () => {
+      if (!map.getSource(PARCEL_SOURCE)) map.addSource(PARCEL_SOURCE, { type: 'vector', tiles: [parcelTiles],
+        minzoom: PARCEL_MIN_ZOOM, maxzoom: PARCEL_MAX_NATIVE_ZOOM });
+      if (!map.getLayer(PARCEL_LINE)) map.addLayer({ ...parcelOutline(), id: PARCEL_LINE, source: PARCEL_SOURCE,
+        paint: { ...parcelOutline().paint, 'line-color': '#005b65', 'line-opacity': current.current.showParcels ? .9 : 0 } });
+    };
+    if (map.isStyleLoaded()) attach();
+    map.on('style.load', attach);
+    return () => {
+      map.off('style.load', attach);
+      if (map.getLayer(PARCEL_LINE)) map.removeLayer(PARCEL_LINE);
+      if (map.getSource(PARCEL_SOURCE)) map.removeSource(PARCEL_SOURCE);
+    };
+  }, [map, bridge.active, bridge.parcelAvailable, parcelTiles]);
+
+  useEffect(() => {
+    if (!map) return;
+    if (map.getLayer(PARCEL_LINE)) map.setPaintProperty(PARCEL_LINE, 'line-opacity', bridge.showParcels ? .9 : 0);
+  }, [map, bridge.showParcels, bridge.plan?.id, bridge.plan?.revision]);
+
+  useEffect(() => {
     if (!map) return;
     (map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData(data(bridge));
+    if (!bridge.sketch.tool) (map.getSource(SNAP_SOURCE) as GeoJSONSource | undefined)?.setData(EMPTY);
     if (bridge.active) map.getCanvas().style.cursor = bridge.sketch.tool ? 'crosshair' : '';
   }, [map, bridge]);
 

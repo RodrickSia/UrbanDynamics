@@ -91,3 +91,17 @@ def update(identifier, revision, mutate):
         connection.execute(f"UPDATE zoning_plans SET document={placeholder} WHERE id={placeholder}",
                            (encode(result, remote), str(identifier)))
         return result
+
+
+def delete(identifier, revision):
+    with database() as (connection, remote):
+        placeholder = "%s" if remote else "?"
+        suffix = " FOR UPDATE" if remote else ""
+        document = decode(connection.execute(
+            f"SELECT document FROM zoning_plans WHERE id={placeholder}{suffix}", (str(identifier),)).fetchone())
+        if document is None:
+            return False
+        if document["revision"] != revision:
+            raise Conflict("This plan changed in another tab. Reload it before deleting.")
+        connection.execute(f"DELETE FROM zoning_plans WHERE id={placeholder}", (str(identifier),))
+        return True

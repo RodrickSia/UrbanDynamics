@@ -4,7 +4,7 @@
 .zoning-nav-button + .zoning-nav-button { border-top: 1px solid var(--border); }
 .zoning-nav-button:hover:not(:disabled) { color: var(--accent); background: var(--accent-muted); }
 .zoning-nav-button[aria-pressed="true"], .zoning-scenario-tabs button[aria-pressed="true"] { color: var(--accent-strong); background: var(--accent-muted); }
-.zoning-panel { position: absolute; z-index: 42; top: 11rem; bottom: 1rem; left: 1rem; width: min(23rem, calc(100vw - 6rem)); padding: 1.15rem; border-radius: var(--radius-panel); overflow: auto; scrollbar-width: thin; }
+.zoning-panel { position: absolute; z-index: 42; top: 0; bottom: 0; left: 0; width: min(25rem, calc(100vw - 4rem)); padding: 11rem 1.15rem 1.5rem; border-radius: 0 var(--radius-panel) var(--radius-panel) 0; overflow: auto; scrollbar-width: thin; box-shadow: .5rem 0 2rem rgba(21, 41, 45, .12); }
 .zoning-expand { position: absolute; z-index: 46; top: 11rem; left: 1rem; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: var(--radius-control); color: var(--accent-strong); cursor: pointer; }
 .zoning-ui { font-size: .85rem; color: var(--text); }
 .zoning-ui header { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
@@ -31,8 +31,11 @@
 .zoning-muted, .zoning-ui small { color: var(--text-secondary); font-size: .76rem; line-height: 1.5; }
 .zoning-empty { padding: 1.5rem 0; }
 .zoning-plan-list, .zoning-type-list, .zoning-findings { list-style: none; padding: 0; margin: .75rem 0; }
-.zoning-plan-list li { border-bottom: 1px solid var(--border); }
-.zoning-plan-list button { width: 100%; flex-direction: column; align-items: flex-start; border: 0; background: transparent; padding: .85rem .5rem; }
+.zoning-plan-list li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.zoning-plan-list li > button:first-child { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; background: transparent; padding: .85rem .5rem; }
+.zoning-ui .zoning-plan-delete { flex: 0 0 auto; width: 2.3rem; padding: .4rem; border: 0; background: transparent; color: var(--text-secondary); }
+.zoning-ui .zoning-plan-delete:hover:not(:disabled), .zoning-ui .zoning-delete-action:hover:not(:disabled) { color: var(--warning); }
+.zoning-ui .zoning-delete-action { width: 100%; margin-top: 1.5rem; color: var(--warning); border-color: var(--border); background: transparent; }
 .zoning-plan-list span { color: var(--text-secondary); }
 .zoning-plan-meta { display: flex; align-items: center; gap: .75rem; }
 .zoning-badge { display: inline-block; width: fit-content; padding: .2rem .5rem; background: var(--accent-muted); border-radius: .4rem; color: var(--accent-strong); font-size: .72rem; font-weight: 600; }
@@ -87,14 +90,14 @@
 @media (max-width: 767px) {
   .zoning-nav { top: 4.75rem; left: .75rem; }
   .zoning-nav[data-search-open="true"] { top: calc(5.35rem + var(--search-panel-height)); }
-  .zoning-panel { top: 14.5rem; bottom: auto; max-height: calc(100dvh - 26rem); width: calc(100vw - 6rem); }
+  .zoning-panel { width: min(23rem, calc(100vw - 4rem)); padding-top: 11rem; padding-bottom: 12rem; }
   .zoning-expand { top: 14.5rem; }
-  .zoning-scenario-bar { top: 11rem; left: 1rem; right: 5rem; }
+  .zoning-scenario-bar { top: 4.75rem; left: 4rem; right: 5rem; max-width: none; padding: .2rem; }
+  .zoning-scenario-tabs button { padding: .5rem .6rem; }
   .zoning-tools { left: 1rem; right: 5rem; bottom: 1rem; max-height: 40dvh; overflow: auto; padding: .65rem; }
   .zoning-tools .zoning-row button span { display: none; }
   .zoning-tools > small { display: none; }
   .zoning-inspector { top: 12.5rem; left: 1rem; right: 5rem; width: auto; max-height: calc(100dvh - 21rem); z-index: 47; }
-  .zoning-workspace:not(:has(.zoning-scenario-bar)) .zoning-panel { top: 11rem; max-height: calc(100dvh - 12rem); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .zoning-nav { transition: top .32s cubic-bezier(.22, 1, .36, 1); }

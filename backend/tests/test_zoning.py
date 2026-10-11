@@ -107,6 +107,31 @@ def test_revision_conflicts_and_invalid_inputs_preserve_saved_plan(client, plan)
     assert client.get(f"/api/v1/zoning/plans/{plan['id']}").json() == updated
 
 
+def test_delete_plan_requires_current_revision_and_removes_only_target(client, plan):
+    other = client.post('/api/v1/zoning/plans', json={"name": "Keep", "study_area": rectangle()}).json()
+    path = f"/api/v1/zoning/plans/{plan['id']}"
+    assert client.delete(path, params={"revision": plan["revision"] + 1}).status_code == 409
+    assert client.get(path).status_code == 200
+    assert client.delete(path, params={"revision": plan["revision"]}).status_code == 204
+    assert client.get(path).status_code == 404
+    assert client.delete(path, params={"revision": plan["revision"]}).status_code == 404
+    assert client.get(f"/api/v1/zoning/plans/{other['id']}").status_code == 200
+
+
+def test_plan_parcel_tiles_use_saved_study_area_and_revision(client, plan, monkeypatch):
+    from app.routers import zoning
+    calls = []
+    monkeypatch.setattr(zoning, "warehouse_configured", lambda: True)
+    monkeypatch.setattr(zoning.parcels, "plan_vector_tile", lambda area, z, x, y:
+                        calls.append((area, z, x, y)) or b"tile")
+    path = f"/api/v1/zoning/plans/{plan['id']}/parcels/tiles/12/3262/1928.pbf"
+    response = client.get(path, params={"revision": plan["revision"]})
+    assert response.status_code == 200 and response.content == b"tile"
+    assert calls == [(plan["study_area"], 12, 3262, 1928)]
+    assert client.get(path, params={"revision": 2}).status_code == 409
+    assert client.get(path.replace('/12/3262/1928', '/12/4096/1928'), params={"revision": 1}).status_code == 404
+
+
 def test_indicators_unknown_controls_and_independent_bounds(client, plan):
     plan = draw(client, add_type(client, plan))
     url = f"/api/v1/zoning/plans/{plan['id']}/indicators?scenario_id={plan['scenarios'][1]['id']}"
