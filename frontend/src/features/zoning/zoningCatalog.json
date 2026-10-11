@@ -1,0 +1,866 @@
+[
+  {
+    "code": "NNP",
+    "name": "Nhóm đất nông nghiệp",
+    "description": "Mã tổng hợp cho đất phục vụ hoạt động trồng trọt, lâm nghiệp, chăn nuôi, thủy sản, làm muối và mục đích nông nghiệp khác.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CHN",
+    "name": "Đất trồng cây hằng năm",
+    "description": "Nhóm đất gieo trồng, thu hoạch theo chu kỳ ngắn, gồm đất lúa và cây hằng năm khác.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "LUA",
+    "name": "Đất trồng lúa",
+    "description": "Nhóm đất sử dụng để trồng lúa.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "LUC",
+    "name": "Đất chuyên trồng lúa",
+    "description": "Đất chuyên canh lúa theo phân loại thống kê hiện hành.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "LUK",
+    "name": "Đất trồng lúa còn lại",
+    "description": "Đất trồng lúa không thuộc phân nhóm đất chuyên trồng lúa LUC.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "HNK",
+    "name": "Đất trồng cây hằng năm khác",
+    "description": "Đất trồng rau, màu hoặc các loại cây hằng năm khác ngoài lúa.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CLN",
+    "name": "Đất trồng cây lâu năm",
+    "description": "Đất trồng cây có chu kỳ sinh trưởng và thu hoạch nhiều năm, như cây ăn quả, cây công nghiệp lâu năm.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "LNP",
+    "name": "Đất lâm nghiệp",
+    "description": "Mã tổng hợp đất lâm nghiệp, gồm rừng đặc dụng, phòng hộ, sản xuất.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RDD",
+    "name": "Đất rừng đặc dụng",
+    "description": "Đất rừng phục vụ bảo tồn thiên nhiên, nghiên cứu, bảo vệ cảnh quan và các mục tiêu đặc dụng theo pháp luật lâm nghiệp.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RPH",
+    "name": "Đất rừng phòng hộ",
+    "description": "Đất rừng có chức năng bảo vệ nguồn nước, đất, chống xói mòn, thiên tai và môi trường.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RSX",
+    "name": "Đất rừng sản xuất",
+    "description": "Đất rừng phục vụ sản xuất lâm nghiệp và các mục đích hợp pháp liên quan.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RSN",
+    "name": "Đất rừng sản xuất là rừng tự nhiên",
+    "description": "Chỉ tiêu thống kê thuộc RSX, dùng riêng cho phần rừng tự nhiên; không phải loại độc lập ngang cấp RSX.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "NTS",
+    "name": "Đất nuôi trồng thủy sản",
+    "description": "Đất sử dụng chuyên vào mục đích nuôi, trồng thủy sản.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CNT",
+    "name": "Đất chăn nuôi tập trung",
+    "description": "Đất trang trại, cơ sở chăn nuôi tập trung theo quy định chuyên ngành.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "LMU",
+    "name": "Đất làm muối",
+    "description": "Đất phục vụ sản xuất muối từ nước biển.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "NKH",
+    "name": "Đất nông nghiệp khác",
+    "description": "Đất vườn ươm, nhà kính, cơ sở nghiên cứu, bảo quản và công trình phụ trợ phục vụ sản xuất nông nghiệp phù hợp quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "PNN",
+    "name": "Nhóm đất phi nông nghiệp",
+    "description": "Mã tổng hợp cho đất ở, công trình cơ quan/sự nghiệp, sản xuất kinh doanh, công cộng, tôn giáo và các loại phi nông nghiệp khác.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "OTC",
+    "name": "Đất ở",
+    "description": "Mã nhóm đất ở, gồm ONT và ODT; không đồng nghĩa riêng với nhà ở đô thị.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "ONT",
+    "name": "Đất ở tại nông thôn",
+    "description": "Đất dùng làm nhà ở và mục đích phục vụ đời sống trong thửa thuộc phạm vi phân loại đất ở nông thôn.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "ODT",
+    "name": "Đất ở tại đô thị",
+    "description": "Đất dùng làm nhà ở và mục đích phục vụ đời sống trong thửa thuộc phạm vi phân loại đất ở đô thị.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TSC",
+    "name": "Đất xây dựng trụ sở cơ quan",
+    "description": "Trụ sở của cơ quan nhà nước, tổ chức chính trị và các tổ chức thuộc phạm vi pháp luật quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CQA",
+    "name": "Đất quốc phòng, an ninh",
+    "description": "Mã tổng hợp cho CQP và CAN.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CQP",
+    "name": "Đất quốc phòng",
+    "description": "Đất phục vụ mục đích quốc phòng theo quản lý, quy hoạch chuyên ngành.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CAN",
+    "name": "Đất an ninh",
+    "description": "Đất phục vụ mục đích an ninh theo quản lý, quy hoạch chuyên ngành.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DSN",
+    "name": "Đất xây dựng công trình sự nghiệp",
+    "description": "Mã tổng hợp các cơ sở sự nghiệp: văn hóa, giáo dục, y tế, xã hội, thể thao, khoa học và các loại khác.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DVH",
+    "name": "Đất xây dựng cơ sở văn hóa",
+    "description": "Nhà hát, bảo tàng, thư viện, nhà văn hóa, trung tâm văn hóa và cơ sở văn hóa được phép hoạt động.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DXH",
+    "name": "Đất xây dựng cơ sở xã hội",
+    "description": "Cơ sở bảo trợ, chăm sóc người cao tuổi, trẻ em, người khuyết tật và các dịch vụ xã hội.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DYT",
+    "name": "Đất xây dựng cơ sở y tế",
+    "description": "Bệnh viện, trạm y tế, trung tâm y tế, cơ sở khám chữa bệnh và hạng mục thuộc phạm vi cơ sở y tế.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DGD",
+    "name": "Đất xây dựng cơ sở giáo dục và đào tạo",
+    "description": "Trường mầm non, phổ thông, đại học, giáo dục nghề nghiệp và các công trình thuộc cơ sở giáo dục.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DTT",
+    "name": "Đất xây dựng cơ sở thể dục, thể thao",
+    "description": "Sân vận động, trung tâm thể thao, sân tập, cơ sở luyện tập/thi đấu và công trình phụ trợ.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DKH",
+    "name": "Đất xây dựng cơ sở khoa học và công nghệ",
+    "description": "Viện nghiên cứu, phòng thí nghiệm, cơ sở đổi mới sáng tạo, ươm tạo công nghệ và hoạt động khoa học công nghệ.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DMT",
+    "name": "Đất xây dựng cơ sở môi trường",
+    "description": "Cơ sở quan trắc, ứng phó sự cố, bảo tồn đa dạng sinh học và công trình bảo vệ môi trường.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DKT",
+    "name": "Đất xây dựng cơ sở khí tượng thủy văn",
+    "description": "Trạm khí tượng thủy văn, giám sát khí hậu và công trình phục vụ lĩnh vực này.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DNG",
+    "name": "Đất xây dựng cơ sở ngoại giao",
+    "description": "Đại sứ quán, lãnh sự quán, cơ quan đại diện và cơ sở ngoại giao thuộc phạm vi quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DSK",
+    "name": "Đất xây dựng công trình sự nghiệp khác",
+    "description": "Công trình sự nghiệp không thuộc các phân nhóm chuyên biệt kể trên; cần xác minh chức năng cụ thể.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CSK",
+    "name": "Đất sản xuất, kinh doanh phi nông nghiệp",
+    "description": "Mã tổng hợp cho đất công nghiệp, thương mại, sản xuất phi nông nghiệp và hoạt động khoáng sản.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SCC",
+    "name": "Đất khu công nghiệp, cụm công nghiệp",
+    "description": "Nhóm đất trong các khu/cụm công nghiệp và khu công nghệ thông tin tập trung theo phân nhóm.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SKK",
+    "name": "Đất khu công nghiệp",
+    "description": "Đất trong khu công nghiệp gồm cơ sở sản xuất và hạ tầng, dịch vụ phụ trợ theo quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SKN",
+    "name": "Đất cụm công nghiệp",
+    "description": "Đất trong cụm công nghiệp phục vụ sản xuất, tiểu thủ công nghiệp và hạ tầng liên quan.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SCT",
+    "name": "Đất khu công nghệ thông tin tập trung",
+    "description": "Đất của khu công nghệ thông tin tập trung, gồm hoạt động và hạ tầng theo quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TMD",
+    "name": "Đất thương mại, dịch vụ",
+    "description": "Cơ sở kinh doanh thương mại, dịch vụ, lưu trú, văn phòng kinh doanh và các công trình phục vụ hoạt động này.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SKC",
+    "name": "Đất cơ sở sản xuất phi nông nghiệp",
+    "description": "Cơ sở công nghiệp, tiểu công nghiệp, thủ công nghiệp ngoài khu/cụm công nghiệp và hạ tầng phục vụ sản xuất.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SKS",
+    "name": "Đất sử dụng cho hoạt động khoáng sản",
+    "description": "Khai thác, thăm dò, chế biến khoáng sản gắn với khu vực được cho phép và công trình phụ trợ.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CCC",
+    "name": "Đất sử dụng vào mục đích công cộng",
+    "description": "Mã tổng hợp đất giao thông, thủy lợi, nước, thiên tai, di tích, chất thải, năng lượng, viễn thông, chợ, vui chơi cộng đồng.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DGT",
+    "name": "Đất công trình giao thông",
+    "description": "Đường, đường sắt, metro, bến xe, ga, cảng, sân bay, bãi đỗ xe và công trình giao thông khác.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DTL",
+    "name": "Đất công trình thủy lợi",
+    "description": "Kênh, đê, cống, hồ/công trình điều tiết, tưới, tiêu phục vụ thủy lợi theo chức năng pháp lý.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DCT",
+    "name": "Đất công trình cấp nước, thoát nước",
+    "description": "Nhà máy nước, bơm, bể chứa, tuyến cấp nước, thoát nước, xử lý nước/bùn và hạ tầng liên quan.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DPC",
+    "name": "Đất công trình phòng, chống thiên tai",
+    "description": "Công trình phòng chống ngập lụt, sạt lở, xâm nhập mặn, trú tránh bão và các công trình phòng chống thiên tai.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DDD",
+    "name": "Đất có di tích lịch sử - văn hóa, danh lam thắng cảnh, di sản thiên nhiên",
+    "description": "Đất gắn với di tích, danh thắng và di sản được xác định, quản lý theo quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DRA",
+    "name": "Đất công trình xử lý chất thải",
+    "description": "Cơ sở thu gom, trung chuyển, xử lý chất thải và các hạng mục công trình liên quan.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DNL",
+    "name": "Đất công trình năng lượng, chiếu sáng công cộng",
+    "description": "Cơ sở, đường dây, trạm năng lượng, điện và hạ tầng chiếu sáng công cộng theo phạm vi công trình.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DBV",
+    "name": "Đất công trình hạ tầng bưu chính, viễn thông, công nghệ thông tin",
+    "description": "Công trình và hạ tầng bưu chính, viễn thông, công nghệ thông tin.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DCH",
+    "name": "Đất chợ dân sinh, chợ đầu mối",
+    "description": "Chợ dân sinh, chợ đầu mối thuộc nhóm công trình công cộng; không tự đồng nhất với TMD.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DKV",
+    "name": "Đất khu vui chơi, giải trí công cộng, sinh hoạt cộng đồng",
+    "description": "Đất dành cho vui chơi, giải trí công cộng, sinh hoạt cộng đồng; không phải mọi công viên đều mặc nhiên mang DKV.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TON",
+    "name": "Đất tôn giáo",
+    "description": "Đất dùng cho hoạt động của tổ chức, cơ sở tôn giáo theo quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TIN",
+    "name": "Đất tín ngưỡng",
+    "description": "Đất dùng cho hoạt động tín ngưỡng cộng đồng và các công trình tín ngưỡng.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "NTD",
+    "name": "Đất nghĩa trang, nhà tang lễ, cơ sở hỏa táng; đất cơ sở lưu trữ tro cốt",
+    "description": "Đất phục vụ mai táng, tang lễ, hỏa táng và lưu giữ tro cốt.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TVC",
+    "name": "Đất có mặt nước chuyên dùng",
+    "description": "Nhóm đất mặt nước chuyên dùng, gồm ao/hồ/đầm/phá và sông/ngòi/kênh/rạch/suối.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "MNC",
+    "name": "Đất có mặt nước chuyên dùng dạng ao, hồ, đầm, phá",
+    "description": "Mặt nước dạng ao, hồ, đầm, phá trong nhóm mặt nước chuyên dùng.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "SON",
+    "name": "Đất có mặt nước dạng sông, ngòi, kênh, rạch, suối",
+    "description": "Mặt nước tuyến sông, ngòi, kênh, rạch, suối theo phân loại đất.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "PNK",
+    "name": "Đất phi nông nghiệp khác",
+    "description": "Đất phi nông nghiệp không thuộc những loại nêu trên; không dùng làm fallback cho mã nguồn không rõ nghĩa.",
+    "category": "land_use",
+    "group": "Nhóm đất phi nông nghiệp",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CSD",
+    "name": "Nhóm đất chưa sử dụng",
+    "description": "Mã tổng hợp cho đất chưa được xác định mục đích sử dụng và đất chưa giao, chưa cho thuê theo phạm vi quy định.",
+    "category": "land_use",
+    "group": "Nhóm đất chưa sử dụng",
+    "land_use_codes": ""
+  },
+  {
+    "code": "CGT",
+    "name": "Đất do Nhà nước thu hồi theo quy định của pháp luật đất đai chưa giao, chưa cho thuê",
+    "description": "Đất đã thu hồi nhưng chưa được giao hoặc cho thuê lại.",
+    "category": "land_use",
+    "group": "Nhóm đất chưa sử dụng",
+    "land_use_codes": ""
+  },
+  {
+    "code": "BCS",
+    "name": "Đất bằng chưa sử dụng",
+    "description": "Đất bằng chưa có mục đích sử dụng xác định theo hồ sơ.",
+    "category": "land_use",
+    "group": "Nhóm đất chưa sử dụng",
+    "land_use_codes": ""
+  },
+  {
+    "code": "DCS",
+    "name": "Đất đồi núi chưa sử dụng",
+    "description": "Đất đồi núi chưa có mục đích sử dụng xác định.",
+    "category": "land_use",
+    "group": "Nhóm đất chưa sử dụng",
+    "land_use_codes": ""
+  },
+  {
+    "code": "NCS",
+    "name": "Núi đá không có rừng cây",
+    "description": "Khu vực núi đá không có rừng cây được ghi nhận trong nhóm chưa sử dụng.",
+    "category": "land_use",
+    "group": "Nhóm đất chưa sử dụng",
+    "land_use_codes": ""
+  },
+  {
+    "code": "MCS",
+    "name": "Đất có mặt nước chưa sử dụng",
+    "description": "Mặt nước thuộc nhóm đất chưa sử dụng, khác với mặt nước chuyên dùng TVC.",
+    "category": "land_use",
+    "group": "Nhóm đất chưa sử dụng",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RES",
+    "name": "Residential / Khu ở",
+    "description": "Khu ở và công trình phục vụ nhu cầu ở; cần subtype để phân biệt nhà thấp tầng, nhà ở tập thể, nhà cao tầng.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "OTC, ONT, ODT"
+  },
+  {
+    "code": "MIX",
+    "name": "Mixed-use / Đất hỗn hợp",
+    "description": "Khu kết hợp hai hay nhiều chức năng được cho phép trong hồ sơ quy hoạch, ví dụ ở + thương mại + dịch vụ.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "Không có một mã đất cố định"
+  },
+  {
+    "code": "COM",
+    "name": "Commercial & Services / Thương mại dịch vụ",
+    "description": "Văn phòng, cơ sở thương mại, dịch vụ, lưu trú, bán lẻ.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "TMD"
+  },
+  {
+    "code": "IND",
+    "name": "Industrial / Công nghiệp",
+    "description": "Khu công nghiệp, cụm công nghiệp, cơ sở sản xuất phi nông nghiệp.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "SKK, SKN, SKC"
+  },
+  {
+    "code": "TEC",
+    "name": "Technology & Innovation / Công nghệ",
+    "description": "Khu nghiên cứu, khu CNTT tập trung, đổi mới sáng tạo.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "SCT, DKH; tùy đồ án"
+  },
+  {
+    "code": "EDU",
+    "name": "Education / Giáo dục",
+    "description": "Trường học, đại học, cơ sở đào tạo.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DGD"
+  },
+  {
+    "code": "HEA",
+    "name": "Healthcare / Y tế",
+    "description": "Bệnh viện, trạm y tế, cơ sở chăm sóc và khám chữa bệnh.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DYT"
+  },
+  {
+    "code": "SOC",
+    "name": "Social Services / Dịch vụ xã hội",
+    "description": "Cơ sở bảo trợ, chăm sóc đối tượng cần trợ giúp xã hội.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DXH"
+  },
+  {
+    "code": "CUL",
+    "name": "Culture / Văn hóa",
+    "description": "Nhà hát, bảo tàng, thư viện và trung tâm văn hóa.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DVH"
+  },
+  {
+    "code": "SPT",
+    "name": "Sports & Recreation / Thể thao",
+    "description": "Công trình luyện tập, thi đấu và phục vụ thể thao.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DTT"
+  },
+  {
+    "code": "GOV",
+    "name": "Government / Hành chính",
+    "description": "Trụ sở các cơ quan, tổ chức hành chính thuộc phạm vi quy định.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "TSC"
+  },
+  {
+    "code": "DEF",
+    "name": "Defense & Security / Quốc phòng an ninh",
+    "description": "Không gian phục vụ quốc phòng, an ninh.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "CQP, CAN"
+  },
+  {
+    "code": "PRK",
+    "name": "Parks & Open Space / Công viên cây xanh",
+    "description": "Công viên, vườn hoa, hành lang cây xanh, mặt xanh trong đồ án; cần xác minh pháp lý từng polygon.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "Không thể suy từ DKV một-một"
+  },
+  {
+    "code": "TRN",
+    "name": "Transportation / Giao thông",
+    "description": "Hành lang đường, nhà ga, metro, bến, cảng, bãi đỗ và cơ sở giao thông.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DGT"
+  },
+  {
+    "code": "UTL",
+    "name": "Utilities / Hạ tầng kỹ thuật",
+    "description": "Cấp thoát nước, điện, chất thải, thông tin truyền thông.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DCT, DNL, DRA, DBV"
+  },
+  {
+    "code": "FLO",
+    "name": "Flood Protection / Thủy lợi & phòng thiên tai",
+    "description": "Đê, kè, cống và công trình chống ngập, chống thiên tai.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DTL, DPC"
+  },
+  {
+    "code": "AGR",
+    "name": "Agriculture / Nông nghiệp",
+    "description": "Khu trồng trọt, chăn nuôi, nông nghiệp phục vụ quy hoạch.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "LUA, HNK, CLN, CNT, NKH..."
+  },
+  {
+    "code": "FOR",
+    "name": "Forestry / Lâm nghiệp",
+    "description": "Rừng bảo tồn, phòng hộ, rừng sản xuất.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "RDD, RPH, RSX"
+  },
+  {
+    "code": "WAT",
+    "name": "Water Bodies / Mặt nước",
+    "description": "Sông, hồ, kênh rạch, mặt nước chuyên dùng.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "MNC, SON"
+  },
+  {
+    "code": "HER",
+    "name": "Heritage & Conservation / Bảo tồn",
+    "description": "Di tích, cảnh quan, vùng bảo vệ theo hồ sơ quy hoạch và văn bản chuyên ngành.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "DDD và lớp bảo vệ chuyên ngành"
+  },
+  {
+    "code": "REL",
+    "name": "Religious & Belief / Tôn giáo tín ngưỡng",
+    "description": "Công trình, đất cho hoạt động tôn giáo và tín ngưỡng.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "TON, TIN"
+  },
+  {
+    "code": "UND",
+    "name": "Undeveloped / Chưa sử dụng",
+    "description": "Đất chưa sử dụng; nếu đưa vào zoning đề xuất cần tạo scenario riêng.",
+    "category": "zoning_type",
+    "group": "",
+    "land_use_codes": "CSD và mã con"
+  },
+  {
+    "code": "RES-L",
+    "name": "Low-rise Residential",
+    "description": "Nhà ở thấp tầng/liền kề; giới hạn chiều cao, mật độ và khoảng lùi phải lấy từ đồ án cụ thể.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RES-H",
+    "name": "High-density Residential",
+    "description": "Nhà ở tập trung/chung cư mật độ cao; loại do ứng dụng tạo, không có mã loại đất riêng.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "RES-V",
+    "name": "Villa / Garden Residential",
+    "description": "Nhà ở biệt lập/nhà vườn nếu được hồ sơ quy hoạch địa phương phân định.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "MIX-R",
+    "name": "Residential + Commercial",
+    "description": "Hỗn hợp nhà ở, thương mại; phải ghi rõ tỷ lệ sử dụng, thành phần chức năng được chấp nhận.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "MIX-O",
+    "name": "Office + Retail",
+    "description": "Hỗn hợp văn phòng, bán lẻ, dịch vụ.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "COM-R",
+    "name": "Retail / Shopping",
+    "description": "Bán lẻ, trung tâm thương mại và dịch vụ.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "COM-H",
+    "name": "Hospitality",
+    "description": "Khách sạn và các loại lưu trú được phép.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "IND-L",
+    "name": "Light Industry",
+    "description": "Sản xuất ít gây tác động môi trường hơn; không tự suy ngưỡng tiếng ồn/khí thải.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "IND-M",
+    "name": "Manufacturing",
+    "description": "Khu sản xuất/công nghiệp với giới hạn môi trường theo quy định cụ thể.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "IND-LOG",
+    "name": "Logistics",
+    "description": "Kho vận, logistics; cần xác định TMD/SKC/SKK theo dự án.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "EDU-S",
+    "name": "Schools",
+    "description": "Cơ sở giáo dục mầm non/phổ thông.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "EDU-U",
+    "name": "University / College",
+    "description": "Đại học, cao đẳng, nghiên cứu đào tạo.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "HEA-H",
+    "name": "Hospital",
+    "description": "Bệnh viện, y tế quy mô lớn.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "PRK-U",
+    "name": "Urban Park",
+    "description": "Công viên phục vụ công cộng đô thị.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "PRK-G",
+    "name": "Green Corridor",
+    "description": "Dải xanh cảnh quan, hành lang sinh thái.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TRN-R",
+    "name": "Road Right-of-Way",
+    "description": "Phạm vi dành cho đường và hạ tầng đường.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "TRN-M",
+    "name": "Metro / Rail",
+    "description": "Đường sắt đô thị, depot, nhà ga.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "UTL-W",
+    "name": "Water & Drainage",
+    "description": "Cấp thoát nước và xử lý nước.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  },
+  {
+    "code": "FLO-R",
+    "name": "Flood Retention",
+    "description": "Không gian/công trình trữ nước, điều tiết giảm ngập; phân loại pháp lý dựa trên hồ sơ.",
+    "category": "zoning_subtype",
+    "group": "",
+    "land_use_codes": ""
+  }
+]

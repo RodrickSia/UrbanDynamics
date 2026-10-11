@@ -36,6 +36,7 @@ export default function App() {
       <section
         className="map-workspace"
         data-layers-open={workspace.rightPanel === 'layers'}
+        data-zoning-open={zoning.active && !workspace.isSearchOpen}
         aria-label="Interactive urban map"
         onPointerDownCapture={workspace.handleMapPointerDown}
       >
