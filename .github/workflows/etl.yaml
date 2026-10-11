@@ -48,7 +48,7 @@ jobs:
     # This runner needs Docker, database access, and persistent space for WorldPop files.
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Keep ignored ETL inputs and downloads between runs on this self-hosted runner.
           clean: false

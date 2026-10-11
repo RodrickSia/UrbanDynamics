@@ -20,7 +20,7 @@ jobs:
     # Configure this label to match the private self-hosted runner.
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Start PostGIS and apply pending migrations
         env:
           WAREHOUSE_MIGRATION_TARGET: compose

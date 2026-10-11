@@ -34,7 +34,7 @@ jobs:
       KHOI_API_PORT: ${{ inputs.api_port }}
       KHOI_DB_PORT: ${{ inputs.db_port }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Stage immutable source and preserve runtime data
         shell: bash
         run: |
