@@ -108,7 +108,7 @@ export function ViewshedPanel({
     />
   );
   return (
-    <section className="viewshed-panel glass-panel" aria-label="Viewshed analysis" ref={root}>
+    <section className="viewshed-panel solid-panel" aria-label="Viewshed analysis" ref={root}>
       <header>
         <span>
           <Eye size={18} aria-hidden="true" /> Viewshed

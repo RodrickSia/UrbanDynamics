@@ -42,7 +42,7 @@ export function MeasurementToolbar({ measurement, mode, onToggleComponents, onNe
   return (
     <aside
       ref={toolbarRef}
-      className="measurement-toolbar glass-panel"
+      className="measurement-toolbar solid-panel"
       role="region"
       aria-label="Distance measurement"
       data-phase={measurementPhase(measurement)}

@@ -10,7 +10,7 @@ export function ZoneInspector({ workspace: w }: { workspace: ZoningWorkspace }) 
   const zone = w.scenario?.zones.find(z => z.id === w.selected[0]);
   if (!zone || !w.plan) return null;
   const type = w.plan.types.find(t => t.id === zone.type_id);
-  return <aside className="zoning-inspector glass-panel zoning-ui" aria-label="Zone inspector">
+  return <aside className="zoning-inspector solid-panel zoning-ui" aria-label="Zone inspector">
     <header><div><span className="eyebrow">Zone inspector</span><h2>{type?.name ?? 'Unknown type'}</h2></div><button className="quiet-icon-button" onClick={() => w.pick(null, false)} aria-label="Close zone inspector"><X size={18}/></button></header>
     <span className="zoning-badge">Proposal · {w.scenario?.name}</span><p className="zoning-zone-area">{areaText(zone.area_m2)}</p>
     <label>Zoning type<select value={zone.type_id} disabled={w.readOnly || w.busy || !!w.sketch.tool} onChange={e => void w.execute('assign', { zone_id: zone.id, type_id: e.target.value })}>{w.plan.types.map(t => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}</select></label>

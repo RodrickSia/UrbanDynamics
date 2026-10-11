@@ -8,7 +8,7 @@ export function ZoningToolbar({ workspace: w }: { workspace: ZoningWorkspace }) 
   const [confirmStudy, setConfirmStudy] = useState(false);
   if (!w.plan) return null;
   const hasOne = w.selected.length === 1;
-  return <div className="zoning-tools glass-panel zoning-ui" aria-label="Zoning tools">
+  return <div className="zoning-tools solid-panel zoning-ui" aria-label="Zoning tools">
     {!w.sketch.tool ? <>
       <div className="zoning-row">
         <button aria-label="Select zones" aria-pressed={!w.sketch.tool} onClick={w.cancel}><MousePointer2 size={18}/><span>Select</span></button>

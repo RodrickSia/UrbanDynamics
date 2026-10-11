@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 export function ZoningDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => dialog?.close(); }, []);
-  return <dialog ref={ref} className="zoning-dialog glass-panel zoning-ui" aria-label={title} onCancel={onClose}>
+  return <dialog ref={ref} className="zoning-dialog solid-panel zoning-ui" aria-label={title} onCancel={onClose}>
     <header><h2>{title}</h2><button className="quiet-icon-button" onClick={onClose} aria-label="Close dialog"><X size={18}/></button></header>
     {children}
   </dialog>;

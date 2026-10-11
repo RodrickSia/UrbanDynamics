@@ -41,7 +41,7 @@ export function MapStyleSelector({ value, onChange }: MapStyleSelectorProps) {
     >
       {isOpen && (
         <div className="basemap-pointer-bridge">
-          <section className="basemap-picker glass-panel" role="region" aria-label="Basemap">
+          <section className="basemap-picker solid-panel" role="region" aria-label="Basemap">
             <button type="button" aria-label="Default" aria-pressed={value === 'standard'} onClick={() => selectStyle('standard')}>
               <span className="basemap-preview default-preview" aria-hidden="true"><MapIcon size={18} /></span><span>Default</span>
             </button>

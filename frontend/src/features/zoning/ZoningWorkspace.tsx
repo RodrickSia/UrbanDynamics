@@ -27,7 +27,7 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
       <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { onActivate(); w.setPanel('indicators'); } }}><ChartPie aria-hidden="true" size={19}/></MotionIconButton>
     </nav>
     {w.panel && !searchOpen && <>
-      <aside className="zoning-panel glass-panel zoning-ui" data-has-plan={!!w.plan} aria-label={w.panel === 'plans' ? 'Plans panel' : 'Indicators panel'}>
+      <aside className="zoning-panel solid-panel zoning-ui" data-has-plan={!!w.plan} aria-label={w.panel === 'plans' ? 'Plans panel' : 'Indicators panel'}>
         <header>{w.plan && <button className="quiet-icon-button" aria-label="Back to plans" disabled={w.busy} onClick={() => { w.back(); w.setPanel('plans'); }}><ArrowLeft size={18}/></button>}
           <div><span className="eyebrow">{w.panel === 'plans' ? 'Plans' : 'Indicators'}</span><h2>{w.plan?.name ?? 'Zoning workspace'}</h2></div>
           <button className="quiet-icon-button" aria-label="Close zoning workspace" disabled={w.busy} onClick={w.close}><X size={18}/></button>
@@ -37,13 +37,13 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
         {w.plan && <p role="status" className="zoning-save-status">{w.busy ? 'Saving changes…' : `Saved · revision ${w.plan.revision}`}</p>}
       </aside>
       {w.plan && <>
-        <div className="zoning-scenario-bar glass-surface zoning-ui" aria-label="Plan scenarios">
+        <div className="zoning-scenario-bar solid-panel zoning-ui" aria-label="Plan scenarios">
           <div className="zoning-scenario-tabs" role="group" aria-label="Select scenario">{w.plan.scenarios.map(s => <button key={s.id} disabled={w.busy || !!w.sketch.tool} aria-pressed={w.scenario?.id === s.id} onClick={() => w.selectScenario(s.id)}>
             {s.locked && <LockKeyhole size={13}/>}<span>{s.name}</span>
           </button>)}</div>
           <button className="quiet-icon-button" aria-label="Duplicate scenario" title="Duplicate scenario" disabled={w.busy || !!w.sketch.tool} onClick={() => setDialog('add_scenario')}><Plus size={19}/></button>
           <button className="quiet-icon-button" aria-label="Scenario options" disabled={w.busy || !!w.sketch.tool} aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreHorizontal size={19}/></button>
-          {menu && <div className="zoning-scenario-menu glass-panel">
+          {menu && <div className="zoning-scenario-menu solid-panel">
             <button onClick={() => { setDialog('add_scenario'); setMenu(false); }}><Copy size={16}/>Duplicate scenario</button>
             <button onClick={() => { setDialog('rename_plan'); setMenu(false); }}>Rename plan</button>
             <button disabled={w.scenario?.kind === 'reference' || w.readOnly} onClick={() => { setDialog('rename_scenario'); setMenu(false); }}>Rename scenario</button>

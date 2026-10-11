@@ -52,7 +52,7 @@ describe('premium map workspace', () => {
     expect(within(layers).queryByText(/Add compatible datasets/i)).not.toBeInTheDocument();
     expect(within(layers).queryByText(/Waiting for a backend/i)).not.toBeInTheDocument();
     expect(within(layers).queryByText('API pending')).not.toBeInTheDocument();
-    expect(layers).toHaveClass('glass-panel');
+    expect(layers).toHaveClass('solid-panel');
   });
 
   it('opens the compact measurement toolbar without shifting the right controls', async () => {
@@ -67,7 +67,7 @@ describe('premium map workspace', () => {
     expect(screen.getByRole('button', { name: 'Done' })).toBeDisabled();
   });
 
-  it('keeps place details concise and glass-styled', async () => {
+  it('keeps place details concise on a solid panel', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -75,7 +75,7 @@ describe('premium map workspace', () => {
     await user.click(screen.getByRole('button', { name: 'Hanoi, Vietnam' }));
 
     const details = screen.getByRole('complementary', { name: 'Place details' });
-    expect(details).toHaveClass('glass-panel');
+    expect(details).toHaveClass('solid-panel');
     expect(within(details).queryByText(/sample data/i)).not.toBeInTheDocument();
     expect(within(details).queryByText(/backend endpoints/i)).not.toBeInTheDocument();
   });

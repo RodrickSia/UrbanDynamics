@@ -20,7 +20,7 @@ export function AreaMeasurementToolbar({ measurement, mode, onUnitsChange, onUnd
     ? calculateAreaMeasurement([...measurement.points,measurement.preview],mode) : committed,
   [measurement,mode,committed]);
   const units = measurement.units ?? 'metric';
-  return <aside ref={rootRef} className="measurement-toolbar area-toolbar glass-panel" role="region" aria-label="Area measurement">
+  return <aside ref={rootRef} className="measurement-toolbar area-toolbar solid-panel" role="region" aria-label="Area measurement">
     <div className="measurement-heading">
       <Pentagon aria-hidden="true" size={19} />
       <div>

@@ -35,7 +35,7 @@ export function PlaceDetailsPanel(props: PlaceDetailsPanelProps) {
   );
 
   return (
-    <aside ref={panelRef} className="place-details-panel glass-panel" aria-label="Place details">
+    <aside ref={panelRef} className="place-details-panel solid-panel" aria-label="Place details">
       <button
         className="drawer-collapse-button"
         type="button"

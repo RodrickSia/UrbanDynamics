@@ -115,7 +115,7 @@ export function SearchBox({ isOpen, onOpenChange, onSelectPlace, onWorkspaceHeig
 
   return (
     <div ref={rootRef} className={`search-module ${isOpen ? 'is-open' : ''}`}>
-      <form className="search-shell glass-surface" role="search" onSubmit={submitSearch}>
+      <form className="search-shell solid-panel" role="search" onSubmit={submitSearch}>
         <Search aria-hidden="true" size={19} />
         <label className="sr-only" htmlFor="location-search">Search places</label>
         <input
@@ -135,7 +135,7 @@ export function SearchBox({ isOpen, onOpenChange, onSelectPlace, onWorkspaceHeig
       </form>
 
       {isOpen && (
-        <section className="search-workspace glass-panel" role="region" aria-label="Search workspace">
+        <section className="search-workspace solid-panel" role="region" aria-label="Search workspace">
           <div className="search-section-heading">
             <span>Recent</span>
           </div>

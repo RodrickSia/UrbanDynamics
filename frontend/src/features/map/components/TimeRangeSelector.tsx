@@ -38,7 +38,7 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
   return (
     <div ref={rootRef} className="time-range-module">
       {isOpen && (
-        <section className="time-range-popover glass-panel" role="region" aria-label="Time range">
+        <section className="time-range-popover solid-panel" role="region" aria-label="Time range">
           {TIME_RANGE_OPTIONS.map((option) => (
             <button
               key={option.value}

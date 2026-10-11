@@ -369,7 +369,7 @@ function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: B
     <>
       {parcelId && <ParcelDetails key={parcelId} parcelId={parcelId} onClose={() => setParcelId(null)} />}
       {inspection && bridge.selections.length > 0 && (
-        <aside className="dataset-inspection glass-panel" aria-label="Dataset details">
+        <aside className="dataset-inspection solid-panel" aria-label="Dataset details">
           <button
             type="button"
             className="quiet-icon-button"

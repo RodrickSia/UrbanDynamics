@@ -54,7 +54,7 @@ export function ParcelDetails({ parcelId, onClose }: { parcelId: string; onClose
   const retry = useCallback(() => { setError(false); setDetail(null); setAttempt(value => value + 1); }, []);
 
   return createPortal(
-    <dialog ref={dialog} className="parcel-dialog glass-panel" aria-labelledby="parcel-title"
+    <dialog ref={dialog} className="parcel-dialog solid-panel" aria-labelledby="parcel-title"
       onCancel={event => { event.preventDefault(); close(); }}
       onClick={event => { if (event.target === event.currentTarget) {
         const rect = event.currentTarget.getBoundingClientRect();

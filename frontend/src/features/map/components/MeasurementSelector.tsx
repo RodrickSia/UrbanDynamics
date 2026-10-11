@@ -43,7 +43,7 @@ export function MeasurementSelector({ measurement, onSelect, viewshedActive = fa
       aria-label="Measurement tools" aria-expanded={open} onClick={() => setOpen(value => !value)}>
       <Ruler size={19} aria-hidden="true" />
     </MotionIconButton>
-    {open && <div className="measurement-picker glass-panel" role="group" aria-label="Choose measurement">
+    {open && <div className="measurement-picker solid-panel" role="group" aria-label="Choose measurement">
       <MotionIconButton className="corner-action" aria-label="Measure distance" title="Distance"
         aria-pressed={active && (measurement.kind ?? 'distance') === 'distance'} onClick={() => select('distance')}>
         <Ruler size={19} aria-hidden="true" />

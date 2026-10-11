@@ -12,7 +12,7 @@ export function LandPriceLegend({ status, selected, onClose, onRetry }: {
 }) {
   const source = selected ? safeSource(selected.source_url) : undefined;
   return (
-    <aside className="land-price-legend glass-panel" aria-label="Land price legend">
+    <aside className="land-price-legend solid-panel" aria-label="Land price legend">
       <strong>Official reference land price</strong>
       {status.state === 'loading' && <p role="status">Loading land-price data…</p>}
       {status.state === 'error' && <p role="alert">{status.message} <button type="button" onClick={onRetry}>Retry</button></p>}

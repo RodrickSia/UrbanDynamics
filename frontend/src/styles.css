@@ -11,7 +11,7 @@
   --accent-border: rgba(11, 95, 168, 0.32);
   --button-surface: rgba(232, 243, 253, 0.88);
   --surface: rgba(250, 253, 253, 0.78);
-  --surface-solid: rgba(248, 252, 252, 0.88);
+  --surface-solid: #fff;
   --surface-raised: rgba(255, 255, 255, 0.86);
   --surface-soft: rgba(24, 83, 139, 0.06);
   --border: rgba(35, 75, 115, 0.16);
@@ -23,8 +23,8 @@
   --shadow-panel: 0 1.25rem 3rem rgba(22, 54, 58, 0.18);
   --radius-control: 0.5rem;
   --radius-panel: 0.75rem;
-  --left-drawer-width: min(25rem, calc(100vw - 4rem));
-  --right-drawer-width: min(25rem, calc(100vw - 4rem));
+  --left-drawer-width: min(22rem, calc(100vw - 4rem));
+  --right-drawer-width: min(22rem, calc(100vw - 4rem));
 }
 
 * {
@@ -91,8 +91,7 @@ input:focus-visible {
   inset: 0;
 }
 
-.glass-surface,
-.glass-panel {
+.glass-surface {
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow:
@@ -102,7 +101,9 @@ input:focus-visible {
   -webkit-backdrop-filter: saturate(165%) blur(1.125rem);
 }
 
-.glass-panel {
+.solid-panel {
+  border: 1px solid var(--border);
+  background: var(--surface-solid);
   box-shadow: var(--shadow-panel);
 }
 
@@ -370,8 +371,6 @@ input:focus-visible {
   color: var(--text);
   background: var(--surface-solid);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: saturate(165%) blur(1.25rem);
-  -webkit-backdrop-filter: saturate(165%) blur(1.25rem);
   will-change: transform;
 }
 
@@ -447,10 +446,8 @@ input:focus-visible {
   min-height: 7rem;
   place-items: center;
   color: var(--accent);
-  background:
-    linear-gradient(rgba(252, 255, 255, 0.28), rgba(231, 243, 244, 0.82)),
-    radial-gradient(circle at 30% 20%, rgba(58, 184, 198, 0.25), transparent 40%),
-    rgba(225, 240, 242, 0.9);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-solid);
 }
 
 .place-details-content {
@@ -618,8 +615,6 @@ input:focus-visible {
   color: var(--text);
   background: var(--surface-solid);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: saturate(165%) blur(1.25rem);
-  -webkit-backdrop-filter: saturate(165%) blur(1.25rem);
   will-change: transform, opacity;
 }
 
@@ -1149,8 +1144,8 @@ input:focus-visible {
 
 @media (max-width: 64rem) {
   :root {
-    --left-drawer-width: min(23rem, calc(100vw - 3.5rem));
-    --right-drawer-width: min(23rem, calc(100vw - 3.5rem));
+    --left-drawer-width: min(21rem, calc(100vw - 3.5rem));
+    --right-drawer-width: min(21rem, calc(100vw - 3.5rem));
   }
 
   .search-dock {

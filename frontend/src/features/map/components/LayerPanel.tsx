@@ -61,7 +61,7 @@ export function LayerPanel(props: LayerPanelProps) {
   return (
     <aside
       ref={panelRef}
-      className="right-workspace layer-workspace glass-panel dataset-panel"
+      className="right-workspace layer-workspace solid-panel dataset-panel"
       role="region"
       aria-label="Data layers"
     >
