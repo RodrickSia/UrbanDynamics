@@ -8,6 +8,7 @@ test('parcel colors, distant tiles, accessible details and style restoration', a
   const requests: string[] = [];
   let failDetail = true;
   let missingPrice = false;
+  let provisionalPrice = false;
   const plots = new GeoJSONVT({ type: 'Feature', id: 42,
     properties: { parcel_id: '42', mdsdd: 'ODT', color: '#d6604d' },
     geometry: { type: 'Polygon', coordinates: [[[106.699,10.799], [106.701,10.799],
@@ -28,8 +29,12 @@ test('parcel colors, distant tiles, accessible details and style restoration', a
     requests.push(url.pathname + url.search);
     if (url.pathname === '/api/v1/layers') return route.fulfill({ json: { layers: [{ id: 'parcels', available: true }] } });
     if (url.pathname === '/api/v1/parcels/42') return route.fulfill({ status: failDetail ? 503 : 200,
-      json: missingPrice ? { ...detail, price: { ...detail.price, status: 'unavailable',
-        unit_price_vnd_m2: null, estimated_land_total_vnd: null, selected: null } } : detail });
+      json: provisionalPrice ? { ...detail, parcel: { ...detail.parcel, mdsdd: 'L' },
+        price: { ...detail.price, status: 'provisional', classification_basis: 'planning',
+          classification_confidence: 'low', valuation_confidence: 'low',
+          estimated_land_total_vnd: null, selected: { ...detail.price.selected, distance_m: 26 } } }
+        : missingPrice ? { ...detail, price: { ...detail.price, status: 'unavailable',
+          unit_price_vnd_m2: null, estimated_land_total_vnd: null, selected: null } } : detail });
     if (url.pathname.endsWith('/features')) return route.fulfill({ json: { type: 'FeatureCollection', features: [], metadata: {} } });
     if (url.pathname.endsWith('.pbf')) {
       const [z,x,y] = url.pathname.match(/tiles\/(\d+)\/(\d+)\/(\d+)/)!.slice(1).map(Number);
@@ -79,6 +84,15 @@ test('parcel colors, distant tiles, accessible details and style restoration', a
   await expect(dialog).toContainText('Estimated Land Value');
   await expect(dialog.locator('.parcel-price')).toHaveText('null');
   await expect(dialog.locator('.parcel-formula')).toContainText('null');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  provisionalPrice = true;
+  await page.mouse.click(500, 350);
+  await expect(dialog.locator('.parcel-price')).toContainText('10.000.000');
+  await expect(dialog.locator('.parcel-price')).toContainText('₫/m²');
+  await expect(dialog).toContainText('Residential · from planning');
+  await expect(dialog).toContainText('Indicative unit price · low confidence');
+  await expect(dialog.locator('.parcel-formula')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await page.evaluate('window.dataMap.setStyle({version:8,sources:{},layers:[]})');

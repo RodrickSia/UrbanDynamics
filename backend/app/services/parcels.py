@@ -44,11 +44,29 @@ def positive(value):
         return None
 
 
+def planning_residential_reference(parcel):
+    """A source L parcel may use a unit-price category from explicit apartment planning."""
+    if str(parcel.get('mdsdd') or '').strip().upper() != 'L':
+        return False
+    rows = planning_breakdown(parcel.get('loai_dat_qh'))
+    parts = [part for part in str(parcel.get('loai_dat_qh') or '').split(';') if part.strip()]
+    labels = {row['label'].casefold() for row in rows}
+    return (len(rows) == len(parts) and
+            any(row['label'].casefold() == 'đất chung cư phức hợp' and row['area_m2'] > 0
+                for row in rows) and
+            labels <= {'đất chung cư phức hợp', 'đất giao thông'})
+
+
 def price_reference(parcel, candidates):
     classification = classify(parcel.get('mdsdd'))
+    classification['classification_basis'] = 'source_land_use' if classification['price_category'] else 'unmapped'
     if parcel.get('conflicting_land_use'):
         classification.update(normalized_land_use=None, price_category=None,
-                              classification_confidence='unmapped')
+                              classification_confidence='unmapped', classification_basis='unmapped')
+    elif not classification['price_category'] and planning_residential_reference(parcel):
+        classification.update(normalized_land_use='Planned apartment use',
+                              price_category='Residential', classification_confidence='low',
+                              classification_basis='planning')
     result = {'status': 'unavailable', 'method': 'nearby_road_geometry',
               'unit_price_vnd_m2': None, 'estimated_land_total_vnd': None,
               'candidates': candidates, 'selected': None,
@@ -60,6 +78,10 @@ def price_reference(parcel, candidates):
         return result
     # Boundaries near a road are evidence of proximity, not legal frontage.
     nearby = [item for item in candidates if item['distance_m'] <= 15]
+    if not nearby:
+        # A centerline across a road can be farther than 15 m from the plot.
+        # Keep this wider association provisional and require one unique road.
+        nearby = [item for item in candidates if item['distance_m'] <= 40]
     if not nearby:
         return result
     identities = {(item['properties'].get('road'), item['properties'].get('start'),
@@ -82,14 +104,16 @@ def price_reference(parcel, candidates):
     unit_price = positive(props.get(field))
     if not unit_price:
         return result
-    result.update(status='reference', unit_price_vnd_m2=unit_price)
+    provisional = classification['classification_basis'] == 'planning' or selected['distance_m'] > 15
+    result.update(status='provisional' if provisional else 'reference',
+                  unit_price_vnd_m2=unit_price)
     result['valuation_confidence'] = (
-        'low' if classification['classification_confidence'] == 'low' else
+        'low' if provisional or classification['classification_confidence'] == 'low' else
         'high' if result['geometry_review_status'] == 'reviewed' and
                   classification['classification_confidence'] == 'high' else 'medium')
     area = positive(parcel.get('area_m2'))
     identity = str(parcel.get('uniq_id') or '').strip().lower()
-    if area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
+    if not provisional and area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
         result['estimated_land_total_vnd'] = round(unit_price * area)
     return result
 
