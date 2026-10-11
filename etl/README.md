@@ -38,17 +38,28 @@ python -m src.main run flood_history --stage all \
 ```
 
 The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
-stage choices for most pipelines, plus `transform` / `load` for parcels. Its
-**all** choice runs eligible full pipelines sequentially in
-this order: population, flood history, flood satellite, flood risk, and land
-price. If rainfall inputs are missing, it downloads forecast/history from
-Open-Meteo for one integration point. If land-price inputs are missing, it
-downloads and parses the official annex and fetches OSM road candidates. The
-boundary is also prepared automatically. Flood risk can then run; land-price
-publishing remains skipped until a person reviews the candidate geometry and
-price values. Selecting all pipelines requires stage `all`. Parcel ETL also
-supports independent `transform` and `load` stages; other pipelines require
-their full pipeline to execute those steps.
+stage choices for most pipelines, plus `transform` / `load` for parcels and
+building footprints. Its **all** choice runs eligible full pipelines
+sequentially in this order: population, flood history, flood satellite, flood
+risk, land price, and HCMC building footprints. If rainfall inputs are missing,
+it downloads forecast/history from Open-Meteo. Land-price source rows and OSM
+road candidates are prepared automatically. Selecting all pipelines requires
+stage `all`. Parcel and buildings-footprint ETL support separate
+`transform` and `load` stages.
+
+Run Overture building footprints independently:
+
+```sh
+docker compose --profile etl-buildings-footprint run --rm etl-buildings-footprint run --stage all
+```
+
+The pipeline reads the pinned Overture `buildings/building` release using a
+bounding-box prefilter, then clips footprints to the checked-in expanded HCMC
+boundary. It fetches building features, not building parts. Source Parquet is
+cached under `etl/data/buildings_footprint/`; use `--refresh` to fetch the
+pinned release again. Extraction and transformation can also run separately
+with `--stage extract` and `--stage transform`; `--stage load` loads normalized
+Parquet without contacting Overture.
 
 ## Warehouse and data
 
@@ -65,6 +76,20 @@ For an already downloaded tile tree, the parcel ETL can also run the stages
 separately with `--stage transform` (validate the XYZ tile tree) and
 `--stage load` (decode and stream the saved tiles to PostGIS). This avoids
 re-fetching tiles when only the database load needs to be completed.
+
+Buildings are bulk-loaded into `buildings.footprint`, with source release,
+attributes, and MultiPolygon geometry, and a latest-import record in
+`buildings.snapshot_metadata`. The load stages rows into a temporary table and
+replaces the previous snapshot in one transaction, so a failed import leaves
+the last successful dataset intact. The `04-buildings-footprint.sql` migration
+creates these tables and spatial indexes; apply it through the existing
+database deployment workflow before running the pipeline.
+
+The checked-in HCMC boundary is from the Vietnamese Provinces Database GIS
+dataset, revision `86361845ba60ee779905ef07f04d7db33c798d04`. Its maintainers
+say the geometry derives from the Vietnam Administrative Units Reference Map
+published by the Ministry of Agriculture and Environment's mapping publisher.
+The source repository is MIT licensed and is not a government agency.
 
 All pipeline services share the host directory `etl/data/`. Flood risk reads a
 previously published `flood_history` layer and forecast/history JSON from

@@ -25,6 +25,10 @@ etl/data/raw/land_price/*
 !etl/data/raw/land_price/official-annex-2026.pdf
 # Keep the downloaded HCMC parcel tiles and sample GeoJSON.
 !etl/data/parcels_hcmc/
+# Keep the pinned HCMC boundary; generated Overture Parquet stays ignored.
+!etl/data/buildings_footprint/
+etl/data/buildings_footprint/*
+!etl/data/buildings_footprint/hcmc_boundary.geojson
 test-results/
 
 # Frontend dependencies and build output

@@ -27,9 +27,10 @@ jobs:
             --profile etl-flood-history --profile etl-flood-satellite \
             --profile etl-flood-risk --profile etl-land-price \
             --profile etl-parcels-hcmc \
+            --profile etl-buildings-footprint \
             build backend frontend etl-population-hcmc \
             etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price \
-            etl-parcels-hcmc
+            etl-parcels-hcmc etl-buildings-footprint
 
   database:
     runs-on: ubuntu-latest
@@ -82,6 +83,12 @@ jobs:
             END IF;
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql') <> 1 THEN
               RAISE EXCEPTION 'parcels migration was not tracked exactly once';
+            END IF;
+            IF to_regclass('buildings.footprint') IS NULL OR to_regclass('buildings.snapshot_metadata') IS NULL THEN
+              RAISE EXCEPTION 'buildings footprint tables are missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql') <> 1 THEN
+              RAISE EXCEPTION 'buildings footprint migration was not tracked exactly once';
             END IF;
           END
           $$;

@@ -16,6 +16,7 @@ on:
           - flood_risk
           - land_price
           - parcels_hcmc
+          - buildings_footprint
       stage:
         description: ETL stage to run
         type: choice
@@ -86,8 +87,16 @@ jobs:
               echo "::error::The parcel migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
               exit 1
             fi
+          elif [ "$ETL_PIPELINE" = buildings_footprint ] || [ "$ETL_PIPELINE" = all ]; then
+            buildings_migration_query="to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.snapshot_metadata') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$buildings_migration_query" | grep -Fxq t; then
+              echo "::error::The buildings-footprint migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
           elif [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; then
-            echo "::error::The transform and load stages are currently supported only for parcels_hcmc." >&2
+            echo "::error::The transform and load stages are currently supported only for parcels_hcmc and buildings_footprint." >&2
             exit 1
           fi
 
@@ -176,7 +185,7 @@ jobs:
               echo "::warning::Could not prepare automatic land-price road matches; land_price will be skipped."
             fi
             skipped=()
-            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
+            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price buildings_footprint; do
               if [ "$pipeline" = flood_risk ] && [ "$rainfall_ready" != true ]; then
                 echo "::warning::Skipping flood_risk: forecast/history inputs could not be prepared."
                 skipped+=(flood_risk)

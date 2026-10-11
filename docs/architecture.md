@@ -21,9 +21,11 @@ Compose network; services connect to the database at `postgis:5432`.
 
 PostGIS 17 stores relational data and population raster tiles. Flood and
 land-price vector snapshots share `public.layer_snapshots` and
-`public.layer_features`. Migrations under `infra/warehouse/migrations/` define
-the schema and the warehouse runner records applied versions. ETL pipelines do
-not create tables.
+`public.layer_features`. Overture footprints use the dedicated, spatially
+indexed `buildings.footprint` table and import metadata table because the HCMC
+dataset is too large for row-by-row generic snapshot publishing. Migrations
+under `infra/warehouse/migrations/` define the schema and the warehouse runner
+records applied versions. ETL pipelines do not create tables.
 
 CI validates the database, backend, and frontend in independent jobs. Database
 migrations deploy separately because they modify persistent data. Backend and
