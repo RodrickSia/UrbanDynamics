@@ -4,7 +4,7 @@
 .zoning-nav-button + .zoning-nav-button { border-top: 1px solid var(--border); }
 .zoning-nav-button:hover:not(:disabled) { color: var(--accent); background: var(--accent-muted); }
 .zoning-nav-button[aria-pressed="true"], .zoning-scenario-tabs button[aria-pressed="true"] { color: var(--accent-strong); background: var(--accent-muted); }
-.zoning-panel { position: absolute; z-index: 42; top: 0; bottom: 0; right: 0; width: min(25rem, calc(100vw - 4rem)); padding: 1.25rem 1.15rem 1.5rem; border-radius: var(--radius-panel) 0 0 var(--radius-panel); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; box-shadow: -.5rem 0 2rem rgba(21, 41, 45, .12); }
+.zoning-panel { position: absolute; z-index: 42; top: 0; bottom: 0; right: 0; width: min(25rem, calc(100vw - 4rem)); padding: 1.25rem 1.15rem 1.5rem; border-radius: 0; border-left: 1px solid var(--border); background: var(--surface-solid); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; box-shadow: var(--shadow-panel); }
 .map-workspace[data-zoning-open='true'] .navigation-cluster,
 .map-workspace[data-zoning-open='true'] .corner-tools { transform: translateX(calc(-1 * min(25rem, 100vw - 4rem))); }
 .zoning-ui { font-size: .85rem; color: var(--text); }
