@@ -17,7 +17,7 @@ export interface SnapCandidate {
 }
 
 export function buildingObjectId(feature: MapGeoJSONFeature): string {
-  return `${feature.source ?? ''}:${feature.sourceLayer ?? ''}:${feature.properties?.gid ?? feature.id ?? JSON.stringify(feature.geometry)}`;
+  return `${feature.source ?? ''}:${feature.sourceLayer ?? ''}:${feature.properties?.gid ?? feature.properties?.feature_id ?? feature.id ?? JSON.stringify(feature.geometry)}`;
 }
 
 /** Build once per scene revision. Altitudes match the rendered extrusion plane. */

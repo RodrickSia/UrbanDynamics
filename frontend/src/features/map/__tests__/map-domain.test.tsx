@@ -138,6 +138,7 @@ describe('map domain', () => {
   });
 
   it('uses only explicit building elevation data', () => {
+    expect(readBuildingHeight({ height_m: 28.5 })).toBe(28.5);
     expect(readBuildingHeight({ height: '36.5' })).toBe(36.5);
     expect(readBuildingHeight({ levels: 8 })).toBeNull();
     expect(readBuildingHeight({ name: 'Building without height' })).toBeNull();

@@ -6,7 +6,7 @@ import { configureMapLibreWorker } from '../config/maplibreWorker';
 import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
-import { setBuildings3d } from '../layers/buildings3d';
+import { BUILDINGS_SNAPSHOT_URL, BUILDINGS_SOURCE_ID, setBuildings3d } from '../layers/buildings3d';
 import { installLandPrice, LAND_PRICE_LAYER, type LandPriceStatus, type LandPriceProperties } from '../layers/landPrice';
 import { LandPriceLegend } from './LandPriceLegend';
 import {
@@ -128,17 +128,15 @@ export function UrbanMap(props: UrbanMapProps) {
           } catch {
             if (in3d) current.onStatusChange(true, 'Map ready · 3D terrain unavailable');
           }
-          let buildingsAvailable = true;
           try {
-            buildingsAvailable = setBuildings3d(
+            setBuildings3d(
               map,
               in3d && current.buildingsEnabled,
               current.buildingsOpacity,
             );
           } catch {
-            buildingsAvailable = false;
+            current.onBuildingsAvailabilityChange(false);
           }
-          current.onBuildingsAvailabilityChange(buildingsAvailable);
         };
 
         const handleStyleLoad = () => {
@@ -171,9 +169,11 @@ export function UrbanMap(props: UrbanMapProps) {
         map.on('idle', interactions.idle);
         map.on('sourcedata', interactions.scenechange);
         map.on('styledata', interactions.scenechange);
-        map.on('error', () =>
-          propsRef.current.onStatusChange(false, 'Some map data could not be loaded'),
-        );
+        map.on('error', (event) => {
+          if ('sourceId' in event && event.sourceId === BUILDINGS_SOURCE_ID)
+            propsRef.current.onBuildingsAvailabilityChange(false);
+          propsRef.current.onStatusChange(false, 'Some map data could not be loaded');
+        });
       })
       .catch(() => propsRef.current.onStatusChange(false, 'MapLibre could not be initialized'));
 
@@ -215,8 +215,8 @@ export function UrbanMap(props: UrbanMapProps) {
       if (in3d) onStatusChange(true, 'Map ready · 3D terrain unavailable');
     }
     try {
-      const available = setBuildings3d(map, in3d && buildingsEnabled, buildingsOpacity);
-      onBuildingsAvailabilityChange(available);
+      setBuildings3d(map, in3d && buildingsEnabled, buildingsOpacity);
+      if (!in3d || !buildingsEnabled) onBuildingsAvailabilityChange(true);
     } catch {
       onBuildingsAvailabilityChange(false);
     }
@@ -230,6 +230,19 @@ export function UrbanMap(props: UrbanMapProps) {
     onBuildingsAvailabilityChange,
     onStatusChange,
   ]);
+
+  useEffect(() => {
+    if (!configuration.ok || !styleReadyRef.current || mode !== '3d' || !buildingsEnabled) return;
+    const abort = new AbortController();
+    void fetch(BUILDINGS_SNAPSHOT_URL, { signal: abort.signal, cache: 'no-cache' })
+      .then(response => {
+        if (!abort.signal.aborted) onBuildingsAvailabilityChange(response.ok);
+      })
+      .catch(() => {
+        if (!abort.signal.aborted) onBuildingsAvailabilityChange(false);
+      });
+    return () => abort.abort();
+  }, [configuration, mode, buildingsEnabled, mapRevision, onBuildingsAvailabilityChange]);
 
   useEffect(() => {
     const map = mapRef.current;

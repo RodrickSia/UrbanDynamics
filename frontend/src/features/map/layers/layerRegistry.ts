@@ -9,7 +9,7 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   {
     id: 'buildings-3d',
     label: '3D buildings',
-    description: 'Building extrusions from the Goong vector source when available.',
+    description: 'Building extrusions from the GBA LoD1 model when loaded in the warehouse.',
     category: 'built-environment',
     enabledByDefault: false,
     status: 'available',

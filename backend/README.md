@@ -27,6 +27,8 @@ order. Spatial query bboxes use `west,south,east,north`.
 | Population XYZ PNG tiles | `/api/v1/population/{year}/tiles/{z}/{x}/{y}.png?palette=pseudocolor` |
 | Population point sample | `/api/v1/population/{year}/value?lng=106.7&lat=10.8` |
 | Population viewport statistics | `/api/v1/population/{year}/stats?bbox=west,south,east,north` |
+| GBA LoD1 building snapshot | `/api/v1/buildings/snapshot` |
+| GBA LoD1 building vector tiles | `/api/v1/buildings/tiles/{z}/{x}/{y}.pbf` |
 
 The vector catalog exposes layer availability, geometry types, fields, source
 metadata, and known limitations. Flood history is reported point observations
@@ -57,6 +59,12 @@ in `population.population_raster`, while vector snapshots remain in
 `public.layer_snapshots` and `public.layer_features`.
 Population PNG rendering is done in the API process from resampled pixel
 values, so it does not require enabling GDAL output drivers in PostGIS.
+
+The 3D building tiles read the `buildings.gba_lod1` snapshot added by the GBA
+ETL on `main`. Only footprints with a positive `height_m` are extruded; the
+frontend reports the model unavailable until a loaded snapshot contains such
+buildings. Tiles are native at zoom 14–16 and overzoom at closer views. The
+GBA model carries CC BY-NC 4.0 terms; the map attributes that source.
 
 ## Configuration and operation
 
