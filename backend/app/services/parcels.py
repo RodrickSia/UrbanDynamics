@@ -210,6 +210,42 @@ def plan_vector_tile(study_area, z, x, y):
     return bytes(row[0]) if row and row[0] else b''
 
 
+def zoned_parcel_vector_tile(zones, z, x, y):
+    """Color only parcel fragments covered by saved proposal zones."""
+    if z < MIN_ZOOM or not zones:
+        return b''
+    resolution = 40075016.68557849 / (512 * 2**z)
+    min_area = (resolution * 2)**2 if z < 16 else 0
+    tolerance = resolution * 0.3 if z < 16 else 0
+    with connect_to_warehouse() as connection:
+        connection.execute("SET LOCAL statement_timeout = '5s'")
+        row = connection.execute("""
+            WITH bounds AS (SELECT ST_TileEnvelope(%s,%s,%s) AS geom),
+            zone_geometries AS (
+                SELECT zone->>'id' AS zone_id,
+                       ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON((zone->'geometry')::text),4326),3857) AS geom
+                FROM jsonb_array_elements(%s::jsonb) AS entries(zone)
+            ), clipped AS (
+                SELECT p.id::text AS parcel_id, p.mdsdd, z.zone_id,
+                       CASE WHEN p.conflicting_land_use THEN '#94a3b8'
+                            ELSE COALESCE(%s::jsonb->>p.mdsdd,'#94a3b8') END AS source_color,
+                       ST_CollectionExtract(ST_Intersection(
+                           ST_SimplifyPreserveTopology(p.geom_web,%s),z.geom),3) AS geom
+                FROM parcels.plot p JOIN zone_geometries z
+                  ON p.geom_web && z.geom AND ST_Intersects(p.geom_web,z.geom)
+                CROSS JOIN bounds b
+                WHERE p.geom_web && ST_Expand(b.geom,(ST_XMax(b.geom)-ST_XMin(b.geom))*64/4096)
+                  AND z.geom && ST_Expand(b.geom,(ST_XMax(b.geom)-ST_XMin(b.geom))*64/4096)
+                  AND p.area_web >= %s
+            ), tile AS (
+                SELECT p.parcel_id, p.mdsdd, p.zone_id, p.source_color,
+                       ST_AsMVTGeom(p.geom,b.geom,4096,64,true) AS geom
+                FROM clipped p, bounds b WHERE NOT ST_IsEmpty(p.geom)
+            ) SELECT ST_AsMVT(tile,'features',4096,'geom') FROM tile
+        """, (z, x, y, Jsonb(zones), Jsonb(COLORS), tolerance, min_area)).fetchone()
+    return bytes(row[0]) if row and row[0] else b''
+
+
 def study_land_use(study_area):
     """Summarize observed parcel use inside a plan, separately from proposed zoning."""
     with connect_to_warehouse() as connection:

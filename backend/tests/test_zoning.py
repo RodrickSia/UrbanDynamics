@@ -63,6 +63,28 @@ def test_current_parcel_land_use_is_separate_from_proposal_zones(client, plan, m
     assert plan["scenarios"][0]["zones"] == []
 
 
+def test_zoned_parcel_tiles_only_use_saved_proposal_zones(client, plan, monkeypatch):
+    from app.services import parcels
+
+    plan = draw(client, add_type(client, plan))
+    monkeypatch.setattr(zoning_router, "warehouse_configured", lambda: True)
+    captured = []
+    def tile(zones, z, x, y):
+        captured.append((zones, z, x, y))
+        return b"tile"
+    monkeypatch.setattr(parcels, "zoned_parcel_vector_tile", tile)
+    path = f"/api/v1/zoning/plans/{plan['id']}/zoned-parcels/tiles/12/3262/1928.pbf"
+    query = {"revision": plan["revision"], "scenario_id": plan["scenarios"][1]["id"]}
+    response = client.get(path, params=query)
+    assert response.status_code == 200
+    assert response.content == b"tile"
+    assert captured[0][0][0]["id"] == plan["scenarios"][1]["zones"][0]["id"]
+    assert captured[0][0][0]["geometry"] == plan["scenarios"][1]["zones"][0]["geometry"]
+    assert captured[0][1:] == (12, 3262, 1928)
+    assert client.get(path, params={**query, "scenario_id": plan["scenarios"][0]["id"]}).status_code == 204
+    assert client.get(path, params={**query, "revision": 1}).status_code == 409
+
+
 def draw(client, plan, geometry=None, policy="preserve"):
     return command(client, plan, "draw", {"geometry": geometry or rectangle(east=106.761),
                    "type_id": plan["types"][0]["id"], "policy": policy})

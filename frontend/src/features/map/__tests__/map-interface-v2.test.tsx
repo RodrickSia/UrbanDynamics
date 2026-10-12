@@ -47,16 +47,12 @@ describe('map-first workspace', () => {
     expect(screen.getByRole('button', { name: 'Collapse place details' })).toBeEnabled();
   });
 
-  it('reveals time ranges horizontally only after the time icon is pressed', async () => {
-    const user = userEvent.setup();
+  it('keeps the map tool cluster focused on active tools', () => {
     render(<App />);
 
     expect(screen.queryByRole('region', { name: 'Time range' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Open time range' }));
-
-    const picker = screen.getByRole('region', { name: 'Time range' });
-    expect(within(picker).getByRole('button', { name: '30 minutes' })).toBeEnabled();
-    expect(within(picker).getByRole('button', { name: '1 year' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Open time range' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Measurement tools' })).toBeEnabled();
   });
 
   it('uses the right sidebar for layers and a compact bottom toolbar for distance measurement', async () => {

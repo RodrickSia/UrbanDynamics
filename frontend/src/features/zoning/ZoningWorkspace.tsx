@@ -24,13 +24,13 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
   workspace: Workspace; onActivate: () => void; searchOpen: boolean; searchPanelHeight: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [dialog, setDialog] = useState<'add_scenario' | 'rename_scenario' | 'delete_scenario' | 'rename_plan' | null>(null);
+  const [dialog, setDialog] = useState<'add_scenario' | 'rename_scenario' | 'delete_scenario' | null>(null);
   const [menu, setMenu] = useState(false);
   const [tab, setTab] = useState<DetailTab>('zoning');
   const displayedTab = w.selected.length ? 'zoning' : tab;
   useGSAP(() => {
     if (!w.panel || searchOpen) return;
-    gsap.fromTo('.zoning-plan-drawer', { opacity: 0, x: -24 },
+    if (!w.plan) gsap.fromTo('.zoning-plan-drawer', { opacity: 0, x: -24 },
       { opacity: 1, x: 0, duration: motionDuration(.32), ease: 'power3.out', clearProps: 'transform,opacity' });
     if (w.plan) gsap.fromTo('.zoning-detail-drawer', { opacity: 0, x: 24 },
       { opacity: 1, x: 0, duration: motionDuration(.32), ease: 'power3.out', clearProps: 'transform,opacity' });
@@ -38,16 +38,16 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
   return <div ref={ref} className="zoning-workspace" data-has-plan={!!w.plan}>
     <nav className="zoning-nav glass-surface" aria-label="Planning workspace"
       data-search-open={searchOpen} style={{ '--search-panel-height': `${searchPanelHeight}px` } as CSSProperties}>
-      <MotionIconButton className="zoning-nav-button" title="Plans" aria-label="Plans" aria-pressed={w.panel === 'plans'} disabled={w.busy} onClick={() => { if (w.panel === 'plans') w.close(); else { onActivate(); w.setPanel('plans'); setTab('zoning'); } }}><Clapperboard aria-hidden="true" size={19}/></MotionIconButton>
+      <MotionIconButton className="zoning-nav-button" title="Plans" aria-label="Plans" aria-pressed={w.panel === 'plans'} disabled={w.busy} onClick={() => { if (w.panel === 'plans' && !w.plan) w.close(); else { onActivate(); w.back(); w.setPanel('plans'); setTab('zoning'); } }}><Clapperboard aria-hidden="true" size={19}/></MotionIconButton>
       <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { onActivate(); w.setPanel('indicators'); setTab('dashboard'); } }}><ChartPie aria-hidden="true" size={19}/></MotionIconButton>
     </nav>
     {w.panel && !searchOpen && <>
-      <aside className="zoning-plan-drawer solid-panel zoning-ui" data-creating={w.sketch.tool === 'study'} aria-label="Plans panel">
+      {!w.plan && <aside className="zoning-plan-drawer solid-panel zoning-ui" data-creating={w.sketch.tool === 'study'} aria-label="Plans panel">
         <header><div><h2>Plans</h2></div>
           <button className="quiet-icon-button" aria-label="Close zoning workspace" disabled={w.busy} onClick={w.close}><X size={18}/></button></header>
         {!w.plan && w.error && <div className="zoning-error" role="alert">{w.error}</div>}
         <PlansPanel workspace={w}/>
-      </aside>
+      </aside>}
       {w.plan && <>
         <aside className="zoning-detail-drawer solid-panel zoning-ui" aria-label="Plan details">
           <header><div><span className="eyebrow">{w.scenario?.name ?? 'Plan'}</span><h2>{w.plan.name}</h2></div>
@@ -57,7 +57,7 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
             onClick={() => { if (w.selected.length) w.pick(null, false); setTab(item.id); }}><item.icon size={19} aria-hidden="true"/></button>)}</nav>
           {w.error && <div className="zoning-error" role="alert"><p>{w.error}</p><button disabled={w.busy} onClick={() => void w.openPlan(w.plan!.id)}>Reload plan</button></div>}
           <div key={displayedTab} className="zoning-tab-body">
-            {displayedTab === 'info' ? <PlanInfoPanel workspace={w} onRename={() => setDialog('rename_plan')}/>
+            {displayedTab === 'info' ? <PlanInfoPanel workspace={w}/>
               : displayedTab === 'zoning' ? <PlanZoningPanel workspace={w}/>
               : displayedTab === 'development' ? <DevelopmentPanel workspace={w}/>
               : <IndicatorsPanel workspace={w}/>}
@@ -80,8 +80,8 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
         <ZoningToolbar workspace={w}/>
       </>}
     </>}
-    {dialog && <ActionDialog title={{ add_scenario: 'Duplicate scenario', rename_scenario: 'Rename scenario', rename_plan: 'Rename plan', delete_scenario: 'Delete scenario?' }[dialog]}
-      initial={dialog === 'delete_scenario' ? undefined : dialog === 'rename_plan' ? w.plan?.name : dialog === 'add_scenario' ? `${w.scenario?.name} copy` : w.scenario?.name}
+    {dialog && <ActionDialog title={{ add_scenario: 'Duplicate scenario', rename_scenario: 'Rename scenario', delete_scenario: 'Delete scenario?' }[dialog]}
+      initial={dialog === 'delete_scenario' ? undefined : dialog === 'add_scenario' ? `${w.scenario?.name} copy` : w.scenario?.name}
       message={dialog === 'delete_scenario' ? 'This scenario and its geometry history will be removed.' : undefined}
       busy={w.busy} error={w.error} onClose={() => setDialog(null)} onConfirm={async name => !!await w.execute(dialog, dialog === 'delete_scenario' ? { confirm: true } : { name })}/>}
   </div>;

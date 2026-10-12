@@ -14,6 +14,11 @@ export function PlanZoningPanel({ workspace: w }: { workspace: ZoningWorkspace }
   const [typeAction, setTypeAction] = useState<{ type: ZoneType; action: 'delete_type' | 'duplicate_type' } | null>(null);
   const plan = w.plan, scenario = w.scenario;
   if (!plan || !scenario) return null;
+  if (scenario.kind === 'reference') return <>
+    <CurrentParcelUse plan={plan}/>
+    <label className="zoning-check"><input type="checkbox" disabled={!w.parcelAvailable} checked={w.showParcels && w.parcelAvailable}
+      onChange={e => w.setShowParcels(e.target.checked)}/>Show parcel outlines</label>
+  </>;
   const assigned = scenario.zones.reduce((sum, zone) => sum + zone.area_m2, 0);
   const unassigned = Math.max(0, plan.area_m2 - assigned);
   const reorder = (index: number, direction: number) => {
@@ -35,7 +40,6 @@ export function PlanZoningPanel({ workspace: w }: { workspace: ZoningWorkspace }
     <label>Overlap policy<select disabled={w.readOnly || w.busy} value={w.policy} onChange={e => w.setPolicy(e.target.value as 'preserve' | 'replace')}>
       <option value="preserve">Preserve existing</option><option value="replace">Replace underneath</option>
     </select></label>
-    <CurrentParcelUse plan={plan}/>
     <h3>Zoning types <button className="quiet-icon-button" disabled={w.busy || !!w.sketch.tool} onClick={() => { w.setError(''); setEditingType('new'); }} aria-label="Add zoning type"><Plus size={18}/></button></h3>
     <input aria-label="Search zoning types" placeholder="Search type or code" value={filter} onChange={e => setFilter(e.target.value)}/>
     {!plan.types.length && <p className="zoning-muted">Add a type, then draw a zone.</p>}

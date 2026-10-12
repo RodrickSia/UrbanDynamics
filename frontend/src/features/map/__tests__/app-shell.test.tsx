@@ -31,6 +31,7 @@ describe('map application shell', () => {
     render(<App />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('Goong Map Tiles Key is not configured');
-    expect(screen.getByRole('button', { name: 'Open time range' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Measurement tools' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Open time range' })).not.toBeInTheDocument();
   });
 });

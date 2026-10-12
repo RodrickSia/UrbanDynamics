@@ -76,6 +76,30 @@ def plan_parcels_tile(identifier: UUID, z: int, x: int, y: int, revision: int = 
                     headers={"Cache-Control": "private, max-age=300"})
 
 
+@router.get("/{identifier}/zoned-parcels/tiles/{z}/{x}/{y}.pbf")
+def zoned_parcels_tile(identifier: UUID, z: int, x: int, y: int,
+                       revision: int = Query(ge=1), scenario_id: UUID = Query()):
+    if not 0 <= z <= 18 or not 0 <= x < 2**z or not 0 <= y < 2**z:
+        raise HTTPException(404, "Tile coordinates are outside the XYZ matrix")
+    plan = execute(lambda: require_plan(identifier))
+    if plan["revision"] != revision:
+        raise HTTPException(409, "Plan changed. Reload its parcels.")
+    scenario = next((item for item in plan["scenarios"] if item["id"] == str(scenario_id)), None)
+    if scenario is None:
+        raise HTTPException(404, "Scenario not found")
+    if scenario["kind"] == "reference" or not scenario["zones"]:
+        return Response(status_code=204)
+    if not warehouse_configured():
+        raise HTTPException(503, "Zoned parcels require the PostGIS warehouse")
+    zones = [{"id": item["id"], "geometry": item["geometry"]} for item in scenario["zones"]]
+    try:
+        tile = parcels.zoned_parcel_vector_tile(zones, z, x, y)
+    except (OSError, ValueError, DatabaseError):
+        raise HTTPException(503, "Zoned parcels temporarily unavailable") from None
+    return Response(tile, media_type="application/vnd.mapbox-vector-tile", status_code=200 if tile else 204,
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
 @router.post("/{identifier}/commands")
 def change_plan(identifier: UUID, command: Command):
     def change():

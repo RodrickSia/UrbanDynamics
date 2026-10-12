@@ -91,6 +91,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   } }));
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await expect(page.getByLabel('Plan details')).toHaveCount(0);
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
   const outlines = page.getByRole('checkbox', { name: 'Show parcel outlines', exact: true });
   await expect(outlines).toBeChecked();
@@ -106,12 +107,20 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline'));
   await page.locator('.zoning-plan-list li > button:first-child').click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
-  await expect(page.getByRole('heading', { name: 'Zoning in scenario' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Current parcel land use' })).toContainText('OTC');
-  await expect(page.getByLabel('Overlap policy')).toBeVisible();
+  await expect(page.getByLabel('Plans panel')).toHaveCount(0);
   await expect(page.getByLabel('Plan details')).toBeVisible();
+  const widths = await page.evaluate(() => ({ search: document.querySelector('.search-dock')!.getBoundingClientRect().width,
+    details: document.querySelector('.zoning-detail-drawer')!.getBoundingClientRect().width }));
+  expect(widths.details).toBe(widths.search);
+  expect(await page.locator('.zoning-tool-rail button').count()).toBe(6);
+  await expect(page.getByRole('button', { name: 'Open time range' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Zoning in scenario' })).toBeVisible();
+  await expect(page.getByLabel('Overlap policy')).toBeVisible();
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
-  await expect(page.getByLabel('Overlap policy')).toBeDisabled();
+  await expect(page.getByRole('region', { name: 'Current parcel land use' })).toContainText('OTC');
+  await expect(page.getByLabel('Overlap policy')).toHaveCount(0);
+  expect(await page.evaluate(() => !!window.dataMap.getLayer('zoning-plan-parcels-fill'))).toBe(false);
+  await page.screenshot({ path: 'test-results/zoning-existing-desktop.png' });
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect(page.getByLabel('Overlap policy')).toHaveValue('preserve');
   await page.getByRole('button', { name: 'Development' }).click();
@@ -120,6 +129,11 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   const scenarioBox = await page.locator('.zoning-scenario-bar').boundingBox();
   const navigationBox = await page.locator('.navigation-cluster').boundingBox();
   expect(scenarioBox!.x + scenarioBox!.width).toBeLessThanOrEqual(navigationBox!.x);
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await expect(page.getByLabel('Plans panel')).toBeVisible();
+  await expect(page.getByLabel('Plan details')).toHaveCount(0);
+  await page.locator('.zoning-plan-list li > button:first-child').click();
+  await expect(page.getByLabel('Plan details')).toBeVisible();
   await page.screenshot({ path: 'test-results/zoning-panel-right-desktop.png' });
   await page.setViewportSize({ width: 320, height: 900 });
   await page.screenshot({ path: 'test-results/zoning-panel-right-plan-320.png' });
@@ -143,6 +157,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await editor.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Plan info' }).click();
   await expect(page.getByLabel('Plan details')).toContainText('Planning horizon');
+  for (const action of ['Rename', 'Locate', 'Edit study area']) await expect(page.getByRole('button', { name: action, exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Delete plan', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline') && !window.dataMap.getSource('zoning-plan-parcels'));

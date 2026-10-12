@@ -28,7 +28,7 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
   expect(await page.evaluate(() => {
     const map = window.dataMap;
-    return { fill: !!map.getLayer('zoning-plan-parcels-fill'), ordinary: !!map.getLayer('dataset-parcels'),
+    return { fill: !!map.getLayer('zoning-colored-parcels-fill'), ordinary: !!map.getLayer('dataset-parcels'),
       tiles: (map.getSource('zoning-plan-parcels') as { serialize: () => { tiles: string[] } }).serialize().tiles };
   })).toMatchObject({ fill: false, ordinary: false, tiles: [expect.stringContaining('/parcels/tiles/')] });
   await page.getByRole('button', { name: 'Add zoning type' }).click();
@@ -42,9 +42,18 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.waitForFunction('!window.dataMap.isMoving()');
   await page.getByRole('button', { name: 'Draw zone', exact: true }).click();
   for (const p of [[106.7605, 10.8205], [106.762, 10.8205], [106.762, 10.8235], [106.7605, 10.8235]]) await mapClick(page, p);
+  expect(await page.evaluate(() => window.dataMap.queryRenderedFeatures({ layers: ['zoning-fill'] })
+    .some(f => f.properties.kind === 'zone'))).toBe(false);
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   await expect(page.getByText('Preview ready', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.dataMap.queryRenderedFeatures({ layers: ['zoning-fill'] })
+    .some(f => f.properties.kind === 'zone'))).toBe(false);
   await page.getByRole('button', { name: 'Confirm zoning', exact: true }).click();
+  await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
+  await page.waitForFunction('!!window.dataMap.getLayer("zoning-colored-parcels-fill")');
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-colored-parcels-fill', 'fill-opacity'))).toBe(.35);
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-colored-parcels-fill', 'fill-color')))
+    .toEqual(['to-color', ['get', 'source_color'], '#94a3b8']);
   await expect(page.getByRole('region', { name: 'Zoning in scenario' })).toContainText('assigned');
   await expect(page.getByRole('status').filter({ hasText: 'revision 3' })).toBeVisible();
   await page.getByRole('button', { name: 'Duplicate scenario', exact: true }).click();
@@ -61,6 +70,7 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Draw zone', exact: true })).toBeDisabled();
+  await page.waitForFunction('!window.dataMap.getLayer("zoning-colored-parcels-fill")');
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   // Style reload must recreate map sources without resetting persisted geometry.
   await page.evaluate('window.dataMap.setStyle({version:8,sources:{},layers:[{id:"new-background",type:"background",paint:{"background-color":"#d6e5df"}}]})');
@@ -79,7 +89,8 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   for (const width of [320, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole('button', { name: 'Plans', exact: true })).toBeInViewport();
-    await expect(page.getByLabel(width <= 900 ? 'Plan details' : 'Plans panel')).toBeInViewport();
+    await expect(page.getByLabel('Plan details')).toBeInViewport();
+    await expect(page.getByLabel('Plans panel')).toHaveCount(0);
     expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
     await page.screenshot({ path: `test-results/zoning-plans-${width}.png` });
   }
@@ -139,7 +150,7 @@ test('vertex editing, split/merge, undo and exclusive measurement ownership', as
   expect((await saved()).scenarios[1].zones[0].area_m2).toBeLessThan(originalArea);
   await page.getByRole('button', { name: 'Undo geometry', exact: true }).click();
   await expect.poll(async () => (await saved()).scenarios[1].zones[0].area_m2).toBe(originalArea);
-  await page.getByRole('button', { name: 'Split', exact: true }).click();
+  await page.getByRole('button', { name: 'Split zone', exact: true }).click();
   await mapClick(page, [106.7602, 10.822]); await mapClick(page, [106.7623, 10.822]);
   await page.getByRole('button', { name: 'Apply split', exact: true }).click();
   await expect.poll(async () => (await saved()).scenarios[1].zones.length).toBe(2);
@@ -148,7 +159,7 @@ test('vertex editing, split/merge, undo and exclusive measurement ownership', as
   await mapClick(page, [106.761, 10.8227]);
   await expect(page.getByRole('region', { name: 'Zone inspector', exact: true })).toBeVisible();
   await page.keyboard.down('Shift'); await mapClick(page, [106.761, 10.821]); await page.keyboard.up('Shift');
-  await page.getByRole('button', { name: 'Merge', exact: true }).click();
+  await page.getByRole('button', { name: 'Merge zones', exact: true }).click();
   await expect.poll(async () => (await saved()).scenarios[1].zones.length).toBe(1);
   await page.getByRole('button', { name: 'Measurement tools', exact: true }).click();
   await page.getByRole('button', { name: 'Measure distance', exact: true }).click();

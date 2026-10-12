@@ -37,6 +37,7 @@ export default function App() {
         className="map-workspace"
         data-layers-open={workspace.rightPanel === 'layers'}
         data-zoning-open={zoning.active && !workspace.isSearchOpen}
+        data-zoning-plan-open={zoning.active && !!zoning.plan && !workspace.isSearchOpen}
         aria-label="Interactive urban map"
         onPointerDownCapture={workspace.handleMapPointerDown}
       >
@@ -121,9 +122,7 @@ export default function App() {
           rightPanelOpen={workspace.rightPanel === 'layers'}
           hasSelection={Boolean(workspace.selection)}
           mapStyle={workspace.mapStyle}
-          timeRange={workspace.timeRange}
           onMapStyleChange={workspace.setMapStyle}
-          onTimeRangeChange={workspace.setTimeRange}
           onStartMeasurement={kind => { if (zoning.busy) return; zoning.close(); workspace.startMeasurement(kind); }}
           onMeasurementUnitsChange={workspace.changeMeasurementUnits}
           onUndoMeasurementPoint={workspace.undoMeasurementPoint}

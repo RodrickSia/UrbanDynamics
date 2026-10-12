@@ -11,6 +11,7 @@ const SOURCE = 'zoning-editor';
 const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
 const PARCEL_SOURCE = 'zoning-plan-parcels';
 const PARCEL_LINE = 'zoning-plan-parcels-outline';
+const ZONED_SOURCE = 'zoning-colored-parcels', ZONED_FILL = 'zoning-colored-parcels-fill';
 const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 function feature(geometry: Geometry, properties: Record<string, unknown>): Feature { return { type: 'Feature', geometry, properties }; }
@@ -19,13 +20,14 @@ function data(bridge: ZoningBridge): FeatureCollection {
   if (!bridge.active) return EMPTY;
   const features: Feature[] = [];
   if (bridge.plan) features.push(feature(bridge.plan.study_area, { kind: 'study', color: '#005b65', alpha: 0, width: 3 }));
-  if (bridge.visible) for (const zone of bridge.preview?.zones ?? bridge.scenario?.zones ?? []) {
+  if (bridge.visible) for (const zone of bridge.scenario?.zones ?? []) {
     const type = bridge.plan?.types.find(t => t.id === zone.type_id);
     features.push(feature(zone.geometry, { kind: 'zone', id: zone.id, label: type?.code ?? 'Unknown',
-      color: type?.color ?? '#6d8588', alpha: bridge.opacity, width: bridge.selected.includes(zone.id) ? 4 : 1.5 }));
+      color: type?.color ?? '#6d8588', alpha: bridge.parcelAvailable ? 0 : bridge.opacity,
+      width: bridge.selected.includes(zone.id) ? 4 : 1.5 }));
   }
   const draft = sketchGeometry(bridge.sketch);
-  if (draft) features.push(feature(draft, { kind: 'draft', color: '#005b65', alpha: .18, width: 3 }));
+  if (draft) features.push(feature(draft, { kind: 'draft', color: '#005b65', alpha: 0, width: 3 }));
   else if (bridge.sketch.points.length > 1) features.push(feature({ type: 'LineString', coordinates: bridge.sketch.points },
     { kind: 'draft', color: '#005b65', alpha: 0, width: 3 }));
   const editableRings = bridge.sketch.geometry && bridge.sketch.geometry.type !== 'LineString'
@@ -46,6 +48,9 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
   const parcelTiles = bridge.plan
     ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}`
     : `${API_BASE_URL}/api/v1/layers/parcels/tiles/{z}/{x}/{y}.pbf?schema=2`;
+  const zonedTiles = bridge.plan && bridge.scenario?.kind === 'proposal' && bridge.scenario.zones.length
+    ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/zoned-parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}&scenario_id=${encodeURIComponent(bridge.scenario.id)}`
+    : null;
   useEffect(() => { current.current = bridge; }, [bridge]);
   useEffect(() => {
     if (!map || !bridge.active) return;
@@ -192,6 +197,33 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     if (!map) return;
     if (map.getLayer(PARCEL_LINE)) map.setPaintProperty(PARCEL_LINE, 'line-opacity', bridge.showParcels ? .9 : 0);
   }, [map, bridge.showParcels, bridge.plan?.id, bridge.plan?.revision]);
+
+  useEffect(() => {
+    if (!map || !bridge.active || !bridge.parcelAvailable || !zonedTiles) return;
+    const attach = () => {
+      if (!map.getSource(ZONED_SOURCE)) map.addSource(ZONED_SOURCE, { type: 'vector', tiles: [zonedTiles],
+        minzoom: PARCEL_MIN_ZOOM, maxzoom: PARCEL_MAX_NATIVE_ZOOM });
+      if (!map.getLayer(ZONED_FILL)) map.addLayer({ id: ZONED_FILL, source: ZONED_SOURCE,
+        'source-layer': 'features', type: 'fill', minzoom: PARCEL_MIN_ZOOM,
+        paint: { 'fill-color': ['to-color', ['get', 'source_color'], '#94a3b8'],
+          'fill-opacity': current.current.visible && !current.current.sketch.tool ? current.current.opacity : 0,
+          'fill-antialias': false } }, map.getLayer(PARCEL_LINE) ? PARCEL_LINE : undefined);
+    };
+    if (map.isStyleLoaded()) attach();
+    map.on('style.load', attach);
+    map.on('idle', attach);
+    return () => {
+      map.off('style.load', attach);
+      map.off('idle', attach);
+      if (map.getLayer(ZONED_FILL)) map.removeLayer(ZONED_FILL);
+      if (map.getSource(ZONED_SOURCE)) map.removeSource(ZONED_SOURCE);
+    };
+  }, [map, bridge.active, bridge.parcelAvailable, zonedTiles]);
+
+  useEffect(() => {
+    if (map?.getLayer(ZONED_FILL)) map.setPaintProperty(ZONED_FILL, 'fill-opacity',
+      bridge.visible && !bridge.sketch.tool ? bridge.opacity : 0);
+  }, [map, bridge.visible, bridge.sketch.tool, bridge.opacity, zonedTiles]);
 
   useEffect(() => {
     if (!map) return;

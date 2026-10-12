@@ -8,16 +8,16 @@ export function ZoningToolbar({ workspace: w }: { workspace: ZoningWorkspace }) 
   const [confirmStudy, setConfirmStudy] = useState(false);
   if (!w.plan) return null;
   const hasOne = w.selected.length === 1;
-  return <div className="zoning-tools solid-panel zoning-ui" aria-label="Zoning tools">
+  return <div className={`zoning-tools solid-panel zoning-ui${w.sketch.tool ? ' is-editing' : ''}`} aria-label="Zoning tools">
     {!w.sketch.tool ? <>
-      <div className="zoning-row">
-        <button aria-label="Select zones" aria-pressed={!w.sketch.tool} onClick={w.cancel}><MousePointer2 size={18}/><span>Select</span></button>
-        <button disabled={w.readOnly || w.busy || !w.chosenType} onClick={() => w.begin('draw')}><Pentagon size={18}/><span>Draw zone</span></button>
-        <button disabled={w.readOnly || w.busy || !hasOne} onClick={() => w.begin('split')}><Scissors size={18}/><span>Split</span></button>
-        <button disabled={w.readOnly || w.busy || w.selected.length < 2} onClick={() => void w.execute('merge', { zone_ids: w.selected })}><Combine size={18}/><span>Merge</span></button>
-        <button aria-label="Undo geometry" disabled={w.readOnly || w.busy || !w.scenario?.can_undo} onClick={() => void w.execute('undo')}><Undo2 size={18}/></button>
-        <button aria-label="Redo geometry" disabled={w.readOnly || w.busy || !w.scenario?.can_redo} onClick={() => void w.execute('redo')}><Redo2 size={18}/></button>
-      </div><small>{w.readOnly ? 'Read-only · duplicate to edit' : 'Shift-click to multi-select.'}</small>
+      <div className="zoning-tool-rail">
+        <button title="Select zones" aria-label="Select zones" aria-pressed={!w.sketch.tool} onClick={w.cancel}><MousePointer2 size={18}/></button>
+        <button title="Draw zone" aria-label="Draw zone" disabled={w.readOnly || w.busy || !w.chosenType} onClick={() => w.begin('draw')}><Pentagon size={18}/></button>
+        <button title="Split zone" aria-label="Split zone" disabled={w.readOnly || w.busy || !hasOne} onClick={() => w.begin('split')}><Scissors size={18}/></button>
+        <button title="Merge zones" aria-label="Merge zones" disabled={w.readOnly || w.busy || w.selected.length < 2} onClick={() => void w.execute('merge', { zone_ids: w.selected })}><Combine size={18}/></button>
+        <button title="Undo geometry" aria-label="Undo geometry" disabled={w.readOnly || w.busy || !w.scenario?.can_undo} onClick={() => void w.execute('undo')}><Undo2 size={18}/></button>
+        <button title="Redo geometry" aria-label="Redo geometry" disabled={w.readOnly || w.busy || !w.scenario?.can_redo} onClick={() => void w.execute('redo')}><Redo2 size={18}/></button>
+      </div>
     </> : <>
       <div className="zoning-row"><strong>{w.sketch.tool === 'edit-study' ? 'Edit study area' : w.sketch.tool === 'reshape' ? 'Edit zone vertices' : w.sketch.tool === 'split' ? 'Split selected zone' : `Draw ${w.chosenType?.code ?? 'zone'}`}</strong><button className="quiet-icon-button" aria-label="Cancel geometry edit" disabled={w.busy} onClick={w.cancel}><X size={18}/></button></div>
       <p>{w.sketch.geometry ? 'Drag a vertex. Click a midpoint to add; Shift-click a vertex to remove.' : w.sketch.tool === 'split' ? 'Click points to cut across the zone, then apply the split.' : 'Click to add points. Available parcel, road, water, and zoning edges snap within 10 pixels. Hold Ctrl to suspend snapping.'}</p>
