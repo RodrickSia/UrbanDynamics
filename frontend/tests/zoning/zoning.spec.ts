@@ -45,17 +45,18 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   await expect(page.getByText('Preview ready', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm zoning', exact: true }).click();
-  await expect(page.getByText('Saved · revision 3', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Zoning in scenario' })).toContainText('assigned');
+  await expect(page.getByRole('status').filter({ hasText: 'revision 3' })).toBeVisible();
   await page.getByRole('button', { name: 'Duplicate scenario', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Phase 1');
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Phase 1', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
   await mapClick(page, [106.761, 10.822]);
-  await expect(page.getByRole('complementary', { name: 'Zone inspector', exact: true })).toContainText('Unknown');
+  await expect(page.getByRole('region', { name: 'Zone inspector', exact: true })).toContainText('Unknown');
   await page.getByRole('button', { name: 'Delete zone', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect(page.getByText('Saved · revision 5', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'revision 5' })).toBeVisible();
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
@@ -66,19 +67,19 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.waitForFunction('window.dataMap.getLayer("zoning-fill") && window.dataMap.isStyleLoaded()');
   await page.getByRole('button', { name: 'Indicators', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Zone distribution', exact: true })).toBeVisible();
-  await expect(page.getByLabel('Indicators panel')).toContainText('Insufficient authoritative data');
+  await expect(page.getByLabel('Plan details')).toContainText('Insufficient authoritative data');
   await page.screenshot({ path: 'test-results/zoning-indicators-desktop.png' });
   await page.reload();
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
   await expect(page.getByRole('button', { name: 'Phase 1', exact: true })).toBeVisible();
-  await expect(page.getByText('Saved · revision 5', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'revision 5' })).toBeVisible();
   await page.waitForFunction('window.dataMap.getLayer("zoning-fill") && window.dataMap.getZoom() > 14 && !window.dataMap.isMoving()');
   await page.screenshot({ path: 'test-results/zoning-plans-desktop.png' });
   for (const width of [320, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole('button', { name: 'Plans', exact: true })).toBeInViewport();
-    await expect(page.getByLabel('Plans panel')).toBeInViewport();
+    await expect(page.getByLabel(width <= 900 ? 'Plan details' : 'Plans panel')).toBeInViewport();
     expect(await page.evaluate('document.documentElement.scrollWidth <= innerWidth')).toBe(true);
     await page.screenshot({ path: `test-results/zoning-plans-${width}.png` });
   }
@@ -142,10 +143,10 @@ test('vertex editing, split/merge, undo and exclusive measurement ownership', as
   await mapClick(page, [106.7602, 10.822]); await mapClick(page, [106.7623, 10.822]);
   await page.getByRole('button', { name: 'Apply split', exact: true }).click();
   await expect.poll(async () => (await saved()).scenarios[1].zones.length).toBe(2);
-  await expect(page.getByText('Saved · revision 6', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'revision 6' })).toBeVisible();
   await page.waitForFunction('new Set(window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).filter(f=>f.properties.kind==="zone").map(f=>f.properties.id)).size === 2');
   await mapClick(page, [106.761, 10.8227]);
-  await expect(page.getByRole('complementary', { name: 'Zone inspector', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Zone inspector', exact: true })).toBeVisible();
   await page.keyboard.down('Shift'); await mapClick(page, [106.761, 10.821]); await page.keyboard.up('Shift');
   await page.getByRole('button', { name: 'Merge', exact: true }).click();
   await expect.poll(async () => (await saved()).scenarios[1].zones.length).toBe(1);
@@ -156,8 +157,7 @@ test('vertex editing, split/merge, undo and exclusive measurement ownership', as
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await expect(page.getByLabel('Plans panel')).toBeVisible();
   await expect.poll(() => page.evaluate('Boolean(window.dataMap.getSource("zoning-editor"))')).toBe(true);
-  await page.getByRole('button', { name: 'Collapse zoning panel', exact: true }).click();
-  await expect(page.getByLabel('Plans panel')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Expand zoning panel', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close zoning workspace', exact: true }).click();
+  await expect(page.getByLabel('Plans panel')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

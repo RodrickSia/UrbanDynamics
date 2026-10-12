@@ -17,13 +17,11 @@ export function ZoningToolbar({ workspace: w }: { workspace: ZoningWorkspace }) 
         <button disabled={w.readOnly || w.busy || w.selected.length < 2} onClick={() => void w.execute('merge', { zone_ids: w.selected })}><Combine size={18}/><span>Merge</span></button>
         <button aria-label="Undo geometry" disabled={w.readOnly || w.busy || !w.scenario?.can_undo} onClick={() => void w.execute('undo')}><Undo2 size={18}/></button>
         <button aria-label="Redo geometry" disabled={w.readOnly || w.busy || !w.scenario?.can_redo} onClick={() => void w.execute('redo')}><Redo2 size={18}/></button>
-      </div><small>{w.readOnly ? 'Read-only scenario · duplicate to edit' : 'Shift-click zones to select several. Select a zone to edit its vertices.'}</small>
-      <details><summary>Parcel painting</summary><p>Available in a later milestone after parcel boundaries are verified for zoning use. You can draw polygons now.</p><button disabled>Paint parcels</button></details>
+      </div><small>{w.readOnly ? 'Read-only · duplicate to edit' : 'Shift-click to multi-select.'}</small>
     </> : <>
       <div className="zoning-row"><strong>{w.sketch.tool === 'edit-study' ? 'Edit study area' : w.sketch.tool === 'reshape' ? 'Edit zone vertices' : w.sketch.tool === 'split' ? 'Split selected zone' : `Draw ${w.chosenType?.code ?? 'zone'}`}</strong><button className="quiet-icon-button" aria-label="Cancel geometry edit" disabled={w.busy} onClick={w.cancel}><X size={18}/></button></div>
       <p>{w.sketch.geometry ? 'Drag a vertex. Click a midpoint to add; Shift-click a vertex to remove.' : w.sketch.tool === 'split' ? 'Click points to cut across the zone, then apply the split.' : 'Click to add points. Available parcel, road, water, and zoning edges snap within 10 pixels. Hold Ctrl to suspend snapping.'}</p>
       {!w.sketch.geometry && <small role="status">{w.sketch.points.length} points</small>}
-      {(w.sketch.tool === 'draw' || w.sketch.tool === 'reshape') && <label>Overlap policy<select disabled={w.busy} value={w.policy} onChange={e => w.setPolicy(e.target.value as 'preserve' | 'replace')}><option value="preserve">Preserve existing zones · clip incoming</option><option value="replace">Replace underneath · clip existing</option></select></label>}
       {w.preview && <div role="status" className="zoning-preview"><strong>Preview ready</strong><p>{w.preview.affected_ids.length} existing zones intersect · {areaText(w.preview.overlap_m2)}</p><p>Outside study area clipped: {areaText(w.preview.clipped_outside_m2)}</p></div>}
       <footer><button disabled={w.busy} onClick={w.cancel}>Cancel</button>{!w.sketch.geometry && <button disabled={w.busy || !w.sketch.points.length} onClick={() => w.setSketch({ ...w.sketch, points: w.sketch.points.slice(0, -1) })}>Undo point</button>}
         <button className="zoning-primary" disabled={w.busy || !sketchGeometry(w.sketch)} onClick={() => {

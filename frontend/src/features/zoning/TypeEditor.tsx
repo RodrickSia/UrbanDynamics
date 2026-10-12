@@ -4,6 +4,7 @@ import { ZoningDialog } from './Dialog';
 import catalog from './zoningCatalog.json';
 import type { TypeInput, ZoneType } from './types';
 import { RULE_FIELDS } from './types';
+import { isZoningCode, ruleGuidance, RULE_SOURCE } from './zoningRules';
 const EMPTY: TypeInput = { code: '', name: '', color: '#55a99a', description: '', uses: '', source: '',
   max_height: null, max_floors: null, coverage: null, far: null, setback_front: null, setback_side: null, setback_rear: null };
 
@@ -18,10 +19,11 @@ export function TypeEditor({ value, shared, busy, error, onClose, onSave }: {
   const matches = useMemo(() => catalog.filter(item =>
     `${item.code} ${item.name} ${item.description}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'))), [query]);
   const choose = (item: typeof catalog[number]) => {
-    setForm(current => ({ ...current, code: item.code, name: item.name, description: item.description,
+    setForm(current => ({ ...EMPTY, color: current.color, code: item.code, name: item.name,
+      description: item.description, uses: item.category === 'land_use' ? '' : item.description,
       source: item.category === 'land_use'
-        ? 'Vietnam land-use code reference · Circular 08/2024/TT-BTNMT, Appendix II, Section A. Applied here as a draft zoning type; verify against the approved plan.'
-        : `UrbanDynamics 2026 reference catalog · ${item.category === 'zoning_type' ? 'proposed zoning type' : 'optional proposed subtype'}${item.land_use_codes ? ` · Related land-use codes: ${item.land_use_codes}` : ''}. Not a statutory land-use code.` }));
+        ? 'Vietnam land-use reference · Circular 08/2024/TT-BTNMT. This is not an approved zoning rule.'
+        : 'UrbanDynamics proposal catalog · numeric controls require the approved plan.' }));
     setCatalogOpen(false);
     setQuery('');
   };
@@ -63,6 +65,14 @@ export function TypeEditor({ value, shared, busy, error, onClose, onSave }: {
       <label>Intended uses<input maxLength={1000} value={form.uses} onChange={e => setForm({ ...form, uses: e.target.value })} placeholder="Unknown when not specified"/></label>
       <div className="zoning-form-grid">{RULE_FIELDS.map(([key, label, max]) => <label key={key}>{label}<input type="number" min={0} max={max} step={key === 'max_floors' ? 1 : .01}
         value={form[key] ?? ''} placeholder="Unknown" onChange={e => setForm({ ...form, [key]: e.target.value === '' ? null : Number(e.target.value) })}/></label>)}</div>
+      {form.code && <section className="zoning-rule-guide" aria-label="Planning rule guidance">
+        <strong>{isZoningCode(form.code) ? 'Rule guide · conditional' : 'Land use ≠ zoning rules'}</strong>
+        {isZoningCode(form.code) ? <dl>{ruleGuidance(form.code).map(({ field, hint }) => <div key={field}>
+          <dt>{RULE_FIELDS.find(([key]) => key === field)?.[1]}</dt>
+          <dd><span className={`zoning-rule-state zoning-rule-state-${hint.state}`}>{hint.state === 'not_applicable' ? 'N/A' : hint.state === 'conditional' ? 'Check' : 'Unknown'}</span> {hint.text}</dd>
+        </div>)}</dl> : <p className="zoning-muted">Choose a planning zone and an approved plan to set build controls.</p>}
+        <small>{RULE_SOURCE}</small>
+      </section>}
       <label>Description<textarea maxLength={1000} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/></label>
       <label>Source / design basis<textarea maxLength={2000} value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} placeholder="Document or explanation for this proposed rule"/></label>
       {shared && <label className="zoning-check"><input required type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}/>Apply this type change to all scenarios using it.</label>}

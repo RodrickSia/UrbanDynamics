@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routers import zoning as zoning_router
 from app.services.zoning import engine, store
 from app.services.zoning.geometry import projected
 from app.services.zoning.models import Command
@@ -41,6 +42,25 @@ def command(client, plan, action, payload=None, scenario_id=None, status=200):
 def add_type(client, plan, code="MU"):
     return command(client, plan, "add_type", {"type": {"code": code, "name": "Mixed use proposal",
                    "color": "#309284", "coverage": 60, "far": 4}})
+
+
+def test_current_parcel_land_use_is_separate_from_proposal_zones(client, plan, monkeypatch):
+    from app.services import parcels
+
+    monkeypatch.setattr(zoning_router, "warehouse_configured", lambda: True)
+    captured = []
+    def observed(study_area):
+        captured.append(study_area)
+        return {"basis": "observed_parcels", "rows": [{
+            "code": "OTC", "parcels": 2, "area_m2": 120.0,
+            "category": "Residential", "color": "#D79B8C",
+        }]}
+    monkeypatch.setattr(parcels, "study_land_use", observed)
+    response = client.get(f"/api/v1/zoning/plans/{plan['id']}/land-use")
+    assert response.status_code == 200
+    assert captured == [plan["study_area"]]
+    assert response.json()["rows"][0]["code"] == "OTC"
+    assert plan["scenarios"][0]["zones"] == []
 
 
 def draw(client, plan, geometry=None, policy="preserve"):

@@ -103,3 +103,14 @@ def preview(identifier: UUID, command: Command):
 @router.get("/{identifier}/indicators")
 def indicators(identifier: UUID, scenario_id: str, compare_id: str | None = None):
     return execute(lambda: report(require_plan(identifier), scenario_id, compare_id))
+
+
+@router.get("/{identifier}/land-use")
+def plan_land_use(identifier: UUID):
+    plan = execute(lambda: require_plan(identifier))
+    if not warehouse_configured():
+        raise HTTPException(503, "Current parcel land use requires the PostGIS warehouse")
+    try:
+        return parcels.study_land_use(plan["study_area"])
+    except (OSError, ValueError, DatabaseError):
+        raise HTTPException(503, "Current parcel land use temporarily unavailable") from None

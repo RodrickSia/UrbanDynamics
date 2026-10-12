@@ -43,6 +43,10 @@ export interface Indicators {
   findings: { id: string; severity: string; certainty: string; zone_id: string | null; message: string; geometry?: PolygonGeometry }[];
   comparison_status: string; area_basis: string;
 }
+export interface CurrentLandUse {
+  basis: 'observed_parcels';
+  rows: { code: string | null; parcels: number; area_m2: number; category: string | null; color: string }[];
+}
 export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | null;
 export interface Sketch { tool: Tool; points: Position[]; geometry: SketchGeometry | null }
 export interface ZoningBridge {

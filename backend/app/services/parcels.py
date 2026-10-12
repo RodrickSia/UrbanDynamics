@@ -208,3 +208,31 @@ def plan_vector_tile(study_area, z, x, y):
             ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile
         """, (z, x, y, json.dumps(study_area), tolerance, min_area)).fetchone()
     return bytes(row[0]) if row and row[0] else b''
+
+
+def study_land_use(study_area):
+    """Summarize observed parcel use inside a plan, separately from proposed zoning."""
+    with connect_to_warehouse() as connection:
+        connection.execute("SET LOCAL statement_timeout = '10s'")
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute("""
+                WITH study AS (
+                    SELECT ST_SetSRID(ST_GeomFromGeoJSON(%s),4326) AS geom
+                ), clipped AS (
+                    SELECT CASE WHEN p.conflicting_land_use THEN NULL
+                                ELSE NULLIF(BTRIM(p.mdsdd),'') END AS code,
+                           ST_Area(ST_Transform(ST_Intersection(p.geom,s.geom),32648)) AS area_m2
+                    FROM parcels.plot p, study s
+                    WHERE p.geom && s.geom AND ST_Intersects(p.geom,s.geom)
+                )
+                SELECT code, count(*) AS parcels, sum(area_m2) AS area_m2
+                FROM clipped WHERE area_m2 > 0
+                GROUP BY code ORDER BY area_m2 DESC
+            """, (json.dumps(study_area),))
+            records = cursor.fetchall()
+    return {'basis': 'observed_parcels', 'rows': [
+        {'code': row['code'], 'parcels': row['parcels'], 'area_m2': round(row['area_m2'], 2),
+         'category': PALETTE['entries'].get(row['code'], {}).get('category'),
+         'color': land_use(row['code'])['color']}
+        for row in records
+    ]}

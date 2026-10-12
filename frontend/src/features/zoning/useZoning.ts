@@ -106,6 +106,7 @@ export function useZoning(parcelAvailable = false) {
   const confirm = async () => { const command = buildCommand(); if (command && preview) await execute(command.action, command.payload); };
   const begin = (tool: Tool) => {
     if (busy) return;
+    if (tool === 'study') { setPlan(null); setScenarioId(null); setSelected([]); }
     const zone = scenario?.zones.find(z => z.id === selected[0]);
     if (tool === 'reshape' && zone) {
       setTypeId(zone.type_id); setSketch({ tool, geometry: structuredClone(zone.geometry), points: [] });
@@ -116,7 +117,7 @@ export function useZoning(parcelAvailable = false) {
   };
   const selectScenario = (id: string) => {
     if (busy) return;
-    setScenarioId(id); cancel();
+    setScenarioId(id); setPolicyState('preserve'); cancel();
     setSelected(ids => ids.filter(zoneId => plan?.scenarios.find(s => s.id === id)?.zones.some(z => z.id === zoneId)));
   };
   const pick = (id: string | null, multiple: boolean) => {

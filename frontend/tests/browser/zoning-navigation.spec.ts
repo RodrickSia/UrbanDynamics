@@ -60,10 +60,10 @@ test('planning buttons match map controls and slide below expanded search', asyn
   await expect(planPanel).toBeVisible();
   await expect.poll(async () => {
     const panelBox = await planPanel.boundingBox();
-    return !!panelBox && panelBox.x + panelBox.width === 320 && panelBox.y === 0 && panelBox.height >= 899;
+    return !!panelBox && panelBox.x === 0 && panelBox.width < 320 && panelBox.y === 0 && panelBox.height >= 899;
   }).toBe(true);
   await expect(page.getByRole('button', { name: 'Collapse zoning panel' })).toHaveCount(0);
-  await page.screenshot({ path: 'test-results/zoning-panel-right-320.png' });
+  await page.screenshot({ path: 'test-results/zoning-panel-left-320.png' });
   expect(errors).toEqual([]);
 });
 
@@ -86,6 +86,9 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
     if (route.request().url().endsWith('/fixture-plan')) return route.fulfill({ json: plan });
     return route.fulfill({ json: { plans: deleted ? [] : [plan] } });
   });
+  await page.route('**/api/v1/zoning/plans/fixture-plan/land-use', route => route.fulfill({ json: {
+    basis: 'observed_parcels', rows: [{ code: 'OTC', parcels: 2, area_m2: 800, category: 'Residential', color: '#D79B8C' }],
+  } }));
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
@@ -103,6 +106,17 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline'));
   await page.locator('.zoning-plan-list li > button:first-child').click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
+  await expect(page.getByRole('heading', { name: 'Zoning in scenario' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Current parcel land use' })).toContainText('OTC');
+  await expect(page.getByLabel('Overlap policy')).toBeVisible();
+  await expect(page.getByLabel('Plan details')).toBeVisible();
+  await page.getByRole('button', { name: 'Existing', exact: true }).click();
+  await expect(page.getByLabel('Overlap policy')).toBeDisabled();
+  await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
+  await expect(page.getByLabel('Overlap policy')).toHaveValue('preserve');
+  await page.getByRole('button', { name: 'Development' }).click();
+  await expect(page.getByLabel('Plan details')).toContainText('Add a zoning type');
+  await page.getByRole('button', { name: 'Zoning', exact: true }).click();
   const scenarioBox = await page.locator('.zoning-scenario-bar').boundingBox();
   const navigationBox = await page.locator('.navigation-cluster').boundingBox();
   expect(scenarioBox!.x + scenarioBox!.width).toBeLessThanOrEqual(navigationBox!.x);
@@ -119,11 +133,16 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await catalog.getByRole('button', { name: /^RES Residential/ }).click();
   await expect(editor.getByLabel('Code', { exact: true })).toHaveValue('RES');
   await expect(editor.getByLabel('Name', { exact: true })).toHaveValue('Residential / Khu ở');
+  await expect(editor.getByRole('region', { name: 'Planning rule guidance' })).toContainText('Table 2.8');
+  await expect(editor.getByLabel('Coverage (%)')).toHaveValue('');
   await editor.getByLabel('Code', { exact: true }).fill('ODT');
   await catalog.getByRole('button', { name: /^ODT Đất ở tại đô thị/ }).click();
   await expect(editor.getByLabel('Description')).toContainText('Đất dùng làm nhà ở');
-  await expect(editor.getByLabel('Source / design basis')).toContainText('draft zoning type');
+  await expect(editor.getByRole('region', { name: 'Planning rule guidance' })).toContainText('Land use ≠ zoning rules');
+  await expect(editor.getByLabel('Source / design basis')).toContainText('not an approved zoning rule');
   await editor.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Plan info' }).click();
+  await expect(page.getByLabel('Plan details')).toContainText('Planning horizon');
   await page.getByRole('button', { name: 'Delete plan', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline') && !window.dataMap.getSource('zoning-plan-parcels'));
