@@ -1,72 +1,98 @@
 {
   "source": "etl/data/parcels_hcmc/samples/thua-q1.geojson",
-  "source_field": "color",
+  "source_code_field": "MDSDD",
+  "source_color_field": "color",
   "source_feature_count": 57514,
-  "provenance_note": "Observed sample colors, not verified cadastral/legal palette. Raw MVT source has no color field. Trimmed-code collisions use the most frequent sample color; preserve case and diacritics. Labels, when present, repeat source text without legal interpretation.",
+  "provenance_note": "Colors are a custom display palette by reviewed land-use group, not verified cadastral/legal classifications. Codes and sample counts come from the observed GeoJSON sample; raw MVT has no color field. Unclear codes use the neutral fallback. Preserve case and diacritics. Labels, when present, repeat source text without legal interpretation.",
   "fallback_color": "#94a3b8",
+  "category_colors": {
+    "Residential": "#D79B8C",
+    "Commercial": "#C18EAD",
+    "Mixed-use": "#AD99C8",
+    "Industrial": "#9D9BAC",
+    "Education": "#86A5C5",
+    "Healthcare": "#79ABA5",
+    "Government": "#A9A1AF",
+    "Parks & Green": "#91B59A",
+    "Agriculture": "#B7BF8A",
+    "Transport": "#A8AFB9",
+    "Culture / Religion": "#C6AB80",
+    "Utilities": "#8CA6AD"
+  },
   "entries": {
     "AN": {
-      "color": "#6b443c",
-      "sample_count": 1
+      "color": "#A9A1AF",
+      "sample_count": 1,
+      "category": "Government"
     },
     "AN/QP": {
-      "color": "#bb8c7f",
-      "sample_count": 65
+      "color": "#A9A1AF",
+      "sample_count": 65,
+      "category": "Government"
     },
     "Ao(Hồ).c": {
-      "color": "#a9a440",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "B.Vien": {
-      "color": "#9e91a1",
-      "sample_count": 2
+      "color": "#79ABA5",
+      "sample_count": 2,
+      "category": "Healthcare"
     },
     "B.thÕ": {
-      "color": "#9d4281",
+      "color": "#94a3b8",
       "sample_count": 3
     },
     "B.thọ": {
-      "color": "#956081",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "B.vien": {
-      "color": "#3e9db3",
-      "sample_count": 1
+      "color": "#79ABA5",
+      "sample_count": 1,
+      "category": "Healthcare"
     },
     "B.viƯn": {
-      "color": "#4848b3",
-      "sample_count": 2
+      "color": "#79ABA5",
+      "sample_count": 2,
+      "category": "Healthcare"
     },
     "B.viện": {
-      "color": "#6088b7",
-      "sample_count": 3
+      "color": "#79ABA5",
+      "sample_count": 3,
+      "category": "Healthcare"
     },
     "B.điện": {
-      "color": "#9b868c",
-      "sample_count": 3
+      "color": "#8CA6AD",
+      "sample_count": 3,
+      "category": "Utilities"
     },
     "C. ty": {
-      "color": "#7a7692",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "C.A": {
-      "color": "#6e5f3d",
-      "sample_count": 12
+      "color": "#A9A1AF",
+      "sample_count": 12,
+      "category": "Government"
     },
     "C.L.B": {
-      "color": "#69a892",
-      "sample_count": 1
+      "color": "#C6AB80",
+      "sample_count": 1,
+      "category": "Culture / Religion"
     },
     "C.hang": {
-      "color": "#ab7780",
-      "sample_count": 2
+      "color": "#C18EAD",
+      "sample_count": 2,
+      "category": "Commercial"
     },
     "C.quan": {
-      "color": "#82ba85",
-      "sample_count": 214
+      "color": "#A9A1AF",
+      "sample_count": 214,
+      "category": "Government"
     },
     "C.ty": {
-      "color": "#ba4c61",
+      "color": "#94a3b8",
       "sample_count": 167,
       "source_variants": [
         {
@@ -84,15 +110,15 @@
       ]
     },
     "CD": {
-      "color": "#a3443c",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "CDG": {
-      "color": "#4a623d",
+      "color": "#94a3b8",
       "sample_count": 108
     },
     "CDK": {
-      "color": "#4e623d",
+      "color": "#94a3b8",
       "sample_count": 35,
       "source_variants": [
         {
@@ -110,158 +136,182 @@
       ]
     },
     "CLB": {
-      "color": "#4d633d",
-      "sample_count": 4
+      "color": "#C6AB80",
+      "sample_count": 4,
+      "category": "Culture / Religion"
     },
     "Ch*a": {
-      "color": "#52b962",
-      "sample_count": 3
+      "color": "#C6AB80",
+      "sample_count": 3,
+      "category": "Culture / Religion"
     },
     "Cho": {
-      "color": "#96663d",
-      "sample_count": 1
+      "color": "#C18EAD",
+      "sample_count": 1,
+      "category": "Commercial"
     },
     "Chùa": {
-      "color": "#815462",
+      "color": "#C6AB80",
       "sample_count": 5,
-      "label": "Chùa"
+      "label": "Chùa",
+      "category": "Culture / Religion"
     },
     "Cty": {
-      "color": "#ac683d",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "D.hoc": {
-      "color": "#8840a5",
-      "sample_count": 1
+      "color": "#86A5C5",
+      "sample_count": 1,
+      "category": "Education"
     },
     "DDT": {
-      "color": "#98663d",
+      "color": "#94a3b8",
       "sample_count": 16
     },
     "DSK": {
-      "color": "#5a8c5a",
+      "color": "#94a3b8",
       "sample_count": 1795
     },
     "DT": {
-      "color": "#54453c",
+      "color": "#94a3b8",
       "sample_count": 2
     },
     "Dầu khí": {
-      "color": "#9c525d",
+      "color": "#9D9BAC",
       "sample_count": 1,
-      "label": "Dầu khí"
+      "label": "Dầu khí",
+      "category": "Industrial"
     },
     "GT": {
-      "color": "#b7453c",
-      "sample_count": 45
+      "color": "#A8AFB9",
+      "sample_count": 45,
+      "category": "Transport"
     },
     "H.D.thuật": {
-      "color": "#763d47",
+      "color": "#94a3b8",
       "sample_count": 2
     },
     "IIa^": {
-      "color": "#4d8765",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "K.s/n": {
-      "color": "#a592a4",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "K.san": {
-      "color": "#9799a4",
-      "sample_count": 5
+      "color": "#C18EAD",
+      "sample_count": 5,
+      "category": "Commercial"
     },
     "K.sạn": {
-      "color": "#577fa8",
-      "sample_count": 5
+      "color": "#C18EAD",
+      "sample_count": 5,
+      "category": "Commercial"
     },
     "Kh.sách": {
-      "color": "#3c4ba7",
-      "sample_count": 1
+      "color": "#C6AB80",
+      "sample_count": 1,
+      "category": "Culture / Religion"
     },
     "Kho": {
-      "color": "#9e883d",
+      "color": "#9D9BAC",
       "sample_count": 3,
-      "label": "Kho"
+      "label": "Kho",
+      "category": "Industrial"
     },
     "Kh¸c": {
-      "color": "#aaae66",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "Khác": {
-      "color": "#73b466",
+      "color": "#94a3b8",
       "sample_count": 8,
       "label": "Khác"
     },
     "L": {
-      "color": "#883c3c",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "L.sự": {
-      "color": "#7a5a66",
+      "color": "#94a3b8",
       "sample_count": 2
     },
     "M.giáo": {
-      "color": "#77b253",
-      "sample_count": 7
+      "color": "#86A5C5",
+      "sample_count": 7,
+      "category": "Education"
     },
     "M.non": {
-      "color": "#a2b648",
-      "sample_count": 1
+      "color": "#86A5C5",
+      "sample_count": 1,
+      "category": "Education"
     },
     "Miếu": {
-      "color": "#a6aa6b",
+      "color": "#C6AB80",
       "sample_count": 2,
-      "label": "Miếu"
+      "label": "Miếu",
+      "category": "Culture / Religion"
     },
     "N.tho": {
-      "color": "#43685a",
-      "sample_count": 2
+      "color": "#C6AB80",
+      "sample_count": 2,
+      "category": "Culture / Religion"
     },
     "N.thê": {
-      "color": "#3e685a",
-      "sample_count": 2
+      "color": "#C6AB80",
+      "sample_count": 2,
+      "category": "Culture / Religion"
     },
     "N.tre": {
-      "color": "#83695a",
-      "sample_count": 2
+      "color": "#86A5C5",
+      "sample_count": 2,
+      "category": "Education"
     },
     "N.trÅ": {
-      "color": "#63695a",
-      "sample_count": 1
+      "color": "#86A5C5",
+      "sample_count": 1,
+      "category": "Education"
     },
     "Ngh.cứu": {
-      "color": "#4867b6",
-      "sample_count": 1
+      "color": "#86A5C5",
+      "sample_count": 1,
+      "category": "Education"
     },
     "Nh.khách": {
-      "color": "#3fa38d",
-      "sample_count": 6
+      "color": "#C18EAD",
+      "sample_count": 6,
+      "category": "Commercial"
     },
     "Nh.máy": {
-      "color": "#47b8a3",
-      "sample_count": 1
+      "color": "#9D9BAC",
+      "sample_count": 1,
+      "category": "Industrial"
     },
     "Nhà khách": {
-      "color": "#91724c",
+      "color": "#C18EAD",
       "sample_count": 1,
-      "label": "Nhà khách"
+      "label": "Nhà khách",
+      "category": "Commercial"
     },
     "Nhà vệ sinh": {
-      "color": "#8149b5",
+      "color": "#8CA6AD",
       "sample_count": 1,
-      "label": "Nhà vệ sinh"
+      "label": "Nhà vệ sinh",
+      "category": "Utilities"
     },
     "NĐ": {
-      "color": "#5a473c",
+      "color": "#94a3b8",
       "sample_count": 8
     },
     "ODT": {
-      "color": "#d6604d",
-      "sample_count": 26
+      "color": "#D79B8C",
+      "sample_count": 26,
+      "category": "Residential"
     },
     "OTC": {
-      "color": "#e85430",
+      "color": "#D79B8C",
       "sample_count": 53181,
       "source_variants": [
         {
@@ -276,35 +326,41 @@
             "130,163,78": 3
           }
         }
-      ]
+      ],
+      "category": "Residential"
     },
     "Q.sư": {
-      "color": "#9e7a69",
-      "sample_count": 1
+      "color": "#A9A1AF",
+      "sample_count": 1,
+      "category": "Government"
     },
     "Q.sự": {
-      "color": "#5f9869",
-      "sample_count": 10
+      "color": "#A9A1AF",
+      "sample_count": 10,
+      "category": "Government"
     },
     "R/p": {
-      "color": "#8d9f3d",
+      "color": "#94a3b8",
       "sample_count": 2
     },
     "Rap": {
-      "color": "#7fa53d",
-      "sample_count": 2
+      "color": "#C6AB80",
+      "sample_count": 2,
+      "category": "Culture / Religion"
     },
     "S.thị": {
-      "color": "#a480b5",
-      "sample_count": 1
+      "color": "#C18EAD",
+      "sample_count": 1,
+      "category": "Commercial"
     },
     "Sân": {
-      "color": "#5fba3d",
+      "color": "#91B59A",
       "sample_count": 1,
-      "label": "Sân"
+      "label": "Sân",
+      "category": "Parks & Green"
     },
     "T": {
-      "color": "#903c3c",
+      "color": "#94a3b8",
       "sample_count": 165,
       "source_variants": [
         {
@@ -322,104 +378,126 @@
       ]
     },
     "T.Hoc": {
-      "color": "#784046",
-      "sample_count": 1
+      "color": "#86A5C5",
+      "sample_count": 1,
+      "category": "Education"
     },
     "T.hoc": {
-      "color": "#984847",
-      "sample_count": 2
+      "color": "#86A5C5",
+      "sample_count": 2,
+      "category": "Education"
     },
     "T.viƯn": {
-      "color": "#9aa3b0",
-      "sample_count": 2
+      "color": "#C6AB80",
+      "sample_count": 2,
+      "category": "Culture / Religion"
     },
     "T.viện": {
-      "color": "#b263b4",
-      "sample_count": 20
+      "color": "#C6AB80",
+      "sample_count": 20,
+      "category": "Culture / Religion"
     },
     "TL": {
-      "color": "#5c473c",
+      "color": "#94a3b8",
       "sample_count": 2
     },
     "TON": {
-      "color": "#8dab3d",
-      "sample_count": 1
+      "color": "#C6AB80",
+      "sample_count": 1,
+      "category": "Culture / Religion"
     },
     "Th.nhi": {
-      "color": "#a5a0a2",
-      "sample_count": 3
+      "color": "#86A5C5",
+      "sample_count": 3,
+      "category": "Education"
     },
     "Tr.C.đoàn": {
-      "color": "#afb97a",
-      "sample_count": 1
+      "color": "#C6AB80",
+      "sample_count": 1,
+      "category": "Culture / Religion"
     },
     "Tr.hoc": {
-      "color": "#8a7c57",
-      "sample_count": 14
+      "color": "#86A5C5",
+      "sample_count": 14,
+      "category": "Education"
     },
     "Tr.hình": {
-      "color": "#5aac41",
-      "sample_count": 1
+      "color": "#C6AB80",
+      "sample_count": 1,
+      "category": "Culture / Religion"
     },
     "Tr.học": {
-      "color": "#a8665b",
-      "sample_count": 25
+      "color": "#86A5C5",
+      "sample_count": 25,
+      "category": "Education"
     },
     "Tr.liên lạc": {
-      "color": "#4d5356",
-      "sample_count": 2
+      "color": "#8CA6AD",
+      "sample_count": 2,
+      "category": "Utilities"
     },
     "Tr.tâm": {
-      "color": "#733e57",
+      "color": "#94a3b8",
       "sample_count": 1
     },
     "U.B": {
-      "color": "#81ab3d",
-      "sample_count": 5
+      "color": "#A9A1AF",
+      "sample_count": 5,
+      "category": "Government"
     },
     "UB": {
-      "color": "#73473c",
-      "sample_count": 15
+      "color": "#A9A1AF",
+      "sample_count": 15,
+      "category": "Government"
     },
     "UBND Phường 19 QL": {
-      "color": "#a66166",
-      "sample_count": 1
+      "color": "#A9A1AF",
+      "sample_count": 1,
+      "category": "Government"
     },
     "V.C.học": {
-      "color": "#694875",
-      "sample_count": 1
+      "color": "#86A5C5",
+      "sample_count": 1,
+      "category": "Education"
     },
     "V.hoá": {
-      "color": "#987a6b",
-      "sample_count": 2
+      "color": "#C6AB80",
+      "sample_count": 2,
+      "category": "Culture / Religion"
     },
     "V.sinh": {
-      "color": "#52a658",
-      "sample_count": 4
+      "color": "#8CA6AD",
+      "sample_count": 4,
+      "category": "Utilities"
     },
     "Vườn": {
-      "color": "#6d8d76",
+      "color": "#91B59A",
       "sample_count": 1,
-      "label": "Vườn"
+      "label": "Vườn",
+      "category": "Parks & Green"
     },
     "X.nghiep": {
-      "color": "#5d786e",
-      "sample_count": 1
+      "color": "#9D9BAC",
+      "sample_count": 1,
+      "category": "Industrial"
     },
     "X.nghiêp": {
-      "color": "#82896e",
-      "sample_count": 1
+      "color": "#9D9BAC",
+      "sample_count": 1,
+      "category": "Industrial"
     },
     "X.nghiƯp": {
-      "color": "#67a36e",
-      "sample_count": 20
+      "color": "#9D9BAC",
+      "sample_count": 20,
+      "category": "Industrial"
     },
     "X.nghiệp": {
-      "color": "#7f6372",
-      "sample_count": 3
+      "color": "#9D9BAC",
+      "sample_count": 3,
+      "category": "Industrial"
     },
     "XD": {
-      "color": "#58473c",
+      "color": "#94a3b8",
       "sample_count": 19,
       "source_variants": [
         {
@@ -437,39 +515,47 @@
       ]
     },
     "Xg.dau": {
-      "color": "#437f64",
-      "sample_count": 1
+      "color": "#C18EAD",
+      "sample_count": 1,
+      "category": "Commercial"
     },
     "Xg.dầu": {
-      "color": "#496668",
-      "sample_count": 7
+      "color": "#C18EAD",
+      "sample_count": 7,
+      "category": "Commercial"
     },
     "Xưởng": {
-      "color": "#786d64",
+      "color": "#9D9BAC",
       "sample_count": 2,
-      "label": "Xưởng"
+      "label": "Xưởng",
+      "category": "Industrial"
     },
     "Y tế": {
-      "color": "#483f6d",
-      "sample_count": 1
+      "color": "#79ABA5",
+      "sample_count": 1,
+      "category": "Healthcare"
     },
     "Y.tế": {
-      "color": "#567b6d",
-      "sample_count": 3
+      "color": "#79ABA5",
+      "sample_count": 3,
+      "category": "Healthcare"
     },
     "chùa": {
-      "color": "#a16074",
+      "color": "#C6AB80",
       "sample_count": 2,
-      "label": "chùa"
+      "label": "chùa",
+      "category": "Culture / Religion"
     },
     "sân": {
-      "color": "#7f423e",
+      "color": "#91B59A",
       "sample_count": 8,
-      "label": "sân"
+      "label": "sân",
+      "category": "Parks & Green"
     },
     "Đ.học": {
-      "color": "#72b194",
-      "sample_count": 5
+      "color": "#86A5C5",
+      "sample_count": 5,
+      "category": "Education"
     }
   },
   "excluded_values": [

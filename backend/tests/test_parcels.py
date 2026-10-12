@@ -145,8 +145,13 @@ def test_planning_breakdown_keeps_source_areas_without_fabricating_percentages()
     assert rows == [{'label': 'Đất ở', 'area_m2': 180.9}, {'label': 'Đất giao thông', 'area_m2': 10.8}]
 
 
-def test_palette_uses_source_sample_and_normalizes_unknown():
-    assert parcels.land_use('OTC')['color'] == '#e85430'
+def test_palette_uses_land_use_groups_and_normalizes_unknown():
+    assert parcels.land_use('OTC')['color'] == '#D79B8C'
+    assert parcels.land_use('OTC')['color_source'] == 'category_palette'
+    assert parcels.land_use('Tr.học')['color'] == '#86A5C5'
+    assert parcels.land_use('GT')['color'] == '#A8AFB9'
+    assert parcels.land_use('DSK')['color'] == '#94a3b8'
+    assert parcels.land_use('DSK')['color_source'] == 'unknown'
     assert parcels.land_use('null')['code'] is None
     assert parcels.land_use('unrecognized')['color'] == '#94a3b8'
 
@@ -200,7 +205,7 @@ def test_canonical_geometry_tile_colors_and_price_api(monkeypatch):
             decoded = mapbox_vector_tile.decode(parcels.vector_tile(zoom, tile.x, tile.y))
             matches = [f for f in decoded['features']['features'] if f['properties']['parcel_id'] == str(row[0])]
             assert len(matches) == 1
-            assert matches[0]['properties']['color'] == '#d6604d'
+            assert matches[0]['properties']['color'] == '#D79B8C'
         assert parcels.vector_tile(11, 0, 0) == b''
         response = TestClient(app).get(f'/api/v1/parcels/{row[0]}')
         assert response.status_code == 200

@@ -24,7 +24,7 @@ def land_use(raw):
     entry = PALETTE['entries'].get(code, {})
     return {'code': code, 'label': entry.get('label'),
             'color': entry.get('color', PALETTE['fallback_color']),
-            'color_source': 'source_sample' if entry else 'unknown'}
+            'color_source': 'category_palette' if entry and entry.get('category') else 'unknown'}
 
 
 def planning_breakdown(text):
