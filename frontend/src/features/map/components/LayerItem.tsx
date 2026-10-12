@@ -101,7 +101,7 @@ export function LayerItem({
           )}
           {layer.id === 'buildings-3d' && (
             <p className="building-alignment-note">
-              Fits Land parcels where the overlap is reliable. Unmatched buildings keep their source position.
+              Uses Overture footprints for verified matches. Clear parcel conflicts are hidden; source data is preserved.
             </p>
           )}
         </div>

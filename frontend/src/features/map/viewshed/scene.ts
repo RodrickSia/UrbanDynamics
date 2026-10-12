@@ -65,6 +65,12 @@ export function buildScene(view: Viewshed, input: SceneInput): SceneMesh {
     }
   const seen = new Set<string>();
   for (const feature of input.buildings) {
+    // Source queries include diagnostic footprints hidden by the render filter.
+    // They must not create invisible occluders or imply complete scene coverage.
+    if (feature.properties?.geometry_status === 'outside_parcels') {
+      complete = false;
+      continue;
+    }
     if (vertices.length / 3 >= MAX_VERTICES) {
       complete = false;
       break;

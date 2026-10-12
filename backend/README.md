@@ -65,11 +65,31 @@ ETL on `main`. Only footprints with a positive `height_m` are extruded; the
 frontend reports the model unavailable until a loaded snapshot contains such
 buildings. Tiles are native at zoom 14–16 and overzoom at closer views. The
 GBA model carries CC BY-NC 4.0 terms; the map attributes that source.
-At zoom 15 and above, the tile service clips a GBA footprint to the union of
-the corresponding Land parcels only when at least 90% of its area overlaps
-those parcels. Tile properties report `parcel_fit: matched` or
-`parcel_fit: source_unmatched`; unmatched footprints keep their source shape.
-At zoom 14, `parcel_fit: not_checked` avoids the extra spatial join.
+At every native zoom the tile service compares complete GBA footprints with
+`buildings.footprint` (the Overture snapshot already loaded by the main ETL).
+A replacement requires a unique Google source record ID or at least 75% direct
+intersection-over-union, a centroid distance within 50 projected metres, an
+area ratio between 0.5 and 2, and no competing match in either direction.
+Other candidates with at least 50% IoU count as competitors. We do not search
+for translations/rotations or choose the nearest parcel. The accepted Overture
+footprint must have at least 90% parcel coverage; only the small excess is clipped.
+GBA height and feature identity are retained. Whole geometries and a tile halo
+keep matching independent of MVT clipping and zoom.
+
+Tile properties expose `geometry_source`, `overture_id`, `match_method`,
+`parcel_coverage` (of the original GBA footprint), `parcel_fit`, and
+`geometry_status`. `outside_parcels` is reserved for a strong conflict: less
+than 50% parcel coverage, less than 25% corroboration by any nearby Overture
+footprint, no shared source identity, and a nearby Overture building with at
+least 90% parcel coverage. The frontend excludes these footprints from rendering
+and Viewshed occlusion. Their raw geometry remains in PostGIS and the MVT for
+diagnosis. Missing reference data alone never suppresses a building.
+
+The regression fixture `tests/fixtures/building-alignment-ham-nghi.json` records
+the two reported road blocks and a positive source-identity match using Overture
+release `2026-09-23.1`, plus native API parcel/GBA geometry. It proves that the road
+blocks are excluded without being reassigned to a neighboring tower. Overture
+attribution: https://docs.overturemaps.org/attribution/.
 
 ## Configuration and operation
 

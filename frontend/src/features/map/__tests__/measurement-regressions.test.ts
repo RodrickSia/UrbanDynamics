@@ -44,7 +44,7 @@ describe('3D measurement regressions', () => {
   it('hides the duplicate Goong extrusion when managing the building layer', () => {
     const setLayoutProperty = vi.fn();
     const map = {
-      getLayer: () => ({}), setPaintProperty: vi.fn(), moveLayer: vi.fn(), setLayoutProperty,
+      getLayer: () => ({}), setPaintProperty: vi.fn(), setFilter: vi.fn(), moveLayer: vi.fn(), setLayoutProperty,
       getStyle: () => ({ layers: [
         { id: 'building', type: 'fill-extrusion', source: 'composite', 'source-layer': 'VN_Building' },
         { id: 'urban-buildings-3d', type: 'fill-extrusion' },
@@ -222,6 +222,7 @@ describe('3D measurement regressions', () => {
     const map = {
       getLayer: () => ({}),
       setPaintProperty: vi.fn(),
+      setFilter: vi.fn(),
       moveLayer,
       getStyle: () => ({
         layers: [

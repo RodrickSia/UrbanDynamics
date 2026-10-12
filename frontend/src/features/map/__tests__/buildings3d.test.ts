@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { BUILDINGS_LAYER_ID, BUILDINGS_SOURCE_ID, setBuildings3d } from '../layers/buildings3d';
+import { BUILDING_FILTER, BUILDINGS_LAYER_ID, BUILDINGS_SOURCE_ID, setBuildings3d } from '../layers/buildings3d';
 
 describe('GBA building layer', () => {
   it('hides Goong extrusions and uses the warehouse model at its recorded height', () => {
@@ -19,6 +19,7 @@ describe('GBA building layer', () => {
       removeSource: vi.fn((id: string) => sources.delete(id)),
       setLayoutProperty: vi.fn(),
       setPaintProperty: vi.fn(),
+      setFilter: vi.fn(),
       moveLayer: vi.fn(),
     };
 
@@ -30,8 +31,12 @@ describe('GBA building layer', () => {
     }));
     expect(map.addLayer).toHaveBeenCalledWith(expect.objectContaining({
       id: BUILDINGS_LAYER_ID, source: BUILDINGS_SOURCE_ID, 'source-layer': 'buildings',
+      filter: BUILDING_FILTER,
       paint: expect.objectContaining({ 'fill-extrusion-height': ['to-number', ['get', 'height_m'], 0] }),
     }), 'street-labels');
+
+    setBuildings3d(map as unknown as MapLibreMap, true, 0.6);
+    expect(map.setFilter).toHaveBeenCalledWith(BUILDINGS_LAYER_ID, BUILDING_FILTER);
 
     expect(setBuildings3d(map as unknown as MapLibreMap, false)).toBe(true);
     expect(map.removeLayer).toHaveBeenCalledWith(BUILDINGS_LAYER_ID);

@@ -9,7 +9,7 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   {
     id: 'buildings-3d',
     label: '3D buildings',
-    description: 'GBA LoD1 buildings fitted to cadastral parcels where the geometry match is reliable.',
+    description: 'GBA heights with verified Overture footprints and parcel checks.',
     category: 'built-environment',
     enabledByDefault: false,
     status: 'available',

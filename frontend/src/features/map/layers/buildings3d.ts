@@ -1,8 +1,9 @@
-import type { FillExtrusionLayerSpecification, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
+import type { FillExtrusionLayerSpecification, FilterSpecification, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
 import { API_BASE_URL } from '../../../services/api';
 
 export const BUILDINGS_LAYER_ID = 'urban-buildings-3d';
 export const BUILDINGS_SOURCE_ID = 'urban-gba-lod1';
+export const BUILDING_FILTER: FilterSpecification = ['!=', ['get', 'geometry_status'], 'outside_parcels'];
 export const BUILDINGS_SNAPSHOT_URL = `${API_BASE_URL}/api/v1/buildings/snapshot`;
 export const BUILDING_PAINT: FillExtrusionLayerSpecification['paint'] = {
   'fill-extrusion-color': '#a9b6ae',
@@ -32,6 +33,7 @@ export function setBuildings3d(map: MapLibreMap, enabled: boolean, opacity = 0.8
   }
 
   if (map.getLayer(BUILDINGS_LAYER_ID)) {
+    map.setFilter(BUILDINGS_LAYER_ID, BUILDING_FILTER);
     map.setPaintProperty(BUILDINGS_LAYER_ID, 'fill-extrusion-opacity', opacity);
     map.moveLayer(BUILDINGS_LAYER_ID, firstLabelLayer(map.getStyle()));
     return true;
@@ -39,10 +41,10 @@ export function setBuildings3d(map: MapLibreMap, enabled: boolean, opacity = 0.8
   if (!map.getSource(BUILDINGS_SOURCE_ID)) {
     map.addSource(BUILDINGS_SOURCE_ID, {
       type: 'vector',
-      tiles: [`${API_BASE_URL}/api/v1/buildings/tiles/{z}/{x}/{y}.pbf`],
+      tiles: [`${API_BASE_URL}/api/v1/buildings/tiles/{z}/{x}/{y}.pbf?geometry=overture-v1`],
       minzoom: 14,
       maxzoom: 16,
-      attribution: 'GlobalBuildingAtlas LoD1 · CC BY-NC 4.0 · UrbanDynamics',
+      attribution: 'GlobalBuildingAtlas LoD1 · CC BY-NC 4.0 · <a href="https://docs.overturemaps.org/attribution/">Overture Maps</a> · UrbanDynamics',
     });
   }
 
@@ -53,6 +55,7 @@ export function setBuildings3d(map: MapLibreMap, enabled: boolean, opacity = 0.8
       'source-layer': 'buildings',
       type: 'fill-extrusion',
       minzoom: 14,
+      filter: BUILDING_FILTER,
       paint: {
         ...BUILDING_PAINT,
         'fill-extrusion-opacity': opacity,

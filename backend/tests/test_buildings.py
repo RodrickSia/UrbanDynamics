@@ -100,8 +100,32 @@ def test_tile_clips_only_confident_parcel_matches(monkeypatch):
         distant = mercantile.tile(106.7, 10.8, 14)
         distant_features = mapbox_vector_tile.decode(
             router.buildings.vector_tile(14, distant.x, distant.y))['buildings']['features']
-        assert all(item['properties']['parcel_fit'] == 'not_checked' for item in distant_features
-                   if item['properties']['feature_id'].startswith(key))
+        distant_ours = {item['properties']['feature_id']: item['properties']['parcel_fit']
+                       for item in distant_features if item['properties']['feature_id'].startswith(key)}
+        assert distant_ours[f"{key}-matched"] == 'matched'
+        assert distant_ours[f"{key}-unmatched"] == 'source_unmatched'
+
+        # Identity may establish a correction even with no initial overlap.
+        connection.execute("""
+            INSERT INTO buildings.gba_lod1
+                (feature_id, gba_id, source, source_id, source_tile, height_m, geom)
+            VALUES (%s, %s, 'google', %s, 'fixture', 46,
+                    ST_Multi(ST_MakeEnvelope(106.6992, 10.799, 106.6993, 10.7991, 4326)))
+        """, (f'{key}-identity', key, key))
+        connection.execute("""
+            INSERT INTO buildings.footprint (overture_id, source_release, properties, geom)
+            VALUES (%s, 'fixture', jsonb_build_object('sources', jsonb_build_array(
+                jsonb_build_object('dataset', 'Google Open Buildings', 'property', '', 'record_id', %s::text))),
+                ST_Multi(ST_MakeEnvelope(106.6996, 10.799, 106.6997, 10.7991, 4326)))
+        """, (key, key))
+        corrected = mapbox_vector_tile.decode(
+            router.buildings.vector_tile(16, tile.x, tile.y))['buildings']['features']
+        identity = next(f for f in corrected if f['properties']['feature_id'] == f'{key}-identity')
+        assert identity['properties']['geometry_source'] == 'overture'
+        assert identity['properties']['overture_id'] == key
+        assert identity['properties']['match_method'] == 'source_identity'
+        assert identity['properties']['height_m'] == 46
+        assert shape(identity['geometry']).bounds[0] == pytest.approx(pixel_x(106.6996), abs=2)
     finally:
         connection.rollback()
         connection.close()

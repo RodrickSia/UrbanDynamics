@@ -43,6 +43,13 @@ describe('viewshed occlusion geometry', () => {
     });
     expect(unknown.vertices.length).toBe(ground.vertices.length);
     expect(unknown.complete).toBe(false);
+    const excluded = buildScene(view, {
+      elevation: () => 0,
+      buildings: [{ geometry, properties: { height_m: 46, geometry_status: 'outside_parcels' } }],
+      buildingsAvailable: true,
+    });
+    expect(excluded.vertices).toEqual(ground.vertices);
+    expect(excluded.complete).toBe(false);
   });
   it('does not turn missing DEM into flat ground or visible results', () => {
     const mesh = buildScene(view, {
