@@ -30,7 +30,7 @@ jobs:
         run: docker compose exec -T postgis /usr/local/bin/migrate-warehouse
       - name: Run ETL and API tests over the Compose network
         run: docker compose --profile checks run --rm khoi-checks
-      - name: Verify main migration ledger includes vector-layer migration
+      - name: Verify shared schema migrations
         run: |
           docker compose exec -T postgis psql --username ci --dbname urbandynamics_ci --set ON_ERROR_STOP=1 <<'SQL'
           DO $$
@@ -43,6 +43,27 @@ jobs:
             END IF;
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '02-population-raster.sql') <> 1 THEN
               RAISE EXCEPTION 'population migration was not recorded exactly once';
+            END IF;
+            IF to_regclass('buildings.footprint') IS NULL OR to_regclass('buildings.snapshot_metadata') IS NULL THEN
+              RAISE EXCEPTION 'buildings footprint tables are missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql') <> 1 THEN
+              RAISE EXCEPTION 'buildings footprint migration was not recorded exactly once';
+            END IF;
+            IF to_regclass('buildings.gba_lod1') IS NULL THEN
+              RAISE EXCEPTION 'GBA LoD1 table is missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'buildings' AND table_name = 'gba_lod1' AND column_name = 'feature_id'
+            ) THEN
+              RAISE EXCEPTION 'GBA feature_id column is missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '05-buildings-gba-lod1.sql') <> 1 THEN
+              RAISE EXCEPTION 'GBA LoD1 migration was not recorded exactly once';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql') <> 1 THEN
+              RAISE EXCEPTION 'GBA feature-id migration was not recorded exactly once';
             END IF;
           END
           $$;

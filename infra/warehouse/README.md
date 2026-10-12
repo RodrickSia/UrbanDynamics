@@ -10,6 +10,8 @@ database; containers connect to `postgis:5432` on the internal network.
 - Population rasters: `population.population_raster`.
 - Flood and land-price vector snapshots: `public.layer_snapshots` and
   `public.layer_features`.
+- Overture building footprints: `buildings.footprint` and
+  `buildings.snapshot_metadata`.
 - Applied migrations: `public.schema_migrations`.
 
 Schema changes are numbered SQL files in `migrations/`. Empty database

@@ -141,6 +141,30 @@ services:
       postgis:
         condition: service_healthy
 
+  etl-buildings-footprint:
+    <<: *etl
+    profiles: ["etl-buildings-footprint"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: buildings_footprint
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-buildings-footprint-gba:
+    <<: *etl
+    profiles: ["etl-buildings-footprint-gba"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: buildings_footprint_gba
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
   khoi-checks:
     build:
       context: .

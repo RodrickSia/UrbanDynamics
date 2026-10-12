@@ -27,9 +27,10 @@ jobs:
             --profile etl-flood-history --profile etl-flood-satellite \
             --profile etl-flood-risk --profile etl-land-price \
             --profile etl-parcels-hcmc \
+            --profile etl-buildings-footprint --profile etl-buildings-footprint-gba \
             build backend frontend etl-population-hcmc \
             etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price \
-            etl-parcels-hcmc
+            etl-parcels-hcmc etl-buildings-footprint etl-buildings-footprint-gba
 
   database:
     runs-on: ubuntu-latest
@@ -82,6 +83,27 @@ jobs:
             END IF;
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql') <> 1 THEN
               RAISE EXCEPTION 'parcels migration was not tracked exactly once';
+            END IF;
+            IF to_regclass('buildings.footprint') IS NULL OR to_regclass('buildings.snapshot_metadata') IS NULL THEN
+              RAISE EXCEPTION 'buildings footprint tables are missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql') <> 1 THEN
+              RAISE EXCEPTION 'buildings footprint migration was not tracked exactly once';
+            END IF;
+            IF to_regclass('buildings.gba_lod1') IS NULL THEN
+              RAISE EXCEPTION 'GBA LoD1 table is missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'buildings' AND table_name = 'gba_lod1' AND column_name = 'feature_id'
+            ) THEN
+              RAISE EXCEPTION 'GBA feature_id column is missing';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '05-buildings-gba-lod1.sql') <> 1 THEN
+              RAISE EXCEPTION 'GBA LoD1 migration was not tracked exactly once';
+            END IF;
+            IF (SELECT count(*) FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql') <> 1 THEN
+              RAISE EXCEPTION 'GBA feature-id migration was not tracked exactly once';
             END IF;
           END
           $$;
