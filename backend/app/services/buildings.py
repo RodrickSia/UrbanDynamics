@@ -4,6 +4,8 @@ from src.shared.database import connect_to_warehouse
 
 MIN_ZOOM = 14
 MAX_NATIVE_ZOOM = 16
+PARCEL_FIT_MIN_ZOOM = 15
+PARCEL_FIT_MIN_COVERAGE = 0.9
 
 
 def snapshot():
@@ -28,15 +30,36 @@ def vector_tile(z: int, x: int, y: int) -> bytes:
         row = connection.execute("""
             WITH bounds AS (
                 SELECT ST_TileEnvelope(%s, %s, %s) AS web
-            ), selected AS (
-                SELECT b.feature_id, b.height_m,
-                       ST_AsMVTGeom(ST_Transform(b.geom, 3857), bounds.web,
-                                    4096, 64, true) AS geom
+            ), nearby AS (
+                SELECT b.feature_id, b.height_m, ST_Transform(b.geom, 3857) AS geom_web
                 FROM buildings.gba_lod1 b, bounds
                 WHERE b.geom && ST_Transform(bounds.web, 4326)
                   AND b.height_m > 0
+            ), compared AS (
+                SELECT b.feature_id, b.height_m, b.geom_web, parcel.inside,
+                       ST_Area(parcel.inside) / NULLIF(ST_Area(b.geom_web), 0) AS coverage
+                FROM nearby b
+                LEFT JOIN LATERAL (
+                    SELECT ST_CollectionExtract(ST_UnaryUnion(ST_Collect(
+                        ST_Intersection(p.geom_web, b.geom_web)
+                    )), 3) AS inside
+                    FROM parcels.plot p
+                    WHERE %s >= %s AND p.geom_web && b.geom_web
+                      AND ST_Intersects(p.geom_web, b.geom_web)
+                ) parcel ON true
+            ), selected AS (
+                SELECT c.feature_id, c.height_m,
+                       CASE WHEN %s < %s THEN 'not_checked'
+                            WHEN c.coverage >= %s THEN 'matched'
+                            ELSE 'source_unmatched' END AS parcel_fit,
+                       ST_AsMVTGeom(
+                           CASE WHEN c.coverage >= %s THEN c.inside ELSE c.geom_web END,
+                           bounds.web, 4096, 64, true
+                       ) AS geom
+                FROM compared c, bounds
             )
             SELECT ST_AsMVT(selected, 'buildings', 4096, 'geom') FROM selected
             WHERE geom IS NOT NULL
-        """, (z, x, y)).fetchone()
+        """, (z, x, y, z, PARCEL_FIT_MIN_ZOOM, z, PARCEL_FIT_MIN_ZOOM,
+              PARCEL_FIT_MIN_COVERAGE, PARCEL_FIT_MIN_COVERAGE)).fetchone()
     return bytes(row[0]) if row and row[0] else b""

@@ -65,6 +65,11 @@ ETL on `main`. Only footprints with a positive `height_m` are extruded; the
 frontend reports the model unavailable until a loaded snapshot contains such
 buildings. Tiles are native at zoom 14–16 and overzoom at closer views. The
 GBA model carries CC BY-NC 4.0 terms; the map attributes that source.
+At zoom 15 and above, the tile service clips a GBA footprint to the union of
+the corresponding Land parcels only when at least 90% of its area overlaps
+those parcels. Tile properties report `parcel_fit: matched` or
+`parcel_fit: source_unmatched`; unmatched footprints keep their source shape.
+At zoom 14, `parcel_fit: not_checked` avoids the extra spatial join.
 
 ## Configuration and operation
 

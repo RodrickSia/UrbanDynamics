@@ -1,5 +1,10 @@
 """Building map endpoints expose only the loaded GBA LoD1 snapshot."""
 
+import os
+from contextlib import contextmanager
+from uuid import uuid4
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -41,3 +46,62 @@ def test_missing_warehouse_and_empty_tile(monkeypatch):
     monkeypatch.setattr(router, "warehouse_configured", lambda: True)
     monkeypatch.setattr(router.buildings, "vector_tile", lambda z, x, y: b"")
     assert client.get("/api/v1/buildings/tiles/14/13042/7449.pbf").status_code == 204
+
+
+@pytest.mark.skipif(os.getenv("POSTGIS_TESTS") != "1", reason="Requires isolated PostGIS")
+def test_tile_clips_only_confident_parcel_matches(monkeypatch):
+    import mapbox_vector_tile
+    import mercantile
+    from shapely.geometry import shape
+    from src.shared.database import connect_to_warehouse
+
+    connection = connect_to_warehouse()
+    key = uuid4().hex
+
+    @contextmanager
+    def same_transaction():
+        yield connection
+
+    monkeypatch.setattr(router.buildings, "connect_to_warehouse", same_transaction)
+    try:
+        connection.execute("""
+            INSERT INTO parcels.land_plot (uniq_id, mdsdd, tile_z, tile_x, tile_y, geom)
+            VALUES (%s, 'ODT', 16, 0, 0,
+                    ST_MakeEnvelope(106.69953, 10.7985, 106.70047, 10.8005, 4326))
+        """, (key,))
+        connection.execute("REFRESH MATERIALIZED VIEW parcels.plot")
+        for suffix, west, east in (("matched", 106.6995, 106.7005),
+                                   ("unmatched", 106.701, 106.7013)):
+            connection.execute("""
+                INSERT INTO buildings.gba_lod1
+                    (feature_id, gba_id, source_tile, height_m, geom)
+                VALUES (%s, %s, 'fixture', 20,
+                        ST_Multi(ST_MakeEnvelope(%s, 10.7985, %s, 10.8005, 4326)))
+            """, (f"{key}-{suffix}", f"{key}-{suffix}", west, east))
+
+        tile = mercantile.tile(106.7, 10.8, 16)
+        decoded = mapbox_vector_tile.decode(
+            router.buildings.vector_tile(16, tile.x, tile.y))['buildings']['features']
+        ours = {item['properties']['feature_id']: item for item in decoded
+                if item['properties']['feature_id'].startswith(key)}
+        assert ours[f"{key}-matched"]['properties']['parcel_fit'] == 'matched'
+        assert ours[f"{key}-unmatched"]['properties']['parcel_fit'] == 'source_unmatched'
+
+        bounds = mercantile.xy_bounds(tile)
+        def pixel_x(lon):
+            return (mercantile.xy(lon, 10.8)[0] - bounds.left) / (bounds.right - bounds.left) * 4096
+
+        aligned_bounds = shape(ours[f"{key}-matched"]['geometry']).bounds
+        source_bounds = shape(ours[f"{key}-unmatched"]['geometry']).bounds
+        assert aligned_bounds[0] == pytest.approx(pixel_x(106.69953), abs=2)
+        assert aligned_bounds[2] == pytest.approx(pixel_x(106.70047), abs=2)
+        assert source_bounds[0] == pytest.approx(pixel_x(106.701), abs=2)
+
+        distant = mercantile.tile(106.7, 10.8, 14)
+        distant_features = mapbox_vector_tile.decode(
+            router.buildings.vector_tile(14, distant.x, distant.y))['buildings']['features']
+        assert all(item['properties']['parcel_fit'] == 'not_checked' for item in distant_features
+                   if item['properties']['feature_id'].startswith(key))
+    finally:
+        connection.rollback()
+        connection.close()

@@ -9,7 +9,7 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
   {
     id: 'buildings-3d',
     label: '3D buildings',
-    description: 'Building extrusions from the GBA LoD1 model when loaded in the warehouse.',
+    description: 'GBA LoD1 buildings fitted to cadastral parcels where the geometry match is reliable.',
     category: 'built-environment',
     enabledByDefault: false,
     status: 'available',

@@ -99,6 +99,11 @@ export function LayerItem({
               <output>{Math.round(opacity * 100)}%</output>
             </label>
           )}
+          {layer.id === 'buildings-3d' && (
+            <p className="building-alignment-note">
+              Fits Land parcels where the overlap is reliable. Unmatched buildings keep their source position.
+            </p>
+          )}
         </div>
       )}
     </div>
