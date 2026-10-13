@@ -205,6 +205,9 @@ def test_shared_types_confirmation_and_lock_protection(client, plan):
     plan = draw(client, add_type(client, plan))
     plan = command(client, plan, "add_scenario", {"name": "B"})
     kind = plan["types"][0]
+    # Clones now own independent rule versions; explicitly share a type to test shared editing.
+    clone = plan["scenarios"][-1]
+    plan = command(client, plan, "assign", {"zone_id": clone["zones"][0]["id"], "type_id": kind["id"]}, clone["id"])
     from app.services.zoning.models import ZoneType
     fields = {k: v for k, v in kind.items() if k in ZoneType.model_fields}
     fields["far"] = 5

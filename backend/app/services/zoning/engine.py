@@ -30,8 +30,10 @@ def create(data: PlanInput):
                      "study_area": geojson(area),
                      "status": "unverified", "source": "No authoritative zoning snapshot imported"},
         "scenarios": [
-            {"id": new_id(), "name": "Existing", "kind": "reference", "locked": True, "zones": []},
-            {"id": new_id(), "name": "Scenario A", "kind": "proposal", "locked": False, "zones": []},
+            {"id": new_id(), "name": "Existing", "kind": "reference", "locked": True, "zones": [],
+             "description": "", "created_at": captured, "created_by": "local-workspace", "revision": 1},
+            {"id": new_id(), "name": "Scenario A", "kind": "proposal", "locked": False, "zones": [],
+             "description": "", "created_at": captured, "created_by": "local-workspace", "revision": 1},
         ],
     }
 
@@ -90,6 +92,7 @@ def apply(original, command: Command):
     action, data = command.action, command.payload
     revision = plan["revision"] + 1
     if action in ("add_type", "edit_type", "duplicate_type", "delete_type", "reorder_types"):
+        editable(plan, command.scenario_id)
         if action == "reorder_types":
             ids = data.get("ids", [])
             if len(ids) != len(plan["types"]) or set(ids) != {t["id"] for t in plan["types"]}:
@@ -132,6 +135,16 @@ def apply(original, command: Command):
         clone.update(fields, id=new_id(), kind="proposal", locked=False, copied_from=source["id"],
                      created_at=now(), updated_at=now(), created_by="local-workspace", revision=revision,
                      _past=[], _future=[], _dev_past=[], _dev_future=[])
+        used_types = {z["type_id"] for z in clone["zones"]}
+        if len(plan["types"]) + len(used_types) > 100:
+            raise ValueError("Cloning would exceed the 100-type workspace limit")
+        for type_id in used_types:
+            copied = deepcopy(find(plan["types"], type_id))
+            copied.update(id=new_id(), code=(copied["code"][:10] + "-" + new_id()[:8]), origin_id=copied.get("origin_id") or type_id)
+            plan["types"].append(copied)
+            for zone in clone["zones"]:
+                if zone["type_id"] == type_id:
+                    zone["type_id"] = copied["id"]
         for key in ("zones", "buildings", "demolition_masks"):
             for item in clone.get(key, []):
                 item.update(origin_id=item.get("origin_id") or item["id"], id=new_id())

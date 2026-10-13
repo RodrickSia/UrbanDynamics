@@ -99,3 +99,36 @@ def test_scenario_metadata_reorder_and_reference_write_rejected(client, plan, pa
     assert plan["scenarios"][1]["description"] == "Test"
     command(client, plan, "save_building", building(), ids[0], status=422)
     command(client, plan, "reorder_scenarios", {"ids": list(reversed(ids))}, status=422)
+
+
+def test_clone_rule_catalog_is_independent_and_locked_type_writes_rejected(client, plan):
+    plan = draw(client, add_type(client, plan))
+    plan = command(client, plan, "add_scenario", {"name": "B"})
+    a, b = plan["scenarios"][1:]
+    assert a["zones"][0]["type_id"] != b["zones"][0]["type_id"]
+    comparison = client.get(f"/api/v1/zoning/plans/{plan['id']}/indicators", params={"scenario_id": b["id"], "compare_id": a["id"]}).json()
+    assert comparison["changed_m2"] == pytest.approx(0, abs=.001)
+    from app.services.zoning.models import ZoneType
+    original = plan["types"][0]
+    fields = {k: v for k, v in original.items() if k in ZoneType.model_fields}
+    fields["far"] = 9
+    plan = command(client, plan, "edit_type", {"id": original["id"], "type": fields})
+    assert next(t for t in plan["types"] if t["id"] == b["zones"][0]["type_id"])["far"] == 4
+    plan = command(client, plan, "lock_scenario", {"locked": True})
+    command(client, plan, "add_type", {"type": {"code": "X", "name": "Bypass", "color": "#123456"}}, status=422)
+
+
+def test_source_unavailable_and_invalid_ids_do_not_create_fake_parcels(client, plan):
+    from app.services.zoning import store
+    original = store.load(plan["id"])
+    command(client, plan, "save_building", building(), status=503)
+    command(client, plan, "save_building", building(parcel_id="-1"), status=422)
+    assert store.load(plan["id"]) == original
+
+
+def test_gfa_and_far_flags_do_not_double_count_or_conflate_metrics(client, plan, parcel_source):
+    result = preview(client, plan, building(counts_gfa=False, counts_far=True))
+    assert result["metrics"]["gfa_m2"] == 0
+    assert result["metrics"]["far"] > 0
+    assert result["metrics"]["footprint_m2"] > 0
+    assert sum(result["metrics"]["space_use_m2"].values()) == 0

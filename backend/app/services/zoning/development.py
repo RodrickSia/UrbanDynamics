@@ -6,7 +6,7 @@ from uuid import uuid4
 from shapely.affinity import scale
 from shapely.ops import unary_union
 
-from .geometry import EPSILON, geojson, projected
+from .geometry import EPSILON, geojson, polygonal, projected
 from .models import BuildingInput, GenerationInput
 
 SPACE_USES = [
@@ -93,10 +93,13 @@ def prepare_building(plan, scenario, payload):
            for b in buildings):
         raise ValueError("Building footprints overlap; move the duplicate before saving")
     data.pop("demolish")
+    if previous:
+        data["origin_id"] = previous.get("origin_id")
     data.update(id=data["id"] or str(uuid4()), geometry=geojson(geometry), height_m=data["floors"] * data["floor_height"],
                 footprint_m2=geometry.area, ground_anchor={"datum": "terrain_relative", "offset_m": 0,
                 "status": "elevation_unverified"}, status="user_proposed", template_version=1 if data["template_id"] else None,
-                space_use_version=1, color=next(s["color"] for s in SPACE_USES if s["id"] == data["space_use_id"]))
+                origin="generated" if data["template_id"] else "manual", space_use_version=1,
+                color=next(s["color"] for s in SPACE_USES if s["id"] == data["space_use_id"]))
     same_parcel = [b for b in buildings if b["parcel_id"] == data["parcel_id"] and b["id"] != data["id"]] + [data]
     return data, validation(plan, scenario, parcel, same_parcel)
 
@@ -166,8 +169,11 @@ def apply(plan, scenario, action, payload):
 
 def mask_parcel(plan, scenario, parcel_id):
     if not any(m["parcel_id"] == parcel_id for m in scenario.get("demolition_masks", [])):
+        geometry = polygonal(projected(plan["parcels"][parcel_id]["geometry"]).intersection(projected(plan["study_area"])))
+        if geometry is None:
+            raise ValueError("The demolition parcel does not intersect the study area")
         scenario.setdefault("demolition_masks", []).append({"id": str(uuid4()), "parcel_id": parcel_id,
-            "geometry": geojson(projected(plan["parcels"][parcel_id]["geometry"]).intersection(projected(plan["study_area"]))),
+            "geometry": geojson(geometry),
             "status": "user_proposed"})
 
 

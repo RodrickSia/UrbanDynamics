@@ -1,3 +1,5 @@
+import json
+
 from shapely.geometry import GeometryCollection
 from shapely.ops import unary_union
 
@@ -10,11 +12,17 @@ def report(plan, scenario_id, compare_id):
     comparison = find(plan["scenarios"], compare_id or plan["scenarios"][0]["id"])
     study = projected(plan["study_area"])
     types = {t["id"]: t for t in plan["types"]}
+    representatives, aliases = {}, {}
+    for identifier, kind in types.items():
+        fields = {k: v for k, v in kind.items() if k not in ("id", "code", "version", "origin_id")}
+        signature = (kind.get("origin_id") or identifier, json.dumps(fields, sort_keys=True))
+        aliases[identifier] = representatives.setdefault(signature, identifier)
 
     def grouped(scenario):
         result = {}
         for zone in scenario["zones"]:
-            result.setdefault(zone["type_id"], []).append(projected(zone["geometry"]))
+            identifier = aliases.get(zone["type_id"], zone["type_id"])
+            result.setdefault(identifier, []).append(projected(zone["geometry"]))
         return {key: unary_union(value) for key, value in result.items()}
 
     zones, before = grouped(current), grouped(comparison)
