@@ -91,11 +91,11 @@ jobs:
               exit 1
             fi
           elif [ "$ETL_PIPELINE" = model_generation ]; then
-            model_generation_migration_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql') AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.footprint) AND EXISTS (SELECT 1 FROM buildings.gba_lod1)"
+            model_generation_migration_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql') AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.gba_lod1)"
             if ! docker compose exec -T postgis sh -c \
               'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
               sh "$model_generation_migration_query" | grep -Fxq t; then
-              echo "::error::Model generation requires the parcel, Overture, GBA, and model-generation migrations, with parcel and building source data already loaded." >&2
+              echo "::error::Model generation requires parcel, GBA, and model-generation migrations, with parcel and GBA source data already loaded." >&2
               exit 1
             fi
           elif [ "$ETL_PIPELINE" = buildings_footprint ] || [ "$ETL_PIPELINE" = all ]; then
@@ -243,7 +243,7 @@ jobs:
               run_pipeline "$pipeline"
             done
             model_sources_ready=false
-            model_source_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.footprint) AND EXISTS (SELECT 1 FROM buildings.gba_lod1) AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql')"
+            model_source_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.gba_lod1) AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql')"
             if docker compose exec -T postgis sh -c \
               'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
               sh "$model_source_query" | grep -Fxq t; then
@@ -252,7 +252,7 @@ jobs:
             if [ "$model_sources_ready" = true ]; then
               run_pipeline model_generation
             else
-              echo "::warning::Skipping model_generation: parcel data, building sources, or its migration are not ready."
+              echo "::warning::Skipping model_generation: parcel data, GBA source data, or its migration are not ready."
               skipped+=(model_generation)
             fi
             if [ "${#skipped[@]}" -gt 0 ]; then

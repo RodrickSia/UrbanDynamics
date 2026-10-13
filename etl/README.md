@@ -46,13 +46,14 @@ LoD1 buildings, and parcel-based model generation. If rainfall inputs are missin
 it downloads forecast/history from Open-Meteo. Land-price source rows and OSM
 road candidates are prepared automatically. Selecting all pipelines requires
 stage `all`. Parcel and buildings-footprint ETL support separate
-`transform` and `load` stages. Model generation runs last when parcel,
-Overture, and GBA source data are available.
+`transform` and `load` stages. Model generation runs last when parcel and GBA
+source data are available.
 
-`model_generation` runs after the parcel, Overture, and GBA source datasets are
-available. It selects eligible vacant residential parcels, insets each parcel
-outline, samples a height from the observed GBA residential-height distribution,
-and replaces `buildings.synthetic_residential` in one transaction. The backend
+`model_generation` runs after the parcel and GBA source datasets are available.
+It selects eligible residential parcels that do not overlap a GBA footprint,
+insets each parcel outline, and samples a height from the observed GBA
+residential-height distribution. It replaces `buildings.synthetic_residential`
+in one transaction. The backend
 serves this table as `synthetic_buildings` vector tiles; the frontend renders
 the layer in 3D. These are approximate models, not surveyed building outlines
 or heights. Apply the `20261013-model-generation.sql` migration before running it.
@@ -103,8 +104,8 @@ use. The `05-buildings-gba-lod1.sql` and
 apply migrations through the protected database deployment workflow before
 running this pipeline.
 
-Generate inset residential building extrusions from parcels after the parcel,
-Overture, and GBA datasets are loaded:
+Generate inset residential building extrusions from parcels after the parcel
+and GBA datasets are loaded:
 
 ```sh
 docker compose --profile etl-model-generation run --rm etl-model-generation run --stage all
@@ -112,7 +113,7 @@ docker compose --profile etl-model-generation run --rm etl-model-generation run 
 
 The pipeline inventories all parcel land-use values, uses only the explicit
 residential codes `OTC`, `ODT`, and `ONT`, skips parcels overlapped by existing
-Overture or GBA building footprints, and samples model heights from GBA
+GBA building footprints, and samples model heights from GBA
 buildings on residential parcels. It publishes the synthetic models separately
 to `buildings.synthetic_residential`. The `20261013-model-generation.sql`
 migration creates that table; apply it with the protected database deployment

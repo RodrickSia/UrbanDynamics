@@ -12,7 +12,7 @@ from src.shared.data_io import data_dir
 
 logger = logging.getLogger(__name__)
 
-_REQUIRED_TABLES = ("parcels.plot", "buildings.footprint", "buildings.gba_lod1")
+_REQUIRED_TABLES = ("parcels.plot", "buildings.gba_lod1")
 
 
 def _temporary_path(path: Path) -> Path:
@@ -28,7 +28,7 @@ def _require_sources(connection) -> None:
     ]
     if missing:
         raise RuntimeError(
-            "Model generation requires migrated parcel, Overture footprint, and "
+            "Model generation requires migrated parcel and "
             f"GBA LoD1 tables; missing: {', '.join(missing)}. Load those source datasets first."
         )
 
@@ -108,11 +108,6 @@ def run(settings: ModelGenerationConfig = config) -> tuple[Path, Path]:
                   WHERE upper(trim(coalesce(p.mdsdd, ''))) = ANY(%s)
                     AND NOT p.conflicting_land_use
                     AND p.area_m2 BETWEEN %s AND %s
-                    AND NOT EXISTS (
-                      SELECT 1 FROM buildings.footprint AS existing
-                      WHERE existing.geom && p.geom
-                        AND ST_Relate(existing.geom, p.geom, '2********')
-                    )
                     AND NOT EXISTS (
                       SELECT 1 FROM buildings.gba_lod1 AS existing
                       WHERE existing.geom && p.geom
