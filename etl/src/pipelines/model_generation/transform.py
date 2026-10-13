@@ -1,10 +1,11 @@
-"""Inset residential parcel silhouettes and assign reproducible observed heights."""
+"""Inset residential parcel silhouettes and sample observed residential heights."""
 
-import hashlib
 import json
 import logging
 import math
 import os
+import random
+from pathlib import Path
 
 from pyproj import Transformer
 from shapely import make_valid
@@ -19,17 +20,15 @@ _TO_METERS = Transformer.from_crs("EPSG:4326", "EPSG:32648", always_xy=True)
 _TO_WGS84 = Transformer.from_crs("EPSG:32648", "EPSG:4326", always_xy=True)
 
 
-def _sample_height(parcel_id: int, distribution: dict, settings: ModelGenerationConfig) -> float:
+def _sample_height(rng: random.Random, distribution: dict) -> float:
     samples = distribution["height_samples"]
-    total = sum(item["count"] for item in samples)
-    selector = int(
-        hashlib.sha256(f"{settings.seed}:{parcel_id}".encode()).hexdigest(), 16
-    ) % total
-    for item in samples:
-        selector -= item["count"]
-        if selector < 0:
-            return float(item["height_m"])
-    raise RuntimeError("Could not sample a residential height")
+    return float(
+        rng.choices(
+            samples,
+            weights=(item["count"] for item in samples),
+            k=1,
+        )[0]["height_m"]
+    )
 
 
 def _polygon_parts(geometry) -> list[Polygon]:
@@ -63,6 +62,9 @@ def run(settings: ModelGenerationConfig = config) -> Path:
         raise FileNotFoundError("Run model_generation extract before transform")
 
     distribution = json.loads(distribution_path.read_text(encoding="utf-8"))
+    # A seeded random stream samples independently per building while keeping
+    # regenerated snapshots stable for the same input ordering and seed.
+    height_rng = random.Random(settings.seed)
     candidate_count = generated = rejected = 0
     with candidates_path.open(encoding="utf-8") as source, output_part.open(
         "w", encoding="utf-8"
@@ -82,7 +84,7 @@ def run(settings: ModelGenerationConfig = config) -> Path:
                 continue
             footprint = MultiPolygon(parts)
             wgs84_footprint = transform_geometry(_TO_WGS84.transform, footprint)
-            height_m = _sample_height(parcel_id, distribution, settings)
+            height_m = _sample_height(height_rng, distribution)
             floors = max(1, round(height_m / settings.storey_height_m))
             target.write(
                 json.dumps(
