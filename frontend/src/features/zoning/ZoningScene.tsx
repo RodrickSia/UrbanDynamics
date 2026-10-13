@@ -6,11 +6,13 @@ import { PARCEL_MAX_NATIVE_ZOOM, PARCEL_MIN_ZOOM, parcelOutline } from '../map/d
 import { editVertex, rings, sketchGeometry } from './geometry';
 import { nearestSnap, snapSource, type SnapGeometry } from './snapping';
 import type { PolygonGeometry, ZoningBridge } from './types';
+import { BUILDING_LAYER } from './DevelopmentScene';
 
 const SOURCE = 'zoning-editor';
 const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
 const PARCEL_SOURCE = 'zoning-plan-parcels';
 const PARCEL_LINE = 'zoning-plan-parcels-outline';
+const PARCEL_PICK = 'zoning-plan-parcels-pick';
 const ZONED_SOURCE = 'zoning-colored-parcels', ZONED_FILL = 'zoning-colored-parcels-fill';
 const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -80,6 +82,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
       if (e.originalEvent.ctrlKey) return null;
       const candidates: SnapGeometry[] = [];
       if (current.current.plan) candidates.push({ geometry: current.current.plan.study_area, source: 'zoning' });
+      if (current.current.development?.parcel) candidates.push({ geometry: current.current.development.parcel.geometry, source: 'parcel' });
       for (const zone of current.current.scenario?.zones ?? []) candidates.push({ geometry: zone.geometry, source: 'zoning' });
       const layers = map.getStyle().layers.filter(layer =>
         layer.id === PARCEL_LINE ? current.current.showParcels : snapSource(layer) !== null);
@@ -120,6 +123,16 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         if (b.sketch.points.length < 1000) b.onSketch({ ...b.sketch, points: [...b.sketch.points, snap(e)] });
         return;
       }
+      if (b.development?.active) {
+        const building = query(e, BUILDING_LAYER)[0];
+        if (building && building.properties.id !== 'preview') b.development.onPickBuilding(String(building.properties.id));
+        else {
+          const parcel = query(e, PARCEL_PICK)[0];
+          const id = parcel?.properties.parcel_id ?? parcel?.id;
+          if (id !== undefined) b.development.onPickParcel(String(id));
+        }
+        return;
+      }
       const picked = query(e, FILL).find(f => f.properties.kind === 'zone');
       b.onPick(picked ? String(picked.properties.id) : null, e.originalEvent.shiftKey);
     };
@@ -154,6 +167,15 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     const key = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest('input, textarea, select, button, dialog') || current.current.busy) return;
       if (e.key === 'Control') (map.getSource(SNAP_SOURCE) as GeoJSONSource | undefined)?.setData(EMPTY);
+      if (current.current.development?.active && e.key === 'Delete' && !current.current.sketch.tool) {
+        e.preventDefault(); current.current.development.onDelete();
+      }
+      if (current.current.development?.active && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (current.current.sketch.tool && !current.current.sketch.geometry) current.current.onSketch({
+          ...current.current.sketch, points: current.current.sketch.points.slice(0, -1) });
+        else if (!current.current.sketch.tool) current.current.development.onUndo(e.shiftKey);
+      }
       if (e.key === 'Escape') current.current.onCancel();
       if (e.key === 'Enter' && current.current.sketch.tool) { e.preventDefault(); current.current.onFinish(); }
       if (e.key === 'Backspace' && current.current.sketch.tool && !current.current.sketch.geometry) {
@@ -181,6 +203,8 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         minzoom: PARCEL_MIN_ZOOM, maxzoom: PARCEL_MAX_NATIVE_ZOOM });
       if (!map.getLayer(PARCEL_LINE)) map.addLayer({ ...parcelOutline(), id: PARCEL_LINE, source: PARCEL_SOURCE,
         paint: { ...parcelOutline().paint, 'line-color': '#005b65', 'line-opacity': current.current.showParcels ? .9 : 0 } });
+      if (!map.getLayer(PARCEL_PICK)) map.addLayer({ id: PARCEL_PICK, source: PARCEL_SOURCE, 'source-layer': 'features',
+        type: 'fill', paint: { 'fill-opacity': 0 } }, PARCEL_LINE);
     };
     if (map.isStyleLoaded()) attach();
     map.on('style.load', attach);
@@ -188,6 +212,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     return () => {
       map.off('style.load', attach);
       map.off('idle', attach);
+      if (map.getLayer(PARCEL_PICK)) map.removeLayer(PARCEL_PICK);
       if (map.getLayer(PARCEL_LINE)) map.removeLayer(PARCEL_LINE);
       if (map.getSource(PARCEL_SOURCE)) map.removeSource(PARCEL_SOURCE);
     };

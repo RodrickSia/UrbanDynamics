@@ -1,4 +1,5 @@
 import type { LineString, MultiPolygon, Polygon, Position } from 'geojson';
+import type { DevelopmentBridge, DevelopmentMetrics, DevelopmentParcel, ProposedBuilding } from './developmentTypes';
 
 export type PolygonGeometry = Polygon | MultiPolygon;
 export type SketchGeometry = PolygonGeometry | LineString;
@@ -22,12 +23,16 @@ export interface Zone {
 export interface Scenario {
   id: string; name: string; kind: 'reference' | 'proposal'; locked: boolean; zones: Zone[];
   can_undo: boolean; can_redo: boolean;
+  description?: string; copied_from?: string; created_at?: string;
+  buildings?: ProposedBuilding[]; demolition_masks?: { id: string; parcel_id: string; geometry: PolygonGeometry }[];
+  development_metrics?: DevelopmentMetrics; can_undo_development?: boolean; can_redo_development?: boolean;
 }
 export interface Plan {
   id: string; name: string; description: string; horizon: number | null;
   study_area: PolygonGeometry; area_m2: number; revision: number; updated_at: string;
   status: 'draft'; baseline: { version: string; captured_at: string; status: string; source: string };
   types: ZoneType[]; scenarios: Scenario[];
+  parcels?: Record<string, DevelopmentParcel>;
 }
 export type PlanSummary = Pick<Plan, 'id' | 'name' | 'area_m2' | 'updated_at' | 'revision'>;
 export interface Command {
@@ -47,12 +52,13 @@ export interface CurrentLandUse {
   basis: 'observed_parcels';
   rows: { code: string | null; parcels: number; area_m2: number; category: string | null; color: string }[];
 }
-export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | null;
+export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | 'building' | 'edit-building' | null;
 export interface Sketch { tool: Tool; points: Position[]; geometry: SketchGeometry | null }
 export interface ZoningBridge {
   active: boolean; plan: Plan | null; scenario: Scenario | null; selected: string[];
   sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; showParcels: boolean;
   parcelAvailable: boolean; busy: boolean;
+  development?: DevelopmentBridge;
   onPick: (id: string | null, multiple: boolean) => void;
   onSketch: (sketch: Sketch) => void;
   onFinish: () => void; onCancel: () => void;
