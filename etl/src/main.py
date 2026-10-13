@@ -27,7 +27,7 @@ def _run(pipeline_name: str, stage: str, options) -> None:
             "flood_history": ("source", "boundary"),
             "flood_satellite": ("boundary", "catalog_only", "limit"),
             "flood_risk": ("weather_input", "history_input"),
-            "land_price": ("source", "segments", "full_city"),
+            "land_price": ("source", "segments", "full_city", "automatic_reference"),
             "buildings_footprint": ("source", "refresh"),
             "buildings_footprint_gba": ("source", "refresh"),
         }.get(pipeline_name, ())
@@ -159,6 +159,8 @@ def main() -> None:
     )
     run_parser.add_argument("--refresh-history", action="store_true")
     run_parser.add_argument("--full-city", action="store_true")
+    run_parser.add_argument("--automatic-reference", action="store_true",
+                            help="Automatically allocate table reference prices to all cached city roads")
 
     argv = sys.argv[1:]
     if argv and argv[0] in PIPELINES:

@@ -72,7 +72,7 @@ LAYER_INFO = {
         "time_field": "issued_at",
     },
     "land_price": {
-        "title": "Official reference prices with road-match provenance",
+        "title": "Land price references from the published table",
         "geometry": ["LineString", "MultiLineString"],
         "fields": [
             "road",

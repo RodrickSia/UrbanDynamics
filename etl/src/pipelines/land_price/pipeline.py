@@ -1,7 +1,16 @@
 from src.shared.data_io import data_dir, read_json, write_json
 from src.shared.spatial import read_boundary
 from . import extract, transform, load, unmatched_rows
-def run(source=None, segments=None, full_city=False, refresh_source=False, **kwargs):
+def run(source=None, segments=None, full_city=False, refresh_source=False, automatic_reference=False, **kwargs):
+    if automatic_reference:
+        from . import automatic_fill
+        from .road_sources import prepare
+        rows, _ = extract.run(source, full_city=True, refresh_source=refresh_source)
+        write_json(data_dir() / 'review/land_price_rows.json', rows)
+        if refresh_source or not all((data_dir()/relative).exists() for relative in
+                ('raw/land_price/osm_roads.json', 'inputs/land_price_wards.geojson')):
+            prepare(cached=not refresh_source)
+        return automatic_fill.run(data_dir(), publish_warehouse=True)
     rows, provenance = extract.run(source,full_city=full_city,refresh_source=refresh_source)
     write_json(data_dir() / "review" / "land_price_rows.json", rows)
     geometry = read_json(segments) if segments else {"features": []}
