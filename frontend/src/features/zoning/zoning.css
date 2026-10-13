@@ -74,6 +74,15 @@
 .zoning-distribution-caption { display: flex; justify-content: space-between; gap: .5rem; margin-top: .55rem; color: var(--text-secondary); font-size: .75rem; }
 .zoning-land-use-list { list-style: none; margin: .5rem 0; padding: 0; }
 .zoning-land-use-list li { display: flex; align-items: center; gap: .5rem; min-height: 2rem; border-bottom: 1px solid var(--border); font-size: .78rem; }
+.development-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .75rem 0; }
+.development-actions button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
+.development-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.development-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.development-parcel { display: flex; flex-direction: column; gap: .3rem; padding: .75rem 0; border-bottom: 1px solid var(--border); }
+.development-parcel span { font-size: .8rem; color: var(--text-muted); }
+.development-fail { color: #9c3b25; font-weight: 600; }
+.development-list { list-style: none; margin: 0; padding: 0; }
+.development-list button { display: flex; flex-direction: column; gap: .25rem; width: 100%; text-align: left; margin: .4rem 0; }
 .zoning-land-use-list li > span { flex: 1; min-width: 0; }
 .zoning-land-use-list li small { margin-left: .3rem; }
 .zoning-land-use-list li strong { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }

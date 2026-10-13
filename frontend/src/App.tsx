@@ -47,7 +47,12 @@ export default function App() {
             opacity: zoning.opacity, visible: zoning.visible, showParcels: zoning.showParcels,
             parcelAvailable: zoning.parcelAvailable, busy: zoning.busy,
             onPick: zoning.pick, onSketch: zoning.setSketch, onFinish: () => void zoning.finish(),
-            onCancel: zoning.cancel, focus: zoning.focus }}
+            onCancel: zoning.cancel, focus: zoning.focus,
+            development: { active: zoning.section === 'development', parcel: zoning.development.parcel,
+              selectedBuilding: zoning.development.selectedBuilding, preview: zoning.development.preview?.building ?? null,
+              onPickParcel: zoning.development.pickParcel, onPickBuilding: zoning.development.pickBuilding,
+              onDelete: () => { if (!zoning.readOnly && !zoning.busy && !zoning.development.dirty && zoning.development.selectedBuilding) zoning.development.setDeleteRequested(true); },
+              onUndo: redo => { if (!zoning.readOnly && !zoning.busy && !zoning.development.dirty) void zoning.execute(redo ? 'redo_development' : 'undo_development'); } } }}
           backend={{selections:backend.selections,opacity:workspace.opacityByLayer,revision:backend.revision,report:backend.report}}
           viewshed={{state:workspace.viewsheds,onAction:workspace.handleViewshedAction,onStatus:workspace.setViewshedStatus}}
           configuration={configuration}
@@ -90,7 +95,7 @@ export default function App() {
           />
         </div>
 
-        <ZoningWorkspace workspace={zoning} onActivate={activateZoning}
+        <ZoningWorkspace workspace={zoning} onActivate={activateZoning} onView={workspace.handleModeChange}
           searchOpen={workspace.isSearchOpen} searchPanelHeight={searchPanelHeight}/>
 
         {workspace.rightPanel === 'layers' && (
@@ -108,14 +113,14 @@ export default function App() {
           mode={workspace.mode}
           rightPanelOpen={workspace.rightPanel === 'layers'}
           layersOpen={workspace.rightPanel === 'layers'}
-          onModeChange={mode => { if (zoning.busy) return; zoning.close(); workspace.handleModeChange(mode); }}
-          onToggleLayers={() => { if (zoning.busy) return; zoning.close(); workspace.toggleLayers(); }}
+          onModeChange={mode => { if (zoning.busy) return; workspace.handleModeChange(mode); }}
+          onToggleLayers={() => zoning.close(workspace.toggleLayers)}
           onCommand={workspace.handleMapCommand}
         />
 
         <MapControls
           viewshedActive={workspace.viewsheds.phase !== 'idle'}
-          onViewshed={() => { if (zoning.busy) return; zoning.close(); workspace.handleViewshedAction({type:'start'}); }}
+          onViewshed={() => zoning.close(() => workspace.handleViewshedAction({type:'start'}))}
           mode={workspace.mode}
           onToggleMeasurementComponents={workspace.toggleMeasurementComponents}
           measurement={workspace.measurement}
@@ -123,7 +128,7 @@ export default function App() {
           hasSelection={Boolean(workspace.selection)}
           mapStyle={workspace.mapStyle}
           onMapStyleChange={workspace.setMapStyle}
-          onStartMeasurement={kind => { if (zoning.busy) return; zoning.close(); workspace.startMeasurement(kind); }}
+          onStartMeasurement={kind => zoning.close(() => workspace.startMeasurement(kind))}
           onMeasurementUnitsChange={workspace.changeMeasurementUnits}
           onUndoMeasurementPoint={workspace.undoMeasurementPoint}
           onCancelMeasurement={workspace.cancelMeasurement}

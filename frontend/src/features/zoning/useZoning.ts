@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteZoningPlan, zoningRequest } from './api';
 import { sketchGeometry } from './geometry';
+import { useDevelopment } from './useDevelopment';
 import type { Command, Plan, PlanSummary, PolygonGeometry, Preview, Sketch, Tool } from './types';
 
 const EMPTY_SKETCH: Sketch = { tool: null, points: [], geometry: null };
@@ -22,11 +23,19 @@ export function useZoning(parcelAvailable = false) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focus, setFocus] = useState<{ key: number; geometry: PolygonGeometry } | null>(null);
+  const [section, setSectionState] = useState<'info' | 'zoning' | 'development' | 'dashboard'>('zoning');
+  const [leaving, setLeaving] = useState(false);
+  const leaveAction = useRef<(() => void) | null>(null);
   const pending = useRef(false);
   const scenario = plan?.scenarios.find(s => s.id === scenarioId) ?? plan?.scenarios[0] ?? null;
   const readOnly = !scenario || scenario.locked || scenario.kind === 'reference';
   const chosenType = plan?.types.find(t => t.id === typeId) ?? plan?.types[0];
   const active = panel !== null;
+  useEffect(() => {
+    if (plan && scenario) {
+      try { localStorage.setItem(`urban-plan-scenario-${plan.id}`, scenario.id); } catch { /* Browser storage is optional. */ }
+    }
+  }, [plan, scenario]);
   const cancel = useCallback(() => { setSketchState(EMPTY_SKETCH); setPreview(null); }, []);
   const setSketch = useCallback((value: Sketch) => { setSketchState(value); setPreview(null); }, []);
   const setPolicy = (value: 'preserve' | 'replace') => { setPolicyState(value); setPreview(null); };
@@ -56,7 +65,9 @@ export function useZoning(parcelAvailable = false) {
   const openPlan = async (id: string) => {
     const next = await run(() => zoningRequest<Plan>(`/${encodeURIComponent(id)}`));
     if (!next) return;
-    setPlan(next); setScenarioId(next.scenarios.find(s => s.kind === 'proposal')?.id ?? next.scenarios[0].id);
+    let remembered: string | null = null;
+    try { remembered = localStorage.getItem(`urban-plan-scenario-${next.id}`); } catch { /* Browser storage is optional. */ }
+    setPlan(next); setScenarioId(next.scenarios.find(s => s.id === remembered)?.id ?? next.scenarios.find(s => s.kind === 'proposal')?.id ?? next.scenarios[0].id);
     setSelected([]); cancel(); zoomTo(next.study_area);
   };
   const execute = async (action: string, payload: Record<string, unknown> = {}, target = scenario?.id ?? null) => {
@@ -72,6 +83,19 @@ export function useZoning(parcelAvailable = false) {
     }
     return next;
   };
+  const development = useDevelopment(plan, scenario, sketch, setSketch, execute, setError);
+  const leave = (action: () => void) => {
+    if (busy || development.working) return;
+    if (development.dirty) { leaveAction.current = action; setLeaving(true); }
+    else action();
+  };
+  const resolveLeave = async (choice: 'save' | 'discard' | 'cancel') => {
+    if (choice === 'cancel') { setLeaving(false); leaveAction.current = null; return; }
+    if (choice === 'save' && !await development.save()) return;
+    if (choice === 'discard') development.cancel();
+    setLeaving(false); leaveAction.current?.(); leaveAction.current = null;
+  };
+  const setSection = (value: typeof section, after?: () => void) => leave(() => { setSelected([]); cancel(); setSectionState(value); after?.(); });
   const create = async (name: string, description: string, horizon: number | null) => {
     const geometry = sketchGeometry(sketch);
     if (!geometry || geometry.type === 'LineString') { setError('Draw a study area with at least three points'); return; }
@@ -96,6 +120,7 @@ export function useZoning(parcelAvailable = false) {
     } };
   };
   const finish = async () => {
+    if (sketch.tool === 'building' || sketch.tool === 'edit-building') { await development.previewBuilding(); return; }
     if (sketch.tool === 'study' || sketch.tool === 'edit-study') return;
     const command = buildCommand();
     if (!command || !plan) return;
@@ -117,18 +142,18 @@ export function useZoning(parcelAvailable = false) {
   };
   const selectScenario = (id: string) => {
     if (busy) return;
-    setScenarioId(id); setPolicyState('preserve'); cancel();
-    setSelected(ids => ids.filter(zoneId => plan?.scenarios.find(s => s.id === id)?.zones.some(z => z.id === zoneId)));
+    leave(() => { setScenarioId(id); setPolicyState('preserve'); cancel(); setSelected([]); development.clearSelection(); });
   };
   const pick = (id: string | null, multiple: boolean) => {
     if (busy) return;
     setSelected(ids => !id ? [] : multiple ? ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id] : [id]);
   };
-  const close = () => { if (!busy) { setPanel(null); cancel(); } };
+  const close = (after?: () => void) => leave(() => { setPanel(null); cancel(); after?.(); });
   return { panel, setPanel, active, close, plan, plans, scenario, chosenType, typeId, setTypeId, selected, pick,
-    sketch, setSketch, begin, cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
-    visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,
-    back: () => { setPlan(null); setSelected([]); cancel(); void refresh(); },
+    sketch, setSketch, begin, cancel: development.dirty ? development.cancel : cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
+    section, setSection, development, leaving, resolveLeave, leave,
+    visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy: busy || development.working, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,
+    back: (after?: () => void) => leave(() => { setPlan(null); setSelected([]); cancel(); void refresh(); after?.(); }),
   };
 }
 export type ZoningWorkspace = ReturnType<typeof useZoning>;

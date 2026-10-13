@@ -3,6 +3,7 @@ import { zoningRequest } from './api';
 import { areaText } from './geometry';
 import type { Indicators } from './types';
 import type { ZoningWorkspace } from './useZoning';
+import { DevelopmentComparison } from './DevelopmentComparison';
 
 export function IndicatorsPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
   const [compareId, setCompareId] = useState('');
@@ -21,6 +22,7 @@ export function IndicatorsPanel({ workspace: w }: { workspace: ZoningWorkspace }
   if (!plan || !scenario) return <div className="zoning-empty"><h3>Choose a plan</h3><p>Open a plan to compare zoning areas and inspect its findings.</p><button onClick={() => w.setPanel('plans')}>Open Plans</button></div>;
   const data = result?.key === key ? result.data : null;
   return <>
+    <DevelopmentComparison plan={plan} scenario={scenario}/>
     <label>Compare with<select value={comparison?.id} onChange={e => setCompareId(e.target.value)}>{plan.scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
     {!result || result.key !== key ? <p role="status">Calculating indicators…</p> : result.error ? <p role="alert">{result.error}</p> : null}
     {data && <>
