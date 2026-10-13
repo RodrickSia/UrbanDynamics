@@ -153,6 +153,16 @@ def detail(parcel_id):
             'price': price_reference(parcel, candidates)}
 
 
+def development_parcel(parcel_id):
+    """Full selected geometry only; road valuation never supplies zoning rules."""
+    with connect_to_warehouse() as connection:
+        connection.execute("SET LOCAL statement_timeout = '5s'")
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute("SELECT id::text AS id, mdsdd AS land_use, "
+                           "ST_AsGeoJSON(geom,9)::json AS geometry FROM parcels.plot WHERE id=%s", (parcel_id,))
+            return cursor.fetchone()
+
+
 def vector_tile(z, x, y):
     if z < MIN_ZOOM:
         return b''
@@ -202,7 +212,7 @@ def plan_vector_tile(study_area, z, x, y):
                 WHERE p.geom_web && b.geom AND p.geom_web && s.geom
                   AND ST_Intersects(p.geom_web,s.geom) AND p.area_web >= %s
             ), tile AS (
-                SELECT p.id AS feature_id,
+                SELECT p.id AS feature_id, p.id::text AS parcel_id,
                        ST_AsMVTGeom(p.geom,b.geom,4096,64,true) AS geom
                 FROM clipped p, bounds b WHERE NOT ST_IsEmpty(p.geom)
             ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile

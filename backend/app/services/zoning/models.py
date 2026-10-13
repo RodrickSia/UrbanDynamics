@@ -34,9 +34,11 @@ class Command(Input):
     revision: int = Field(ge=1)
     action: Literal[
         "add_type", "edit_type", "duplicate_type", "delete_type", "reorder_types",
-        "add_scenario", "rename_scenario", "lock_scenario", "delete_scenario",
+        "add_scenario", "rename_scenario", "lock_scenario", "delete_scenario", "reorder_scenarios",
         "draw", "reshape", "split", "merge", "delete_zone", "assign",
         "study_area", "rename_plan", "undo", "redo",
+        "save_building", "delete_building", "demolish_parcel", "restore_parcel",
+        "generate_building", "undo_development", "redo_development",
     ]
     scenario_id: str | None = Field(default=None, max_length=80)
     payload: dict = Field(default_factory=dict)
@@ -51,3 +53,31 @@ class BoundaryInput(Input):
 
 class NameInput(Input):
     name: str = Field(min_length=1, max_length=120)
+
+
+class ScenarioInput(NameInput):
+    description: str = Field(default="", max_length=2000)
+
+
+class BuildingInput(Input):
+    id: str | None = Field(default=None, max_length=80)
+    origin_id: str | None = Field(default=None, max_length=80)
+    parcel_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
+    geometry: dict
+    name: str = Field(default="Proposed building", min_length=1, max_length=120)
+    floors: int = Field(ge=1, le=200, strict=True)
+    floor_height: float = Field(gt=0, le=20)
+    space_use_id: Literal["residential", "commercial", "office", "other"]
+    counts_gfa: bool = True
+    counts_far: bool = True
+    template_id: Literal["low-rise-v1"] | None = None
+    demolish: bool = False
+
+
+class GenerationInput(Input):
+    parcel_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
+    floors: int = Field(ge=1, le=200, strict=True)
+    floor_height: float = Field(gt=0, le=20)
+    coverage: float = Field(gt=0, le=100)
+    setback: float = Field(ge=0, le=1000)
+    space_use_id: Literal["residential", "commercial", "office", "other"] = "residential"

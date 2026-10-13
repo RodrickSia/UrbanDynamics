@@ -6,7 +6,8 @@ from uuid import uuid4
 from shapely.ops import split, unary_union
 
 from .geometry import EPSILON, geojson, polygonal, projected, study_geometry, zone_record
-from .models import BoundaryInput, Command, NameInput, PlanInput, ZoneType
+from .models import BoundaryInput, Command, NameInput, PlanInput, ScenarioInput, ZoneType
+from . import development
 
 
 def now():
@@ -126,9 +127,22 @@ def apply(original, command: Command):
         if len(plan["scenarios"]) >= 20:
             raise ValueError("A plan supports at most 20 scenarios")
         source = find(plan["scenarios"], command.scenario_id)
-        name = NameInput.model_validate(data).name
-        plan["scenarios"].append({"id": new_id(), "name": name, "kind": "proposal", "locked": False,
-                                  "zones": deepcopy(source["zones"]), "copied_from": source["id"]})
+        fields = ScenarioInput.model_validate(data).model_dump()
+        clone = deepcopy(source)
+        clone.update(fields, id=new_id(), kind="proposal", locked=False, copied_from=source["id"],
+                     created_at=now(), updated_at=now(), created_by="local-workspace", revision=revision,
+                     _past=[], _future=[], _dev_past=[], _dev_future=[])
+        for key in ("zones", "buildings", "demolition_masks"):
+            for item in clone.get(key, []):
+                item.update(origin_id=item.get("origin_id") or item["id"], id=new_id())
+        plan["scenarios"].append(clone)
+    elif action == "reorder_scenarios":
+        ids = data.get("ids", [])
+        if len(ids) != len(plan["scenarios"]) or set(ids) != {s["id"] for s in plan["scenarios"]}:
+            raise ValueError("Provide each scenario exactly once")
+        if ids[0] != plan["scenarios"][0]["id"]:
+            raise ValueError("Existing stays first")
+        plan["scenarios"] = [find(plan["scenarios"], i) for i in ids]
     elif action in ("rename_scenario", "lock_scenario", "delete_scenario"):
         scenario = find(plan["scenarios"], command.scenario_id)
         if scenario["kind"] == "reference":
@@ -140,7 +154,7 @@ def apply(original, command: Command):
         else:
             editable(plan, scenario["id"])
             if action == "rename_scenario":
-                scenario["name"] = NameInput.model_validate(data).name
+                scenario.update(ScenarioInput.model_validate(data).model_dump())
             else:
                 if data.get("confirm") is not True:
                     raise ValueError("Confirm deleting the scenario")
@@ -148,6 +162,8 @@ def apply(original, command: Command):
     elif action == "rename_plan":
         plan["name"] = NameInput.model_validate(data).name
     elif action == "study_area":
+        if any(s.get("buildings") or s.get("demolition_masks") for s in plan["scenarios"]):
+            raise ValueError("Remove development before changing the study area")
         area = study_geometry(data.get("geometry"))
         if data.get("confirm") is not True:
             raise ValueError("Confirm clipping all proposal scenarios to the new study area")
@@ -163,6 +179,10 @@ def apply(original, command: Command):
                     zones.append(zone_record(clipped, z["type_id"], z["id"], revision))
             scenario.update(zones=zones, _past=[], _future=[])
         plan.update(study_area=geojson(area), area_m2=area.area)
+    elif action in development.ACTIONS:
+        development.apply(plan, editable(plan, command.scenario_id), action, data)
+    elif action == "generate_building":
+        raise ValueError("Generate a preview, then save the confirmed building")
     else:
         scenario = editable(plan, command.scenario_id)
         before = deepcopy(scenario["zones"])
@@ -209,6 +229,10 @@ def apply(original, command: Command):
                 raise ValueError("A scenario supports at most 500 zones")
             scenario["_past"] = [*scenario.get("_past", []), before][-30:]
             scenario["_future"] = []
+    for scenario in plan["scenarios"]:
+        if (scenario["id"] == command.scenario_id and scenario["kind"] != "reference"
+                and action not in ("add_scenario", "reorder_scenarios")):
+            scenario.update(revision=revision, updated_at=now())
     plan.update(revision=revision, updated_at=now())
     return plan
 
@@ -216,6 +240,12 @@ def apply(original, command: Command):
 def present(plan):
     result = deepcopy(plan)
     for scenario in result["scenarios"]:
+        scenario.setdefault("buildings", [])
+        scenario.setdefault("demolition_masks", [])
+        scenario.setdefault("description", "")
+        scenario["can_undo_development"] = bool(scenario.pop("_dev_past", []))
+        scenario["can_redo_development"] = bool(scenario.pop("_dev_future", []))
+        scenario["development_metrics"] = development.summary(result, scenario)
         scenario["can_undo"] = bool(scenario.pop("_past", []))
         scenario["can_redo"] = bool(scenario.pop("_future", []))
     return result

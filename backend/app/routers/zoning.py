@@ -8,7 +8,7 @@ from app.services import parcels
 from pydantic import ValidationError
 from shapely.errors import GEOSException
 
-from app.services.zoning import engine, store
+from app.services.zoning import development, engine, store
 from app.services.zoning.indicators import report
 from app.services.zoning.models import Command, PlanInput
 
@@ -103,7 +103,15 @@ def zoned_parcels_tile(identifier: UUID, z: int, x: int, y: int,
 @router.post("/{identifier}/commands")
 def change_plan(identifier: UUID, command: Command):
     def change():
-        result = store.update(identifier, command.revision, lambda p: engine.apply(p, command))
+        def mutate(plan):
+            if command.action in development.ACTIONS:
+                engine.editable(plan, command.scenario_id)
+                parcel_id = command.payload.get("parcel_id")
+                if parcel_id:
+                    parcel = selected_parcel(plan, str(parcel_id))
+                    plan.setdefault("parcels", {})[parcel["id"]] = parcel
+            return engine.apply(plan, command)
+        result = store.update(identifier, command.revision, mutate)
         if result is None:
             raise HTTPException(404, "Plan not found")
         return engine.present(result)
@@ -116,12 +124,47 @@ def preview(identifier: UUID, command: Command):
         plan = require_plan(identifier)
         if plan["revision"] != command.revision:
             raise store.Conflict("Plan changed. Reload before previewing edits.")
+        if command.action in ("save_building", "generate_building"):
+            scenario = engine.editable(plan, command.scenario_id)
+            parcel = selected_parcel(plan, str(command.payload.get("parcel_id", "")))
+            plan.setdefault("parcels", {})[parcel["id"]] = parcel
+            operation = development.generate if command.action == "generate_building" else development.prepare_building
+            building, report = operation(plan, scenario, command.payload)
+            return {"building": building, "parcel": parcel, **report}
         if command.action not in ("draw", "reshape"):
             raise ValueError("Preview supports draw and reshape operations")
         scenario = engine.editable(plan, command.scenario_id)
         zones, summary = engine.boundary_change(plan, scenario, command.payload, plan["revision"] + 1)
         return {"zones": zones, **summary}
     return execute(calculate)
+
+
+def selected_parcel(plan, parcel_id):
+    if not parcel_id.isdigit() or not 0 < int(parcel_id) <= 9223372036854775807:
+        raise ValueError("Invalid parcel ID")
+    if parcel_id in plan.get("parcels", {}):
+        return plan["parcels"][parcel_id]
+    if not warehouse_configured():
+        raise HTTPException(503, "Development parcels require the PostGIS warehouse")
+    try:
+        source = parcels.development_parcel(int(parcel_id))
+    except (OSError, ValueError, DatabaseError):
+        raise HTTPException(503, "Parcel geometry temporarily unavailable; retry") from None
+    if not source:
+        raise HTTPException(404, "Parcel not found")
+    return development.parcel_snapshot(plan, source)
+
+
+@router.get("/{identifier}/development/parcels/{parcel_id}")
+def development_parcel(identifier: UUID, parcel_id: str, scenario_id: str):
+    def read():
+        plan = require_plan(identifier)
+        scenario = engine.find(plan["scenarios"], scenario_id)
+        parcel = selected_parcel(plan, parcel_id)
+        buildings = [b for b in scenario.get("buildings", []) if b["parcel_id"] == parcel_id]
+        return {"parcel": parcel, "catalog": development.CATALOG,
+                **development.validation(plan, scenario, parcel, buildings)}
+    return execute(read)
 
 
 @router.get("/{identifier}/indicators")
