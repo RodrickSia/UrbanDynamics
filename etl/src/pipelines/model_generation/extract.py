@@ -108,11 +108,6 @@ def run(settings: ModelGenerationConfig = config) -> tuple[Path, Path]:
                   WHERE upper(trim(coalesce(p.mdsdd, ''))) = ANY(%s)
                     AND NOT p.conflicting_land_use
                     AND p.area_m2 BETWEEN %s AND %s
-                    AND NOT EXISTS (
-                      SELECT 1 FROM buildings.gba_lod1 AS existing
-                      WHERE existing.geom && p.geom
-                        AND ST_Relate(existing.geom, p.geom, '2********')
-                    )
                   ORDER BY p.id"""
         total = 0
         with candidate_part.open("w", encoding="utf-8") as stream:

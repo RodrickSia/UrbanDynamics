@@ -50,8 +50,8 @@ stage `all`. Parcel and buildings-footprint ETL support separate
 source data are available.
 
 `model_generation` runs after the parcel and GBA source datasets are available.
-It selects eligible residential parcels that do not overlap a GBA footprint,
-insets each parcel outline, and samples a height from the observed GBA
+It selects eligible residential parcels regardless of building-footprint
+overlap, insets each parcel outline, and samples a height from the observed GBA
 residential-height distribution. It replaces `buildings.synthetic_residential`
 in one transaction. The backend
 serves this table as `synthetic_buildings` vector tiles; the frontend renders
@@ -112,8 +112,8 @@ docker compose --profile etl-model-generation run --rm etl-model-generation run 
 ```
 
 The pipeline inventories all parcel land-use values, uses only the explicit
-residential codes `OTC`, `ODT`, and `ONT`, skips parcels overlapped by existing
-GBA building footprints, and samples model heights from GBA
+residential codes `OTC`, `ODT`, and `ONT` without filtering for existing
+building-footprint overlap, and samples model heights from GBA
 buildings on residential parcels. It publishes the synthetic models separately
 to `buildings.synthetic_residential`. The `20261013-model-generation.sql`
 migration creates that table; apply it with the protected database deployment
