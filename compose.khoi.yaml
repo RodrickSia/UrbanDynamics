@@ -24,6 +24,7 @@ services:
       DATABASE_URL: postgresql://urban:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@warehouse:5432/urban
       DATA_DIR: /data
       SIMULATION_WORK_DIR: /runtime/solvers
+      PLANNING_BENCHMARK_MACHINE_ID: ${PLANNING_BENCHMARK_MACHINE_ID:-}
     ports:
       - "127.0.0.1:${KHOI_API_PORT:-8001}:8000"
     volumes:
@@ -34,6 +35,25 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    depends_on:
+      warehouse:
+        condition: service_healthy
+  planning-worker:
+    profiles: ["planning"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.services.simulation.planning.worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://urban:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@warehouse:5432/urban
+      DATA_DIR: /data
+      SIMULATION_WORK_DIR: /runtime/solvers
+      PLANNING_MAX_RUNNING: 2
+      PLANNING_BENCHMARK_MACHINE_ID: ${PLANNING_BENCHMARK_MACHINE_ID:-}
+    volumes:
+      - ./data:/data:ro
+      - khoi_simulation_runtime:/runtime
     depends_on:
       warehouse:
         condition: service_healthy

@@ -6,7 +6,7 @@ from . import demand, geometry, solvers
 from .context import build_context, digest
 from .models import Design, Conditions, IntegratedRequest
 
-VERSION = "integrated-building-1.1"
+VERSION = "integrated-building-1.4"
 UNAVAILABLE = {
     "thermal_comfort_SOLWEIG": "No radiation/DSM/material model; geometric shade available, no temperature delta",
     "flood_depth_2D": "No coupled surface hydraulics; SWMM node overflow available",
@@ -32,12 +32,14 @@ METRICS = {
 }
 
 
-def evaluate(site, raw_design, context):
+def evaluate(site, raw_design, context, *, baseline=False):
     design = Design(**raw_design)
+    is_baseline = baseline
+    baseline_records = context["baseline_provenance"].get("buildings", [])
     geom = geometry.analyze(site, design)
     library = context["library"]
     loads = demand.calculate(design, geom["floor_areas"], library)
-    solar = geometry.shadows(geom, design, Conditions(**context["conditions"]))
+    solar = geometry.shadows(geom, design, Conditions(**context["conditions"]), context.get("surrounding_buildings"))
     traffic = solvers.traffic(design, loads, context)
     drainage = solvers.drainage(design, geom["metrics"]["surfaces_m2"], context)
     cx, cy = geom["metric_site"].centroid.coords[0]
@@ -61,20 +63,38 @@ def evaluate(site, raw_design, context):
                "mean_outdoor_shaded_percent": solar["mean_outdoor_shaded_percent"],
                "neighbour_shadow_m2": sum(x["neighbour_shadow_m2"] for x in solar["hourly"])/len(solar["hourly"]),
                "road_length_m": 600+design.added_road_m-design.removed_road_m}
-    services = {"kind": "synthetic", "demand_people": service_demand, "capacity_people": service_available,
+    distances = [f["properties"]["network_distance_m"] for f in context["services"] if f["properties"].get("network_distance_m") is not None]
+    services = {"kind": context.get("service_provenance", {}).get("kind", "synthetic"), "demand_people": service_demand, "capacity_people": service_available,
                 "unserved_people": service_unserved, "walk_minutes_to_nearest": min(
-                    f["properties"]["network_distance_m"] for f in context["services"])/80,
+                    distances)/80 if distances else None,
+                "provenance": context.get("service_provenance", {}),
                 "map": {"type": "FeatureCollection", "features": context["services"]},
                 "method": "Distance along connected synthetic graph at 80 m/min; 0.25 service demand/resident. Not real accessibility coverage; no SUMO travel-time feedback."}
+    if context.get('source_osm'):
+        services['method'] = context['service_provenance']['walking_method']
+    traffic['completed_fraction'] = traffic['completed_vehicles']/max(1, traffic['planned_vehicles'])
+    traffic['delay_comparability'] = 'completed_trips_only_with_incomplete_population' if traffic['unfinished_vehicles']+traffic['undeparted_vehicles'] else 'all_planned_trips_completed'
+    if traffic.get("network_provenance"):
+        # SUMO lane offsets would double-count two-way roads. Measure source
+        # centrelines clipped to the stated AOI, not directional lane geometry.
+        from shapely.geometry import shape
+        from shapely.ops import unary_union
+        lines = [transform(geom["forward"], shape(f["geometry"])) for f in context["roads"]
+                 if f["properties"].get("highway") not in ('footway', 'path', 'cycleway', 'steps', 'pedestrian', 'construction', 'proposed')]
+        metrics["road_length_m"] = unary_union(lines).length+design.added_road_m-design.removed_road_m
     road_length = metrics['road_length_m']
     if road_length < 0:
         raise ValueError('Removed road length exceeds the synthetic network plus added road length')
     road_region_area = geom['metric_site'].buffer(1000).area
-    roads = {'kind': 'synthetic', 'region': '1 km buffer of site', 'region_area_m2': road_region_area,
+    roads = {'kind': 'osm_import' if context.get('source_osm') else 'synthetic', 'region': '1 km buffer of site', 'region_area_m2': road_region_area,
              'length_m': road_length, 'density_km_per_km2': road_length*1000/road_region_area,
              'baseline_connected_components': 1, 'baseline_nodes': 4, 'baseline_undirected_edges': 3,
              'topology_change_simulated': False, 'design_added_m': design.added_road_m, 'design_removed_m': design.removed_road_m,
              'method': 'Length screening in stated region; connectivity is the frozen synthetic graph, not a real OSM network'}
+    if context.get('source_osm'):
+        roads.update(baseline_connected_components=None, baseline_nodes=traffic['network_provenance']['nodes'],
+                     baseline_undirected_edges=None, network_provenance=traffic['network_provenance'],
+                     method='Union of source OSM road centrelines clipped to 1 km buffer; excludes dedicated foot/cycle paths. SUMO graph can extend beyond AOI. Added/removed lengths do not change topology.')
     return {"design_sha256": digest(raw_design), "metrics": metrics, "gis": geom["metrics"], "demand": loads,
             "runoff": {"engine": "coefficient-screening-1", "kind": "synthetic", "gross_m3": runoff,
                        "empty_storage_m3": available, "retained_potential_m3": min(runoff, available),
@@ -83,9 +103,23 @@ def evaluate(site, raw_design, context):
             "traffic": traffic, "drainage": drainage, "shadow": solar, "services": services, "roads": roads,
             "buildings_map": {"type": "FeatureCollection", "features": [
                 {"type": "Feature", "geometry": b.footprint.model_dump(), "properties": {
-                    "name": b.name, "use": b.use, "height_m": b.height_m, "kind": "design"}} for b in design.buildings]},
+                    "name": b.name, "use": b.use, "height_m": b.height_m,
+                    "kind": "baseline_estimate" if is_baseline else "design",
+                    "provenance": baseline_records[i] if is_baseline and i < len(baseline_records) else
+                        {"kind": context["baseline_provenance"]["kind"] if is_baseline else "user_design"}}}
+                for i, b in enumerate(design.buildings)]},
             "validity": {"swmm_balance_passed": drainage["balance_passed"], "traffic_count_balanced":
                 traffic["planned_vehicles"] == traffic["completed_vehicles"]+traffic["unfinished_vehicles"]+traffic["undeparted_vehicles"]}}
+
+
+def utility_checks(before_loads, after_loads, library):
+    checks = []
+    for metric, key in (("freshwater_m3_day", "water_spare_m3_day"), ("wastewater_m3_day", "wastewater_spare_m3_day")):
+        limit = before_loads[metric]+library[key]
+        checks.append((metric, after_loads[metric] <= limit, limit))
+    additional = max(a-b for a, b in zip(after_loads["hourly"]["power_kw"], before_loads["hourly"]["power_kw"]))
+    checks.append(("power_peak_kw", additional <= library["power_spare_kw"], library["power_spare_kw"]))
+    return checks, additional
 
 
 def assess(before, after, context):
@@ -102,8 +136,11 @@ def assess(before, after, context):
         else:
             better = delta > 0 if direction in ("higher", "benefit") else delta < 0
             verdict = ("benefit" if direction == "benefit" else "better") if better else "worse"
+        if metric == 'traffic_delay_seconds' and any(values['traffic']['unfinished_vehicles']+values['traffic']['undeparted_vehicles'] for values in (before, after)):
+            verdict = 'incomplete_trip_bias'
         rows.append({"metric": metric, "unit": unit, "baseline": b, "development": a, "delta": delta,
-                     "role": direction, "verdict": verdict, "kind": "estimated_on_synthetic_context"})
+                     "role": direction, "verdict": verdict,
+                     "kind": "estimated_on_mixed_context" if context.get("source_osm") or context.get("data_inventory", {}).get("map_context") or context.get("population_provenance", {}).get("kind") == "worldpop_estimate" else "estimated_on_synthetic_context"})
     lib = context["library"]
     goals = lib["goals"]
     checks = [
@@ -115,11 +152,8 @@ def assess(before, after, context):
         ("unretained_runoff_m3", after["metrics"]["unretained_runoff_m3"] <= before["metrics"]["unretained_runoff_m3"]*(1+goals["runoff_increase_max_percent"]/100),
          before["metrics"]["unretained_runoff_m3"]*(1+goals["runoff_increase_max_percent"]/100)),
     ]
-    for metric, key in (("freshwater_m3_day", "water_spare_m3_day"), ("wastewater_m3_day", "wastewater_spare_m3_day")):
-        limit = before["metrics"][metric]+lib[key]
-        checks.append((metric, after["metrics"][metric] <= limit, limit))
-    additional_power_peak = max(a-b for a, b in zip(after['demand']['hourly']['power_kw'], before['demand']['hourly']['power_kw']))
-    checks.append(('power_peak_kw', additional_power_peak <= lib['power_spare_kw'], lib['power_spare_kw']))
+    utility, additional_power_peak = utility_checks(before["demand"], after["demand"], lib)
+    checks.extend(utility)
     benefits = [x["metric"] for x in rows if x["verdict"] in ("benefit", "better")]
     pressures = [x["metric"] for x in rows if x["verdict"] in ("worse", "increased_demand")]
     return {"rows": rows, "benefits": benefits, "pressures": pressures,
@@ -141,7 +175,11 @@ def predict(request: IntegratedRequest):
     # Validate both designs before launching expensive processes.
     geometry.analyze(request.site, Design(**context["baseline"]))
     geometry.analyze(request.site, request.development)
-    before = evaluate(request.site, context["baseline"], context)
+    development_geometry = geometry.analyze(request.site, request.development)
+    development_loads = demand.calculate(request.development, development_geometry['floor_areas'], context['library'])
+    context['traffic_peak_hour'] = max(range(24), key=lambda h: development_loads['hourly']['cars'][h]+development_loads['hourly']['motorcycles'][h])
+    context['sha256'] = digest({k: v for k, v in context.items() if k not in ('created_at', 'sha256')})
+    before = evaluate(request.site, context["baseline"], context, baseline=True)
     after = evaluate(request.site, development, context)
     return {"workflow": "integrated_building_impact", "model_version": VERSION, "inputs": inputs,
             "input_sha256": digest({"inputs": inputs, "context_sha256": context["sha256"], "version": VERSION}),
@@ -151,7 +189,42 @@ def predict(request: IntegratedRequest):
             "warnings": ["Synthetic scenario outputs have not been calibrated/validated against local observations.",
                          "Low/base/high are stress cases, not statistical confidence intervals.",
                          "Added/removed road lengths are design screening only; SUMO graph remains frozen.",
-                         "Daily visitors are people visits, not additional permanent population."]}
+                         "Daily visitors are people visits, not additional permanent population."]+context.get("data_inventory", {}).get("warnings", [])}
+
+
+def predict_shared_study(study, mode="native", checkpoint=None, child_executor=None, frozen_context=None):
+    """Single-site execution on the same regional context as planning studies.
+
+    Uses shared state physics, not portfolio orchestration or legacy site-only
+    networks. Results follow the planning contract for durable jobs/map layers.
+    """
+    if len(study.projects) != 1:
+        raise ValueError("Shared single-site execution requires exactly one project")
+    if mode not in ("screening", "native"):
+        raise ValueError("Shared single-site mode must be screening or native")
+    from ..planning.context import build_context as planning_context, state_keys
+    from ..planning.engine import evaluate as evaluate_state, assemble
+    context = planning_context(study)
+    if frozen_context is not None and frozen_context != context:
+        raise ValueError("Frozen single-site context does not match study/model/library")
+    context = deepcopy(frozen_context if frozen_context is not None else context)
+    states = {}
+    if mode == "native":
+        from ..planning.native import prepare_network, evaluate_native_state, finalize
+        network = prepare_network(study, context, checkpoint, child_executor)
+    keys = sorted(state_keys(study))
+    for index, active in enumerate(keys):
+        if checkpoint:
+            checkpoint({"module": "single_site_state", "active_project_ids": list(active), "done": index, "total": len(keys)})
+        state = evaluate_state(study, context, active)
+        if mode == "native":
+            evaluate_native_state(study, context, state, network, checkpoint, child_executor)
+        states[active] = state
+    result = assemble(study, context, states)
+    if mode == "native":
+        result = finalize(study, result, states, network, child_executor)
+    result["execution_path"] = "single_site_shared_context"
+    return result
 
 
 def dominates(a, b):

@@ -15,6 +15,7 @@ venv/
 .ruff_cache/
 *.egg-info/
 .runtime/
+output/
 data/
 # Keep the official land-price annex available to local and CI ETL runs.
 !etl/data/

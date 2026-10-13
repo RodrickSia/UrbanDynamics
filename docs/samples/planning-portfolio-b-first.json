@@ -1,0 +1,483 @@
+{
+  "schema_version": 1,
+  "title": "All subsets; commissioning B-first",
+  "mode": "cumulative",
+  "study_area": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          106.755,
+          10.815
+        ],
+        [
+          106.77499999999999,
+          10.815
+        ],
+        [
+          106.77499999999999,
+          10.834999999999999
+        ],
+        [
+          106.755,
+          10.834999999999999
+        ],
+        [
+          106.755,
+          10.815
+        ]
+      ]
+    ]
+  },
+  "source_note": "All pilot parcels, capacities, baseline occupancy and regional background are synthetic hackathon fixtures.",
+  "data_mode": "synthetic",
+  "projects": [
+    {
+      "id": "A",
+      "title": "Khu đất A — fixture synthetic",
+      "site": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              106.758,
+              10.82
+            ],
+            [
+              106.759,
+              10.82
+            ],
+            [
+              106.759,
+              10.821
+            ],
+            [
+              106.758,
+              10.821
+            ],
+            [
+              106.758,
+              10.82
+            ]
+          ]
+        ]
+      },
+      "baseline": {
+        "buildings": [],
+        "paved_m2": 4838.370223784447,
+        "green_m2": 4838.370223784447,
+        "permeable_m2": 2419.1851118922236
+      },
+      "baseline_source": "Synthetic unoccupied parcel, mixed green/paved/permeable surfaces; not a surveyed vacant site",
+      "baseline_kind": "synthetic",
+      "baseline_occupancy": "estimated",
+      "development": {
+        "buildings": [
+          {
+            "name": "Project A",
+            "use": "residential",
+            "footprint": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    106.75829999999999,
+                    10.8203
+                  ],
+                  [
+                    106.75869999999999,
+                    10.8203
+                  ],
+                  [
+                    106.75869999999999,
+                    10.8207
+                  ],
+                  [
+                    106.75829999999999,
+                    10.8207
+                  ],
+                  [
+                    106.75829999999999,
+                    10.8203
+                  ]
+                ]
+              ]
+            },
+            "floors": 12,
+            "height_m": 36,
+            "gross_floor_area_m2": 24000,
+            "units": 200,
+            "residents": 600,
+            "staff": 12,
+            "daily_visitors": 80
+          }
+        ],
+        "paved_m2": 6531.799802151321,
+        "green_m2": 2419.1851118922236,
+        "permeable_m2": 1209.5925559461118,
+        "parking_spaces": 200,
+        "ev_chargers": 12
+      },
+      "utility_zone_id": "shared",
+      "catchment_id": "pilot"
+    },
+    {
+      "id": "B",
+      "title": "Khu đất B — fixture synthetic",
+      "site": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              106.765,
+              10.82
+            ],
+            [
+              106.766,
+              10.82
+            ],
+            [
+              106.766,
+              10.821
+            ],
+            [
+              106.765,
+              10.821
+            ],
+            [
+              106.765,
+              10.82
+            ]
+          ]
+        ]
+      },
+      "baseline": {
+        "buildings": [],
+        "paved_m2": 4838.370223784447,
+        "green_m2": 4838.370223784447,
+        "permeable_m2": 2419.1851118922236
+      },
+      "baseline_source": "Synthetic unoccupied parcel, mixed green/paved/permeable surfaces; not a surveyed vacant site",
+      "baseline_kind": "synthetic",
+      "baseline_occupancy": "estimated",
+      "development": {
+        "buildings": [
+          {
+            "name": "Project B",
+            "use": "school",
+            "footprint": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    106.7653,
+                    10.8203
+                  ],
+                  [
+                    106.7657,
+                    10.8203
+                  ],
+                  [
+                    106.7657,
+                    10.8207
+                  ],
+                  [
+                    106.7653,
+                    10.8207
+                  ],
+                  [
+                    106.7653,
+                    10.8203
+                  ]
+                ]
+              ]
+            },
+            "floors": 4,
+            "height_m": 14,
+            "gross_floor_area_m2": 8000,
+            "units": 0,
+            "residents": 0,
+            "staff": 60,
+            "daily_visitors": 80,
+            "daily_users": 600,
+            "service_capacity": 600
+          }
+        ],
+        "paved_m2": 6531.799802151321,
+        "green_m2": 2419.1851118922236,
+        "permeable_m2": 1209.5925559461118,
+        "parking_spaces": 80,
+        "ev_chargers": 0
+      },
+      "utility_zone_id": "shared",
+      "catchment_id": "pilot"
+    },
+    {
+      "id": "C",
+      "title": "Khu đất C — fixture synthetic",
+      "site": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              106.771,
+              10.82
+            ],
+            [
+              106.772,
+              10.82
+            ],
+            [
+              106.772,
+              10.821
+            ],
+            [
+              106.771,
+              10.821
+            ],
+            [
+              106.771,
+              10.82
+            ]
+          ]
+        ]
+      },
+      "baseline": {
+        "buildings": [],
+        "paved_m2": 4838.370223784447,
+        "green_m2": 4838.370223784447,
+        "permeable_m2": 2419.1851118922236
+      },
+      "baseline_source": "Synthetic unoccupied parcel, mixed green/paved/permeable surfaces; not a surveyed vacant site",
+      "baseline_kind": "synthetic",
+      "baseline_occupancy": "estimated",
+      "development": {
+        "buildings": [
+          {
+            "name": "Project C",
+            "use": "residential",
+            "footprint": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    106.7713,
+                    10.8203
+                  ],
+                  [
+                    106.7717,
+                    10.8203
+                  ],
+                  [
+                    106.7717,
+                    10.8207
+                  ],
+                  [
+                    106.7713,
+                    10.8207
+                  ],
+                  [
+                    106.7713,
+                    10.8203
+                  ]
+                ]
+              ]
+            },
+            "floors": 12,
+            "height_m": 36,
+            "gross_floor_area_m2": 18000,
+            "units": 150,
+            "residents": 450,
+            "staff": 12,
+            "daily_visitors": 80
+          }
+        ],
+        "paved_m2": 6531.799802151321,
+        "green_m2": 2419.1851118922236,
+        "permeable_m2": 1209.5925559461118,
+        "parking_spaces": 150,
+        "ev_chargers": 8
+      },
+      "utility_zone_id": "shared",
+      "catchment_id": "pilot"
+    }
+  ],
+  "options": [
+    {
+      "id": "A",
+      "title": "Active A",
+      "active_project_ids": [
+        "A"
+      ]
+    },
+    {
+      "id": "B",
+      "title": "Active B",
+      "active_project_ids": [
+        "B"
+      ]
+    },
+    {
+      "id": "C",
+      "title": "Active C",
+      "active_project_ids": [
+        "C"
+      ]
+    },
+    {
+      "id": "AB",
+      "title": "Active A+B",
+      "active_project_ids": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "id": "AC",
+      "title": "Active A+C",
+      "active_project_ids": [
+        "A",
+        "C"
+      ]
+    },
+    {
+      "id": "BC",
+      "title": "Active B+C",
+      "active_project_ids": [
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "ABC",
+      "title": "Active A+B+C",
+      "active_project_ids": [
+        "A",
+        "B",
+        "C"
+      ]
+    }
+  ],
+  "school_age_fraction": 0.18,
+  "school_max_walk_m": 1200,
+  "background_school_groups": [
+    {
+      "id": "west",
+      "location": [
+        106.759,
+        10.821
+      ],
+      "students": 100,
+      "source": "Synthetic age-group distribution, counted once outside registered parcels"
+    },
+    {
+      "id": "east",
+      "location": [
+        106.769,
+        10.821
+      ],
+      "students": 116,
+      "source": "Synthetic age-group distribution, counted once outside registered parcels"
+    }
+  ],
+  "school_facilities": [
+    {
+      "id": "west_school",
+      "location": [
+        106.757,
+        10.821
+      ],
+      "capacity_places": 230,
+      "reserved_places": 40,
+      "source": "Synthetic 230-place school, 40 places reserved for students outside the modeled groups"
+    }
+  ],
+  "comparison_policy": "declared_programs",
+  "utility_zones": [
+    {
+      "id": "shared",
+      "source_kind": "synthetic",
+      "source": "Shared synthetic supply zone. Background excludes all three parcels; capacities selected to exercise portfolio constraints.",
+      "background_power_kw": [
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80,
+        80
+      ],
+      "background_freshwater_m3_day": 40,
+      "background_wastewater_m3_day": 30,
+      "power_capacity_kw": 500,
+      "water_capacity_m3_day": 180,
+      "wastewater_capacity_m3_day": 130
+    }
+  ],
+  "phases": [
+    {
+      "id": "phase_1",
+      "sequence": 1,
+      "title": "Commission B",
+      "active_project_ids": [
+        "B"
+      ]
+    },
+    {
+      "id": "phase_2",
+      "sequence": 2,
+      "title": "Commission A+B",
+      "active_project_ids": [
+        "A",
+        "B"
+      ]
+    },
+    {
+      "id": "phase_3",
+      "sequence": 3,
+      "title": "Commission A+B+C",
+      "active_project_ids": [
+        "A",
+        "B",
+        "C"
+      ]
+    }
+  ],
+  "conditions": {
+    "traffic_hours": [
+      18
+    ],
+    "seeds": [
+      2026,
+      2027,
+      2028
+    ]
+  },
+  "criteria": [
+    {
+      "metric": "school_unserved_students",
+      "direction": "minimize"
+    },
+    {
+      "metric": "power_peak_kw",
+      "direction": "minimize"
+    }
+  ]
+}

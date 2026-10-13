@@ -33,7 +33,7 @@ def calculate(design, floor_areas, library):
             # The normalized load curve already incorporates coincidence; no second diversity factor.
             power[hour] += floor_area*rates["energy_kwh_m2_day"]*profile[hour]*equipment_factor
             person_trips = block.residents*rates["resident_trips_day"]*resident_profile[hour] + (
-                block.staff*2 + block.daily_visitors*rates["visitor_trips_day"]+block.daily_users*rates['user_trips_day'])*profile[hour]
+                block.staff*rates.get("staff_trips_day", 2) + block.daily_visitors*rates["visitor_trips_day"]+block.daily_users*rates['user_trips_day'])*profile[hour]
             trips[hour] += person_trips*library["scenario_load_factor"]
     irrigation = design.green_m2*library["irrigation_l_m2_day"]/1000
     water[5] += irrigation  # Irrigation is excluded from sanitary wastewater.
@@ -48,7 +48,7 @@ def calculate(design, floor_areas, library):
         waste = [v*(1-reused/waste_before_reuse) for v in waste]
     for offset in range(library["ev_hours"]):
         power[(design.ev_charging_hour+offset) % 24] += design.ev_chargers*library["ev_kw"]
-    power[5] += reused*.6  # Synthetic treatment energy, kWh/m3 in a one-hour bin.
+    power[5] += reused*library.get("reuse_treatment_kwh_m3", .6)
     cars = [v*library["car_person_share"]/library["car_occupancy"] for v in trips]
     bikes = [v*library["motorcycle_person_share"]/library["motorcycle_occupancy"] for v in trips]
     return {"residents": residents, "staff": staff, "daily_visitors": visitors, "daily_users": users, "service_capacity": capacity,
@@ -63,5 +63,7 @@ def calculate(design, floor_areas, library):
             "water_ledger": {"indoor_and_irrigation_m3": freshwater_before_reuse, "reuse_supply_m3": reused,
                              "freshwater_m3": sum(water), "sanitary_before_reuse_m3": waste_before_reuse,
                              "sanitary_discharge_m3": sum(waste)},
-            "provenance": {"kind": "synthetic", "library_version": library["version"],
+            "provenance": {"kind": library["kind"], "library_version": library["version"],
+                           "coefficient_profile": library.get("coefficient_profile", "legacy_frozen"),
+                           "local_calibration": False,
                            "reuse": "Assumed daily treated sanitary supply; needs treatment design validation"}}

@@ -1,0 +1,180 @@
+{
+  "title": "Chung cư tại Thủ Đức",
+  "site": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          106.76,
+          10.82
+        ],
+        [
+          106.761,
+          10.82
+        ],
+        [
+          106.761,
+          10.821
+        ],
+        [
+          106.76,
+          10.821
+        ],
+        [
+          106.76,
+          10.82
+        ]
+      ]
+    ]
+  },
+  "development": {
+    "buildings": [
+      {
+        "name": "Pilot building",
+        "use": "residential",
+        "footprint": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                106.7603,
+                10.8203
+              ],
+              [
+                106.7607,
+                10.8203
+              ],
+              [
+                106.7607,
+                10.8207
+              ],
+              [
+                106.7603,
+                10.8207
+              ],
+              [
+                106.7603,
+                10.8203
+              ]
+            ]
+          ]
+        },
+        "floors": 12,
+        "height_m": 36,
+        "units": 200,
+        "residents": 600,
+        "staff": 12,
+        "daily_visitors": 80,
+        "daily_users": 0,
+        "service_capacity": 0
+      }
+    ],
+    "paved_m2": 6531.799801994859,
+    "green_m2": 2419.18511184752,
+    "permeable_m2": 1209.59255592376,
+    "parking_spaces": 200,
+    "ev_chargers": 12,
+    "trees": [
+      {
+        "longitude": 106.76015,
+        "latitude": 10.82015,
+        "canopy_radius_m": 5,
+        "height_m": 8
+      }
+    ]
+  },
+  "conditions": {
+    "level": "base",
+    "seed": 2026,
+    "solar_date": "2026-04-15"
+  },
+  "map_context": {
+    "provider": "goong",
+    "source_layer": "VN_Building",
+    "dataset_version": "TEST_FIXTURE_NOT_REAL_GOONG",
+    "captured_at": "2026-10-11T08:00:00+07:00",
+    "bbox": [
+      106.75,
+      10.81,
+      106.77,
+      10.83
+    ],
+    "coverage": "loaded_tiles",
+    "buildings": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "id": "onsite",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  106.7601,
+                  10.8201
+                ],
+                [
+                  106.7604,
+                  10.8201
+                ],
+                [
+                  106.7604,
+                  10.8204
+                ],
+                [
+                  106.7601,
+                  10.8204
+                ],
+                [
+                  106.7601,
+                  10.8201
+                ]
+              ]
+            ]
+          },
+          "properties": {
+            "max_height": 18,
+            "height": 12,
+            "building:levels": 6,
+            "building": "apartments"
+          }
+        },
+        {
+          "type": "Feature",
+          "id": "neighbour",
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  106.76105,
+                  10.82015
+                ],
+                [
+                  106.7613,
+                  10.82015
+                ],
+                [
+                  106.7613,
+                  10.82085
+                ],
+                [
+                  106.76105,
+                  10.82085
+                ],
+                [
+                  106.76105,
+                  10.82015
+                ]
+              ]
+            ]
+          },
+          "properties": {
+            "height": 60
+          }
+        }
+      ]
+    }
+  }
+}

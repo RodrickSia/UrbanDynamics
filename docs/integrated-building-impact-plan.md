@@ -1,5 +1,7 @@
 # Kế hoạch simulation tác động tổng hợp của công trình
 
+**Mở rộng quy hoạch (11/10/2026):** [Kế hoạch so sánh nhiều khu đất và nhiều dự án cộng dồn](urban-planning-multisite-cumulative-plan.md). Tài liệu mô tả phạm vi mục tiêu, phần backend thử nghiệm đã có và các điều kiện nghiệm thu còn lại; single-site vẫn theo phạm vi bên dưới.
+
 **Cập nhật triển khai:** 07/10/2026. A–D đã có luồng đa feature, SUMO/SWMM và bóng đổ chạy thực trên dữ liệu tổng hợp; AI giải thích được hoãn theo người dùng. Xem [bản triển khai và giới hạn](integrated-building-impact.md). E có workflow bàn giao; máy 156 chưa có runner/`.env`, chưa deploy. Các phần SOLWEIG/2D/EPANET/EnergyPlus vẫn có điều kiện.
 
 ## 1. Mục tiêu và phạm vi
