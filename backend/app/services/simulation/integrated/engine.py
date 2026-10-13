@@ -6,7 +6,7 @@ from . import demand, geometry, solvers
 from .context import build_context, digest
 from .models import Design, Conditions, IntegratedRequest
 
-VERSION = "integrated-building-1.4"
+VERSION = "integrated-building-1.5"
 UNAVAILABLE = {
     "thermal_comfort_SOLWEIG": "No radiation/DSM/material model; geometric shade available, no temperature delta",
     "flood_depth_2D": "No coupled surface hydraulics; SWMM node overflow available",

@@ -221,7 +221,7 @@ def test_native_predict_save_recommend_and_export_keep_map_context():
     response = client.post("/api/v1/scenarios/integrated/predict", json=fixture_payload())
     assert response.status_code == 201, response.text
     result = response.json()
-    assert result["model_version"] == "integrated-building-1.4"
+    assert result["model_version"] == "integrated-building-1.5"
     for state in result["variants"].values():
         assert all(state["validity"].values())
         assert state["shadow"]["surrounding_buildings"] == result["context"]["surrounding_buildings"]

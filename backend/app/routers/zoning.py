@@ -11,6 +11,7 @@ from shapely.errors import GEOSException
 from app.services.zoning import development, engine, store
 from app.services.zoning.indicators import report
 from app.services.zoning.models import Command, PlanInput
+from app.services.zoning.simulation import SimulationInput, study_from_plan
 
 router = APIRouter(prefix="/api/v1/zoning/plans", tags=["zoning plans"])
 
@@ -181,3 +182,22 @@ def plan_land_use(identifier: UUID):
         return parcels.study_land_use(plan["study_area"])
     except (OSError, ValueError, DatabaseError):
         raise HTTPException(503, "Current parcel land use temporarily unavailable") from None
+
+
+@router.post("/{identifier}/simulation/studies", status_code=201)
+def simulation_study(identifier: UUID, body: SimulationInput):
+    from app.services.simulation.planning import store as simulations
+    from app.services.simulation.planning.context import canonical_input, preflight
+
+    plan = execute(lambda: require_plan(identifier))
+    if plan["revision"] != body.revision:
+        raise HTTPException(409, "Plan changed. Reload before running simulation.")
+    study = execute(lambda: study_from_plan(plan, body))
+    ready = execute(lambda: preflight(study))
+    try:
+        saved = simulations.save_study(canonical_input(study), ready["context_hash"])
+    except simulations.StoreError:
+        raise HTTPException(503, "Simulation storage unavailable") from None
+    return {"id": saved["id"], "plan_id": str(identifier), "revision": plan["revision"],
+            "scenario_id": str(body.scenario_id), "native_work_estimate": ready["native_work_estimate"],
+            "model_version": ready["model_version"], "context_hash": ready["context_hash"]}

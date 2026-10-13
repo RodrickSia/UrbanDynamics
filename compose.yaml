@@ -52,6 +52,8 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
+      planning-worker:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
@@ -68,6 +70,27 @@ services:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       backend:
+        condition: service_healthy
+
+  planning-worker:
+    image: urbandynamics-backend:latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.services.simulation.planning.worker"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /data
+      SIMULATION_WORK_DIR: /runtime/solvers
+      PLANNING_MAX_RUNNING: 2
+    volumes:
+      - ./etl/data:/data:ro
+      - simulation_runtime:/runtime
+    depends_on:
+      postgis:
         condition: service_healthy
 
   etl-population-hcmc:

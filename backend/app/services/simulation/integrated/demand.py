@@ -14,7 +14,13 @@ def calculate(design, floor_areas, library):
     residents = staff = visitors = users = capacity = 0
     fixture_factor = library["efficient_fixture_factor"] if design.efficient_fixtures else 1
     equipment_factor = library["efficient_equipment_factor"] if design.efficient_equipment else 1
-    for block, floor_area in zip(design.buildings, floor_areas):
+    programs = []
+    for block, area in zip(design.buildings, floor_areas):
+        if block.space_uses:
+            programs.extend((part, part.floor_area_m2) for part in block.space_uses)
+        else:
+            programs.append((block, area))
+    for block, floor_area in programs:
         rates = library["uses"][block.use]
         profile = normalized(block.activity_profile) if block.activity_profile else library["profiles"][
             "residential" if block.use in ("residential", "hospital") else "day"]

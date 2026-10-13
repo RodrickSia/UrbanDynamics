@@ -8,13 +8,32 @@ from ..models import StrictModel, PolygonInput
 Use = Literal["residential", "school", "office", "hospital", "other"]
 
 
+class SpaceUseProgram(StrictModel):
+    """Loads by floor use, sharing one physical building footprint and height."""
+    use: Use
+    floor_area_m2: float = Field(ge=0, le=2_000_000)
+    residents: int = Field(default=0, ge=0, le=20000)
+    staff: int = Field(default=0, ge=0, le=20000)
+    daily_visitors: int = Field(default=0, ge=0, le=20000)
+    daily_users: int = Field(default=0, ge=0, le=20000)
+    service_capacity: int = Field(default=0, ge=0, le=50000)
+    activity_profile: list[float] | None = Field(default=None, min_length=24, max_length=24)
+
+    @model_validator(mode="after")
+    def valid_profile(self):
+        if self.activity_profile is not None and (min(self.activity_profile) < 0 or sum(self.activity_profile) <= 0):
+            raise ValueError("Activity profile must be nonnegative with positive total")
+        return self
+
+
 class Building(StrictModel):
     name: str = Field(default="Building", min_length=1, max_length=80)
     use: Use = "residential"
     footprint: PolygonInput
     floors: int = Field(default=12, ge=1, le=100)
     height_m: float = Field(default=36, gt=0, le=400)
-    gross_floor_area_m2: float | None = Field(default=None, gt=0, le=2_000_000)
+    gross_floor_area_m2: float | None = Field(default=None, ge=0, le=2_000_000)
+    space_uses: list[SpaceUseProgram] = Field(default_factory=list, max_length=5)
     units: int = Field(default=0, ge=0, le=10000)
     residents: int = Field(default=0, ge=0, le=20000)
     staff: int = Field(default=0, ge=0, le=20000)
@@ -26,6 +45,12 @@ class Building(StrictModel):
 
     @model_validator(mode="after")
     def schedule(self):
+        if self.space_uses:
+            if len({p.use for p in self.space_uses}) != len(self.space_uses):
+                raise ValueError("Space-use programs must have unique uses")
+            for field in ("residents", "staff", "daily_visitors", "daily_users", "service_capacity"):
+                if sum(getattr(p, field) for p in self.space_uses) != getattr(self, field):
+                    raise ValueError(f"Space-use {field} must sum to the building total")
         if self.activity_profile is not None and (min(self.activity_profile) < 0 or sum(self.activity_profile) <= 0):
             raise ValueError("Activity profile must be nonnegative with positive total")
         return self

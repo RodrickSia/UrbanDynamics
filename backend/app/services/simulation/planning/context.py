@@ -5,7 +5,7 @@ from ..integrated.context import digest
 from ..integrated.library import parameters
 from .models import PlanningStudy
 
-VERSION = "planning-studies-0.18"
+VERSION = "planning-studies-0.19"
 
 
 def canonical_numbers(value):

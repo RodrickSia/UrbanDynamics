@@ -21,7 +21,7 @@ def analyze(site_input, design):
         if any(projected.intersection(other).area > .01 for other in footprints):
             raise ValueError("Building footprints may not overlap")
         footprints.append(projected)
-        floor_areas.append(building.gross_floor_area_m2 or footprint_area*building.floors)
+        floor_areas.append(building.gross_floor_area_m2 if building.gross_floor_area_m2 is not None else footprint_area*building.floors)
         heights.append(building.height_m)
     roof = sum(polygon_and_area(b.footprint)[1] for b in design.buildings)
     total = roof+design.paved_m2+design.permeable_m2+design.green_m2
@@ -42,7 +42,7 @@ def analyze(site_input, design):
                         "impervious_percent": (roof+design.paved_m2)/area*100,
                         "surfaces_m2": {"roof": roof, "paved": design.paved_m2,
                                         "permeable": design.permeable_m2, "green": design.green_m2},
-                        "floor_area_method": ["design" if b.gross_floor_area_m2 else "footprint_times_floors_estimate"
+                        "floor_area_method": ["design" if b.gross_floor_area_m2 is not None else "footprint_times_floors_estimate"
                                               for b in design.buildings]}}
 
 
