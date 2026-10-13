@@ -1,0 +1,91 @@
+import { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../../services/api';
+import { zoningRequest } from './api';
+import type { Plan, Scenario } from './types';
+import type { SimulationJob, SimulationResult, SimulationSettings, SimulationStudy } from './simulationTypes';
+
+async function request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/planning${path}`, {
+    method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Simulation request failed (${response.status})`);
+  return data;
+}
+const active = (job?: SimulationJob | null) => !!job && ['queued', 'running'].includes(job.status);
+
+export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: SimulationSettings) {
+  const key = JSON.stringify([plan.id, plan.revision, scenario.id, settings]);
+  const storageKey = `plan-simulation:${plan.id}:${scenario.id}`;
+  const currentKey = useRef<string | null>(key);
+  const [state, setState] = useState<{ key: string; study?: SimulationStudy; job?: SimulationJob; result?: SimulationResult }>();
+  const [requesting, setRequesting] = useState(false), [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    currentKey.current = key;
+    return () => { currentKey.current = null; };
+  }, [key]);
+  const visible = state?.key === key ? state : undefined;
+  const remember = (job: SimulationJob) => {
+    try { localStorage.setItem(storageKey, JSON.stringify({ key, id: job.id })); } catch { /* Storage may be unavailable. */ }
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let id = visible?.job?.id;
+    if (!id) try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+      if (saved?.key === key && typeof saved.id === 'string') id = saved.id;
+    } catch { /* Ignore an invalid local pointer; server inputs remain immutable. */ }
+    if (!id) return;
+    const poll = async () => {
+      try {
+        const job = await request<SimulationJob>(`/jobs/${encodeURIComponent(id!)}`, undefined, controller.signal);
+        const result = job.status === 'succeeded' && job.result_id
+          ? await request<SimulationResult>(`/runs/${job.result_id}`, undefined, controller.signal) : undefined;
+        if (controller.signal.aborted || currentKey.current !== key) return;
+        setState(previous => ({ ...(previous?.key === key ? previous : {}), key, job, result }));
+        setError('');
+        if (active(job)) timer = setTimeout(poll, 1500);
+      } catch (reason) {
+        if (!controller.signal.aborted && currentKey.current === key) {
+          setError(reason instanceof Error ? reason.message : 'Unable to read simulation');
+          // A failed poll does not mean a server job has stopped.
+          timer = setTimeout(poll, 5000);
+        }
+      }
+    };
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [key, storageKey, visible?.job?.id, refresh]);
+
+  const run = async (mode: 'screening' | 'native') => {
+    if (requesting || active(visible?.job)) return;
+    setRequesting(true); setError('');
+    try {
+      const study = await zoningRequest<SimulationStudy>(`/${plan.id}/simulation/studies`, {
+        revision: plan.revision, scenario_id: scenario.id, ...settings,
+      });
+      // Changing scenario during preflight must not enqueue an unseen run.
+      if (currentKey.current !== key) return;
+      const job = await request<SimulationJob>(`/studies/${study.id}/runs`, { mode, idempotency_key: crypto.randomUUID() });
+      remember(job);
+      if (currentKey.current === key) setState({ key, study, job });
+    } catch (reason) {
+      if (currentKey.current === key) setError(reason instanceof Error ? reason.message : 'Simulation unavailable');
+    } finally { setRequesting(false); }
+  };
+  const action = async (operation: 'cancel' | 'retry') => {
+    if (!visible?.job || requesting) return;
+    setRequesting(true); setError('');
+    try {
+      const job = await request<SimulationJob>(`/jobs/${visible.job.id}/${operation}`, {});
+      remember(job);
+      if (currentKey.current === key) { setState({ key, study: visible.study, job }); setRefresh(value => value + 1); }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Simulation unavailable'); }
+    finally { setRequesting(false); }
+  };
+  return { ...visible, error, requesting, running: active(visible?.job), run, action };
+}

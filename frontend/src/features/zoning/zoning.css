@@ -75,6 +75,12 @@
 .zoning-land-use-list { list-style: none; margin: .5rem 0; padding: 0; }
 .zoning-land-use-list li { display: flex; align-items: center; gap: .5rem; min-height: 2rem; border-bottom: 1px solid var(--border); font-size: .78rem; }
 .development-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .75rem 0; }
+.development-simulation { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .75rem; }
+.development-simulation h3, .development-result-link { display: flex; align-items: center; gap: .4rem; }
+.development-simulation fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.development-simulation-status { padding: .75rem 0; font-size: .8rem; }
+.development-simulation-status small { display: block; margin-top: .25rem; }
+.development-result-link { margin-top: .75rem; color: var(--accent-strong); font-size: .8rem; }
 .development-actions button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
 .development-actions .zoning-checkbox { flex-direction: row; align-items: center; margin: 0; }
 .development-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
