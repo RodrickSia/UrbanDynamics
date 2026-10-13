@@ -43,12 +43,27 @@ def rules_for(plan, scenario, parcel):
 def metrics(buildings, area):
     footprints = [projected(b["geometry"]) for b in buildings]
     footprint = unary_union(footprints).area if footprints else 0.0
-    gfa = sum(p.area * b["floors"] for p, b in zip(footprints, buildings) if b["counts_gfa"])
-    far_area = sum(p.area * b["floors"] for p, b in zip(footprints, buildings) if b["counts_far"])
-    uses = {s["id"]: sum(p.area * b["floors"] for p, b in zip(footprints, buildings)
-                         if b["space_use_id"] == s["id"] and b["counts_gfa"]) for s in SPACE_USES}
+    spaces = [(p.area, floor) for p, b in zip(footprints, buildings) for floor in floor_stack(b)]
+    gfa = sum(size for size, floor in spaces if floor["counts_gfa"])
+    far_area = sum(size for size, floor in spaces if floor["counts_far"])
+    uses = {s["id"]: sum(size for size, floor in spaces
+                         if floor["space_use_id"] == s["id"] and floor["counts_gfa"]) for s in SPACE_USES}
     return {"footprint_m2": footprint, "gfa_m2": gfa, "far": far_area / area,
             "coverage_pct": 100 * footprint / area, "space_use_m2": uses}
+
+
+def floor_stack(building):
+    """Resolve sparse overrides; legacy buildings retain uniform floors."""
+    defaults = {key: building[key] for key in ("floor_height", "space_use_id", "counts_gfa", "counts_far")}
+    overrides = {item["floor"]: item for item in building.get("floor_overrides", [])}
+    colors = {use["id"]: use["color"] for use in SPACE_USES}
+    result, elevation = [], 0.0
+    for number in range(1, building["floors"] + 1):
+        floor = {**defaults, **overrides.get(number, {}), "floor": number}
+        top = elevation + floor["floor_height"]
+        result.append({**floor, "base_m": elevation, "top_m": top, "color": colors[floor["space_use_id"]]})
+        elevation = top
+    return result
 
 
 def validation(plan, scenario, parcel, buildings):
@@ -95,7 +110,8 @@ def prepare_building(plan, scenario, payload):
     data.pop("demolish")
     if previous:
         data["origin_id"] = previous.get("origin_id")
-    data.update(id=data["id"] or str(uuid4()), geometry=geojson(geometry), height_m=data["floors"] * data["floor_height"],
+    stack = floor_stack(data)
+    data.update(id=data["id"] or str(uuid4()), geometry=geojson(geometry), height_m=stack[-1]["top_m"], floor_stack=stack,
                 footprint_m2=geometry.area, ground_anchor={"datum": "terrain_relative", "offset_m": 0,
                 "status": "elevation_unverified"}, status="user_proposed", template_version=1 if data["template_id"] else None,
                 origin="generated" if data["template_id"] else "manual", space_use_version=1,

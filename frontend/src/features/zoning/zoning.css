@@ -76,6 +76,7 @@
 .zoning-land-use-list li { display: flex; align-items: center; gap: .5rem; min-height: 2rem; border-bottom: 1px solid var(--border); font-size: .78rem; }
 .development-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .75rem 0; }
 .development-actions button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
+.development-actions .zoning-checkbox { flex-direction: row; align-items: center; margin: 0; }
 .development-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
 .development-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .development-parcel { display: flex; flex-direction: column; gap: .3rem; padding: .75rem 0; border-bottom: 1px solid var(--border); }
@@ -136,6 +137,9 @@
 .zoning-metrics span, .zoning-metrics strong { display: block; }
 .zoning-metrics strong { margin-top: .3rem; font-size: 1.15rem; }
 .zoning-table-scroll { overflow-x: auto; }
+.zoning-ui .development-floor-editor { margin: .8rem 0; padding: .75rem; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-soft); }
+.development-floor-editor summary { font-weight: 600; cursor: pointer; }
+.development-floor-table { max-height: 13rem; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .zoning-ui table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .76rem; }
 .zoning-ui td, .zoning-ui th { border-bottom: 1px solid var(--border); padding: .6rem .3rem; text-align: right; white-space: nowrap; }
 .zoning-ui th:first-child { text-align: left; }

@@ -62,7 +62,13 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
     setSketch({ tool: source ? 'edit-building' : 'building', geometry: source ? structuredClone(source.geometry) : null, points: [] });
   };
   const update = (patch: Partial<BuildingInput>) => {
-    if (draft && !working) { setDraftState({ scope, value: { ...draft, ...patch } }); setPreviewState(null); }
+    if (draft && !working) {
+      // Removed floors must not leave hidden overrides that reappear on save.
+      const value = { ...draft, ...patch };
+      if (patch.floors !== undefined && Number.isInteger(patch.floors) && patch.floors >= 1)
+        value.floor_overrides = value.floor_overrides?.filter(floor => floor.floor <= value.floors);
+      setDraftState({ scope, value }); setPreviewState(null);
+    }
   };
   const previewBuilding = async () => {
     if (!plan || !scenario || !input || pending.current) { if (!input) setError('Draw at least three points'); return null; }

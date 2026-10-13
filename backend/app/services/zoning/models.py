@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Input(BaseModel):
@@ -59,6 +59,14 @@ class ScenarioInput(NameInput):
     description: str = Field(default="", max_length=2000)
 
 
+class FloorOverride(Input):
+    floor: int = Field(ge=1, le=200, strict=True)
+    floor_height: float = Field(gt=0, le=20)
+    space_use_id: Literal["residential", "commercial", "office", "other"]
+    counts_gfa: bool = True
+    counts_far: bool = True
+
+
 class BuildingInput(Input):
     id: str | None = Field(default=None, max_length=80)
     origin_id: str | None = Field(default=None, max_length=80)
@@ -72,6 +80,14 @@ class BuildingInput(Input):
     counts_far: bool = True
     template_id: Literal["low-rise-v1"] | None = None
     demolish: bool = False
+    floor_overrides: list[FloorOverride] = Field(default_factory=list, max_length=200)
+
+    @model_validator(mode="after")
+    def validate_floors(self):
+        numbers = [floor.floor for floor in self.floor_overrides]
+        if len(set(numbers)) != len(numbers) or any(number > self.floors for number in numbers):
+            raise ValueError("Floor overrides must be unique and within the building's floor count")
+        return self
 
 
 class GenerationInput(Input):

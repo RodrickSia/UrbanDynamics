@@ -132,3 +132,41 @@ def test_gfa_and_far_flags_do_not_double_count_or_conflate_metrics(client, plan,
     assert result["metrics"]["far"] > 0
     assert result["metrics"]["footprint_m2"] > 0
     assert sum(result["metrics"]["space_use_m2"].values()) == 0
+
+
+def test_mixed_use_floors_height_metrics_and_scenario_persistence(client, plan, parcel_source):
+    overrides = [
+        {"floor": 1, "space_use_id": "commercial", "floor_height": 4.5, "counts_gfa": True, "counts_far": True},
+        {"floor": 3, "space_use_id": "other", "floor_height": 2.5, "counts_gfa": False, "counts_far": False},
+    ]
+    payload = building(floors=3, floor_overrides=overrides)
+    result = preview(client, plan, payload)
+    area = projected(payload["geometry"]).area
+    assert result["building"]["height_m"] == pytest.approx(10.2)
+    stack = result["building"]["floor_stack"]
+    assert [f["base_m"] for f in stack] == pytest.approx([0, 4.5, 7.7])
+    assert [f["top_m"] for f in stack] == pytest.approx([4.5, 7.7, 10.2])
+    assert [f["color"] for f in stack] == ["#C18EAD", "#D79B8C", "#8CA6AD"]
+    assert result["metrics"]["gfa_m2"] == pytest.approx(area * 2)
+    assert result["metrics"]["far"] == pytest.approx(area * 2 / projected(rectangle()).area)
+    assert result["metrics"]["coverage_pct"] == pytest.approx(100 * area / projected(rectangle()).area)
+    assert result["metrics"]["space_use_m2"] == pytest.approx({"commercial": area, "residential": area, "office": 0, "other": 0})
+    plan = command(client, plan, "save_building", payload)
+    original = deepcopy(plan["scenarios"][1]["buildings"][0])
+    plan = command(client, plan, "add_scenario", {"name": "Mixed-use alternative"})
+    clone = plan["scenarios"][-1]
+    plan = command(client, plan, "save_building", building(id=clone["buildings"][0]["id"], floors=3), clone["id"])
+    assert plan["scenarios"][1]["buildings"][0] == original
+    plan = command(client, plan, "undo_development", scenario_id=clone["id"])
+    reloaded = client.get(f"/api/v1/zoning/plans/{plan['id']}").json()
+    assert reloaded["scenarios"][-1]["buildings"][0]["floor_overrides"] == overrides
+
+
+@pytest.mark.parametrize("overrides", [
+    [{"floor": 0}], [{"floor": 3}], [{"floor": 1}, {"floor": 1}],
+    [{"floor": 1, "floor_height": 0}], [{"floor": 1, "space_use_id": "invented"}],
+])
+def test_invalid_floor_override_rejected_without_mutation(client, plan, parcel_source, overrides):
+    floors = [{"space_use_id": "commercial", "floor_height": 4, "counts_gfa": True, "counts_far": True, **o} for o in overrides]
+    command(client, plan, "save_building", building(floor_overrides=floors), status=422)
+    assert client.get(f"/api/v1/zoning/plans/{plan['id']}").json() == plan

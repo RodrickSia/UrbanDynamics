@@ -6,7 +6,7 @@ import { PARCEL_MAX_NATIVE_ZOOM, PARCEL_MIN_ZOOM, parcelOutline } from '../map/d
 import { editVertex, rings, sketchGeometry } from './geometry';
 import { nearestSnap, snapSource, type SnapGeometry } from './snapping';
 import type { PolygonGeometry, ZoningBridge } from './types';
-import { BUILDING_LAYER, BUILDING_FOOTPRINT_LAYER } from './DevelopmentScene';
+import { BUILDING_LAYER, BUILDING_EXCLUDED_LAYER, BUILDING_FOOTPRINT_LAYER } from './DevelopmentScene';
 
 const SOURCE = 'zoning-editor';
 const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
@@ -125,7 +125,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         return;
       }
       if (b.development?.active) {
-        const building = query(e, BUILDING_LAYER)[0] ?? query(e, BUILDING_FOOTPRINT_LAYER)[0];
+        const building = query(e, BUILDING_LAYER)[0] ?? query(e, BUILDING_EXCLUDED_LAYER)[0] ?? query(e, BUILDING_FOOTPRINT_LAYER)[0];
         if (building && building.properties.id !== 'preview') b.development.onPickBuilding(String(building.properties.id));
         else {
           const parcel = query(e, PARCEL_PICK)[0];
@@ -184,12 +184,14 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
       }
     };
     if (map.isStyleLoaded()) attach();
-    map.on('style.load', attach); map.on('click', click); map.on('mousedown', down); map.on('mousemove', move); map.on('mouseup', up);
+    // Opening a plan while vector tiles load can miss style.load, which has
+    // already fired. Attach the editor on idle as well so handles stay available.
+    map.on('style.load', attach); map.on('idle', attach); map.on('click', click); map.on('mousedown', down); map.on('mousemove', move); map.on('mouseup', up);
     window.addEventListener('mouseup', up); window.addEventListener('keydown', key);
     return () => {
       up(); cancelAnimationFrame(releaseFrame); cancelAnimationFrame(snapFrame); if (doubleClick) map.doubleClickZoom.enable();
       if (boxZoom) map.boxZoom.enable();
-      map.off('style.load', attach); map.off('click', click); map.off('mousedown', down); map.off('mousemove', move); map.off('mouseup', up);
+      map.off('style.load', attach); map.off('idle', attach); map.off('click', click); map.off('mousedown', down); map.off('mousemove', move); map.off('mouseup', up);
       window.removeEventListener('mouseup', up); window.removeEventListener('keydown', key);
       for (const id of [SNAP_LAYER, VERTEX, LINE, FILL]) if (map.getLayer(id)) map.removeLayer(id);
       for (const id of [SNAP_SOURCE, SOURCE]) if (map.getSource(id)) map.removeSource(id);

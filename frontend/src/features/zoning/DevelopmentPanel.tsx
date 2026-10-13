@@ -3,6 +3,7 @@ import { Copy, Pencil, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { ActionDialog } from './Dialog';
 import { areaText } from './geometry';
 import { BuildingDraftForm } from './BuildingDraftForm';
+import { BuildingFloorSummary } from './BuildingFloorSummary';
 import { DevelopmentValues } from './DevelopmentValues';
 import type { ZoningWorkspace } from './useZoning';
 
@@ -45,7 +46,8 @@ export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWo
       {selected && !d.draft && <div className="development-building"><h3>{selected.name}</h3><p>{selected.floors} floors · {selected.height_m.toFixed(1)} m</p>
         <div className="development-actions"><button disabled={w.readOnly || w.busy} onClick={() => { d.begin(selected); onView?.('2d'); }}><Pencil size={16}/>Edit</button>
           <button disabled={w.readOnly || w.busy} onClick={() => { d.begin(selected, true); onView?.('2d'); }}><Copy size={16}/>Duplicate</button>
-          <button aria-label="Delete building" title="Delete building" disabled={w.readOnly || w.busy} onClick={() => setConfirm('delete')}><Trash2 size={16}/></button></div></div>}
+          <button aria-label="Delete building" title="Delete building" disabled={w.readOnly || w.busy} onClick={() => setConfirm('delete')}><Trash2 size={16}/></button></div>
+        <BuildingFloorSummary building={selected}/></div>}
       <BuildingDraftForm workspace={w} onView={onView}/>
       {report && <DevelopmentValues report={report}/>}
       <p className="zoning-muted">Concept massing · approximate terrain anchor. Baseline heights unverified.</p>

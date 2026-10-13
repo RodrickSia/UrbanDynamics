@@ -1,4 +1,4 @@
-# Development and scenarios — P0
+# Development and scenarios
 
 ## Gate audit (2026-10-13)
 
@@ -8,7 +8,7 @@
 | Scenarios | `engine.py`, `useZoning.ts`, `ZoningWorkspace.tsx`; Existing locked; zone clone/lock/delete | Clone development, metadata, reorder, draft guards | P0 |
 | Real parcels | `services/parcels.py`, `parcels.plot`, viewport MVT + price detail endpoint | Selected full geometry without price inference; immutable selected-parcel snapshot | P0 |
 | Map editing | `ZoningScene.tsx`, MapLibre 6, geometry handles, snapping/Ctrl | Building tools and picking; reuse same map/editor | P0 |
-| Baseline 3D | `layers/buildings3d.ts`: current checkout uses Goong VN_Building, not Overture | ID-aware demolition where supported; disclose unmaskable provider geometry/imagery | P0 |
+| Baseline 3D | `main` Goong VN_Building extrusion plus generated parcel models streamed via `synthetic_buildings` | ID-aware demolition where supported; disclose unmaskable provider geometry/imagery | P0 |
 | Terrain | `layers/terrain.ts`: Mapterhorn DEM, terrain-relative extrusions | No verified survey datum/heights; label approximate terrain anchor | P0 |
 | Building simulation | `routers/building_scenarios.py`: standalone calculated scenarios | Not parcel-owned plan editor; keep separate | Reuse concepts only |
 | Rules | Plan-local proposed types; no approved parcel rules | Never classify these as official allowed limits | P0 UNKNOWN |
@@ -53,7 +53,7 @@ Use the existing user-managed tunnel (51873 frontend / 51874 API). No deployment
 |---|---|---|
 | Existing versus proposals; clone, name, description, order, lock | Persistent documents, revision checks, independent clone and immutable Existing | Existing map provider remains live; no complete historical city snapshot |
 | Develop real selected parcels | MVT stable string ID → selected full geometry → frozen parcel snapshot | Positional/source accuracy not survey-verified |
-| Draw and edit building spaces | One repeated footprint, vertex handles, floors/height/use, GFA/FAR flags, duplicate/delete, preview/save, saved undo/redo | Stacked parts, distinct per-floor uses, underground, elevation gizmos and full transform are P1 |
+| Draw and edit building spaces | One repeated footprint, vertex handles, per-floor height/use/GFA/FAR, duplicate/delete, preview/save, saved undo/redo | Different footprints per floor, underground, elevation gizmos and full transform remain deferred |
 | Assign building types | Immutable versioned low-rise template plus four space-use presets; explicit coverage/setback/floor assumptions | Catalog CRUD, mixes and density generation are P1 |
 | Validate versus rules | Geometry/overlap errors block save; official rules UNKNOWN; proposed limits PASS/FAIL separately | No official rule importer or verified frontage; no legal approval claim |
 | Demolish per scenario | Persisted parcel masks; provider IDs suppress intersecting extrusions; contained anonymous extrusions suppressed spatially; original filters restored | Partly intersecting anonymous geometry, imagery, and unavailable tree layers cannot reliably be suppressed |
@@ -70,3 +70,20 @@ Use the existing user-managed tunnel (51873 frontend / 51874 API). No deployment
 - Authentication is unchanged: this is the existing private workspace API, not a new multi-user authorization system. Baseline metrics/heights and terrain datum remain unknown/unverified where sources cannot establish them.
 
 To reproduce browser checks, start `uvicorn development_testserver:app --host 127.0.0.1 --port 8087` with `PYTHONPATH=backend;etl;backend/tests` and an isolated `ZONING_DATA_DIR`; run Vite 5178 with `API_PROXY_TARGET=http://127.0.0.1:8087`, then `npx playwright test --config playwright.development.config.ts`. Never use the fixture server for production.
+
+## Follow-up: mixed-use floors (2026-10-13)
+
+The user chose per-floor uses as the next Development increment. Research checked the current official [Develop a parcel](https://doc.esri.com/en/arcgis-urban/latest/help/help-parcel-redevelopment.html) and [Manage development data](https://doc.esri.com/en/arcgis-urban/latest/data/data-manager-development.html) documentation. ArcGIS separates building types from space-use types, supports editing a floor's use/height and GFA/FAR inclusion, and compares built metrics with zoning limits. UrbanDynamics implements these concepts with its existing map, white sidebar, blue controls and GSAP transitions. This is conceptual above-ground massing on a shared footprint, not a full ArcGIS feature clone.
+
+- Building defaults still define unchanged floors. Optional `floor_overrides` records carry a unique 1-based floor number, use, height and independent GFA/FAR flags. Unknown uses, duplicate/out-of-range floors and invalid heights are rejected atomically.
+- The server resolves a `floor_stack` with cumulative base/top heights and catalog colors on preview/save. Existing documents without overrides retain their original uniform-floor calculations; no migration is required. Edit, duplicate, scenario clone, undo and reload preserve overrides.
+- GFA sums included floor areas; FAR independently sums FAR-eligible areas over the parcel/study denominator. Coverage counts the footprint once. Space-use totals include only GFA-eligible floor areas. No official regulatory limits are inferred from the chosen use.
+- The editor provides a floor selector, use/height fields, GFA/FAR checkboxes and Reset floor. Reducing the floor count removes overrides for removed floors. Saved buildings show a compact floor schedule.
+- 3D rendering stacks colored bands at their actual heights. Adjacent equal bands share one extrusion; floors excluded from both metrics use a separate translucent layer. 2D renders only the ground footprint, retaining building picking without ghost extrusions.
+- Baseline rendering restores the implementation from fetched `origin/main` (`93a44c6`): one managed Goong extrusion plus the independently streamed generated layer. Both are disabled in 2D, including after style reload. Search is centered within the left plan drawer using `search width + 2 × edge gap` across breakpoints.
+
+Scope remaining: different footprint shapes on each floor, basements, transforms, custom catalog management, surfaces and envelopes. These are not implied by the per-floor implementation.
+
+Updated checks: 64 backend tests pass with one isolated-PostGIS test skipped; 125 frontend unit tests pass; production build and ESLint pass. Browser regression checks cover Goong/generated 3D → 2D → style reload, equal search margins, snapping and parcel-outline cleanup. The mixed-floor browser case uses the real local API with fixture parcels and verifies metrics, persistence, floor removal and 2D/3D visibility. No deployment or live-warehouse verification was performed.
+
+Both Development browser cases pass, including 2D footprint selection, edit handles after reload and a 320 px floor editor. Evidence: `.runtime/development/mixed-floor-preview.png`, `mixed-floor-editor.png`, `mixed-floor-mobile.png`. Mode changes retain the same source and switch layer visibility; the drawing editor also attaches on idle when a plan opens after style metadata but before tiles finish loading.

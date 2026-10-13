@@ -21,4 +21,16 @@ describe('scenario geometry visibility', () => {
     expect(developmentData({ ...bridge, scenario: { ...bridge.scenario!, buildings: [] } }).features).toEqual([]);
     expect(developmentData({ ...bridge, active: false }).features).toEqual([]);
   });
+  it('stacks mixed floor colors at their actual heights and coalesces adjacent equal uses', () => {
+    const bridge = { active: true, scenario: { buildings: [{ id: 'mixed', geometry: square(0,0), height_m: 10.9, color: '#D79B8C',
+      floor_stack: [
+        { base_m: 0, top_m: 4.5, color: '#C18EAD', counts_gfa: true, counts_far: true },
+        { base_m: 4.5, top_m: 7.7, color: '#D79B8C', counts_gfa: true, counts_far: true },
+        { base_m: 7.7, top_m: 10.9, color: '#D79B8C', counts_gfa: true, counts_far: true },
+      ] }], demolition_masks: [] }, development: { selectedBuilding: 'mixed' } } as unknown as ZoningBridge;
+    expect(developmentData(bridge).features.map(f => f.properties)).toEqual([
+      { kind: 'building', id: 'mixed', base: 0, height: 4.5, color: '#C18EAD', opacity: .85, outline: '#2877dc' },
+      { kind: 'building', id: 'mixed', base: 4.5, height: 10.9, color: '#D79B8C', opacity: .85, outline: '#2877dc' },
+    ]);
+  });
 });
