@@ -28,9 +28,9 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
   expect(await page.evaluate(() => {
     const map = window.dataMap;
-    return { fill: !!map.getLayer('zoning-colored-parcels-fill'), ordinary: !!map.getLayer('dataset-parcels'),
+    return { fill: !!map.getLayer('zoning-plan-parcels-fill'), ordinary: !!map.getLayer('dataset-parcels'),
       tiles: (map.getSource('zoning-plan-parcels') as { serialize: () => { tiles: string[] } }).serialize().tiles };
-  })).toMatchObject({ fill: false, ordinary: false, tiles: [expect.stringContaining('/parcels/tiles/')] });
+  })).toMatchObject({ fill: true, ordinary: false, tiles: [expect.stringContaining('/parcels/tiles/')] });
   await page.getByRole('button', { name: 'Add zoning type' }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Code', { exact: true }).fill('MU');
@@ -50,10 +50,12 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
     .some(f => f.properties.kind === 'zone'))).toBe(false);
   await page.getByRole('button', { name: 'Confirm zoning', exact: true }).click();
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
-  await page.waitForFunction('!!window.dataMap.getLayer("zoning-colored-parcels-fill")');
-  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-colored-parcels-fill', 'fill-opacity'))).toBe(.35);
-  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-colored-parcels-fill', 'fill-color')))
-    .toEqual(['to-color', ['get', 'source_color'], '#94a3b8']);
+  await page.waitForFunction('!!window.dataMap.getLayer("zoning-plan-parcels-fill")');
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-plan-parcels-fill', 'fill-opacity'))).toBe(.35);
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-plan-parcels-fill', 'fill-color')))
+    .toEqual(['to-color', ['get', 'color'], '#94a3b8']);
+  expect(await page.evaluate(() => window.dataMap.queryRenderedFeatures({ layers: ['zoning-fill'] })
+    .find(f => f.properties.kind === 'zone')?.properties.alpha)).toBe(.35);
   await expect(page.getByRole('region', { name: 'Zoning in scenario' })).toContainText('assigned');
   await expect(page.getByRole('status').filter({ hasText: 'revision 3' })).toBeVisible();
   await page.getByRole('button', { name: 'Duplicate scenario', exact: true }).click();
@@ -70,7 +72,7 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Draw zone', exact: true })).toBeDisabled();
-  await page.waitForFunction('!window.dataMap.getLayer("zoning-colored-parcels-fill")');
+  await page.waitForFunction('!!window.dataMap.getLayer("zoning-plan-parcels-fill")');
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   // Style reload must recreate map sources without resetting persisted geometry.
   await page.evaluate('window.dataMap.setStyle({version:8,sources:{},layers:[{id:"new-background",type:"background",paint:{"background-color":"#d6e5df"}}]})');

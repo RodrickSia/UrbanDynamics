@@ -206,6 +206,13 @@ def test_canonical_geometry_tile_colors_and_price_api(monkeypatch):
             matches = [f for f in decoded['features']['features'] if f['properties']['parcel_id'] == str(row[0])]
             assert len(matches) == 1
             assert matches[0]['properties']['color'] == '#D79B8C'
+            study = {'type': 'Polygon', 'coordinates': [[[106.6995,10.7995], [106.7005,10.7995],
+                      [106.7005,10.8005], [106.6995,10.8005], [106.6995,10.7995]]]}
+            clipped = mapbox_vector_tile.decode(parcels.plan_vector_tile(study, zoom, tile.x, tile.y))
+            plots = [f for f in clipped['features']['features'] if f['properties']['parcel_id'] == str(row[0])]
+            assert len(plots) == 1
+            assert plots[0]['properties']['color'] == '#D79B8C'
+            assert plots[0]['properties']['mdsdd'] == 'ODT'
         assert parcels.vector_tile(11, 0, 0) == b''
         response = TestClient(app).get(f'/api/v1/parcels/{row[0]}')
         assert response.status_code == 200

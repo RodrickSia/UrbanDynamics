@@ -2,7 +2,6 @@
 import { developmentData } from './developmentSceneData';
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import type { ZoningBridge } from './types';
-import { installDemolition } from './demolition';
 
 const SOURCE = 'development-scene';
 export const BUILDING_LAYER = 'development-buildings';
@@ -52,10 +51,6 @@ export function DevelopmentScene({ map, bridge, mode }: { map: MapLibreMap | nul
     }
   }, [map, bridge.active, mode]);
   useEffect(() => { (map?.getSource(SOURCE) as GeoJSONSource | undefined)?.setData(developmentData(bridge)); }, [map, bridge]);
-  const masks = bridge.active ? bridge.scenario?.demolition_masks : undefined;
-  useEffect(() => {
-    if (map && masks?.length) return installDemolition(map, masks.map(m => m.geometry));
-  }, [map, masks]);
   return null;
 }
 

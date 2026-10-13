@@ -13,7 +13,7 @@ const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
 const PARCEL_SOURCE = 'zoning-plan-parcels';
 const PARCEL_LINE = 'zoning-plan-parcels-outline';
 const PARCEL_PICK = 'zoning-plan-parcels-pick';
-const ZONED_SOURCE = 'zoning-colored-parcels', ZONED_FILL = 'zoning-colored-parcels-fill';
+const PARCEL_FILL = 'zoning-plan-parcels-fill';
 const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const DRAW_COLOR = '#FF6D00';
@@ -26,7 +26,7 @@ function data(bridge: ZoningBridge): FeatureCollection {
   if (bridge.visible) for (const zone of bridge.scenario?.zones ?? []) {
     const type = bridge.plan?.types.find(t => t.id === zone.type_id);
     features.push(feature(zone.geometry, { kind: 'zone', id: zone.id, label: type?.code ?? 'Unknown',
-      color: type?.color ?? '#6d8588', alpha: bridge.parcelAvailable ? 0 : bridge.opacity,
+      color: type?.color ?? '#6d8588', alpha: bridge.sketch.tool ? 0 : bridge.opacity,
       width: bridge.selected.includes(zone.id) ? 4 : 1.5 }));
   }
   const draft = sketchGeometry(bridge.sketch);
@@ -49,11 +49,8 @@ function data(bridge: ZoningBridge): FeatureCollection {
 export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: ZoningBridge }) {
   const current = useRef(bridge);
   const parcelTiles = bridge.plan
-    ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}`
+    ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}&schema=2`
     : `${API_BASE_URL}/api/v1/layers/parcels/tiles/{z}/{x}/{y}.pbf?schema=2`;
-  const zonedTiles = bridge.plan && bridge.scenario?.kind === 'proposal' && bridge.scenario.zones.length
-    ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/zoned-parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}&scenario_id=${encodeURIComponent(bridge.scenario.id)}`
-    : null;
   useEffect(() => { current.current = bridge; }, [bridge]);
   useEffect(() => {
     if (!map || !bridge.active) return;
@@ -208,6 +205,10 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         paint: { ...parcelOutline().paint, 'line-color': '#005b65', 'line-opacity': current.current.showParcels ? .9 : 0 } });
       if (!map.getLayer(PARCEL_PICK)) map.addLayer({ id: PARCEL_PICK, source: PARCEL_SOURCE, 'source-layer': 'features',
         type: 'fill', paint: { 'fill-opacity': 0 } }, PARCEL_LINE);
+      if (current.current.plan && !map.getLayer(PARCEL_FILL)) map.addLayer({ id: PARCEL_FILL,
+        source: PARCEL_SOURCE, 'source-layer': 'features', type: 'fill', minzoom: PARCEL_MIN_ZOOM,
+        paint: { 'fill-color': ['to-color', ['get', 'color'], '#94a3b8'], 'fill-opacity': .35,
+          'fill-antialias': false } }, map.getLayer(FILL) ? FILL : PARCEL_LINE);
     };
     if (map.isStyleLoaded()) attach();
     map.on('style.load', attach);
@@ -216,6 +217,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
       map.off('style.load', attach);
       map.off('idle', attach);
       if (map.getLayer(PARCEL_PICK)) map.removeLayer(PARCEL_PICK);
+      if (map.getLayer(PARCEL_FILL)) map.removeLayer(PARCEL_FILL);
       if (map.getLayer(PARCEL_LINE)) map.removeLayer(PARCEL_LINE);
       if (map.getSource(PARCEL_SOURCE)) map.removeSource(PARCEL_SOURCE);
     };
@@ -225,33 +227,6 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     if (!map) return;
     if (map.getLayer(PARCEL_LINE)) map.setPaintProperty(PARCEL_LINE, 'line-opacity', bridge.showParcels ? .9 : 0);
   }, [map, bridge.showParcels, bridge.plan?.id, bridge.plan?.revision]);
-
-  useEffect(() => {
-    if (!map || !bridge.active || !bridge.parcelAvailable || !zonedTiles) return;
-    const attach = () => {
-      if (!map.getSource(ZONED_SOURCE)) map.addSource(ZONED_SOURCE, { type: 'vector', tiles: [zonedTiles],
-        minzoom: PARCEL_MIN_ZOOM, maxzoom: PARCEL_MAX_NATIVE_ZOOM });
-      if (!map.getLayer(ZONED_FILL)) map.addLayer({ id: ZONED_FILL, source: ZONED_SOURCE,
-        'source-layer': 'features', type: 'fill', minzoom: PARCEL_MIN_ZOOM,
-        paint: { 'fill-color': ['to-color', ['get', 'source_color'], '#94a3b8'],
-          'fill-opacity': current.current.visible && !current.current.sketch.tool ? current.current.opacity : 0,
-          'fill-antialias': false } }, map.getLayer(PARCEL_LINE) ? PARCEL_LINE : undefined);
-    };
-    if (map.isStyleLoaded()) attach();
-    map.on('style.load', attach);
-    map.on('idle', attach);
-    return () => {
-      map.off('style.load', attach);
-      map.off('idle', attach);
-      if (map.getLayer(ZONED_FILL)) map.removeLayer(ZONED_FILL);
-      if (map.getSource(ZONED_SOURCE)) map.removeSource(ZONED_SOURCE);
-    };
-  }, [map, bridge.active, bridge.parcelAvailable, zonedTiles]);
-
-  useEffect(() => {
-    if (map?.getLayer(ZONED_FILL)) map.setPaintProperty(ZONED_FILL, 'fill-opacity',
-      bridge.visible && !bridge.sketch.tool ? bridge.opacity : 0);
-  }, [map, bridge.visible, bridge.sketch.tool, bridge.opacity, zonedTiles]);
 
   useEffect(() => {
     if (!map) return;

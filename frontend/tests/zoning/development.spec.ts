@@ -76,11 +76,12 @@ test('real API: parcel picking, draft, save, clone, edit, lock, masks, style res
   await page.locator('.development-list button').first().click();
   await page.getByRole('button', { name: 'Demolish parcel', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.dataMap.getFilter('baseline-buildings'))).not.toBeUndefined();
-  await expect.poll(() => page.evaluate(() => window.dataMap.queryRenderedFeatures({ layers: ['baseline-buildings'] }).length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.dataMap.getPaintProperty('baseline-buildings', 'fill-extrusion-opacity'))).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-baseline-buildings').length)).toBe(0);
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect.poll(() => buildingHeights(page)).toContain(6.4);
-  await expect.poll(() => page.evaluate(() => window.dataMap.getFilter('baseline-buildings') ?? null)).toBeNull();
+  await page.getByRole('region', { name: 'Development editor' }).getByRole('button', { name: '3D', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-baseline-buildings').length)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
   await expect.poll(() => buildingHeights(page)).toEqual([]);
   await page.getByRole('button', { name: 'Scenario B', exact: true }).click();

@@ -133,7 +133,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Current parcel land use' })).toContainText('OTC');
   await expect(page.getByLabel('Overlap policy')).toHaveCount(0);
-  expect(await page.evaluate(() => !!window.dataMap.getLayer('zoning-plan-parcels-fill'))).toBe(false);
+  expect(await page.evaluate(() => !!window.dataMap.getLayer('zoning-plan-parcels-fill'))).toBe(true);
   await page.screenshot({ path: 'test-results/zoning-existing-desktop.png' });
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect(page.getByLabel('Overlap policy')).toHaveValue('preserve');

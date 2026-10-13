@@ -205,18 +205,20 @@ def plan_vector_tile(study_area, z, x, y):
             WITH bounds AS (SELECT ST_TileEnvelope(%s,%s,%s) AS geom),
             study AS (SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326),3857) AS geom),
             clipped AS (
-                SELECT p.id,
+                SELECT p.id, p.mdsdd,
+                       CASE WHEN p.conflicting_land_use THEN '#94a3b8'
+                            ELSE COALESCE(%s::jsonb->>p.mdsdd,'#94a3b8') END AS color,
                        ST_CollectionExtract(ST_Intersection(
                            ST_SimplifyPreserveTopology(p.geom_web,%s),s.geom),3) AS geom
                 FROM parcels.plot p, bounds b, study s
                 WHERE p.geom_web && b.geom AND p.geom_web && s.geom
                   AND ST_Intersects(p.geom_web,s.geom) AND p.area_web >= %s
             ), tile AS (
-                SELECT p.id AS feature_id, p.id::text AS parcel_id,
+                SELECT p.id AS feature_id, p.id::text AS parcel_id, p.mdsdd, p.color,
                        ST_AsMVTGeom(p.geom,b.geom,4096,64,true) AS geom
                 FROM clipped p, bounds b WHERE NOT ST_IsEmpty(p.geom)
             ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile
-        """, (z, x, y, json.dumps(study_area), tolerance, min_area)).fetchone()
+        """, (z, x, y, json.dumps(study_area), Jsonb(COLORS), tolerance, min_area)).fetchone()
     return bytes(row[0]) if row and row[0] else b''
 
 

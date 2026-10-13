@@ -24,6 +24,7 @@ import { createPoiVisibility } from '../layers/poi';
 import { BackendDataScene } from '../datasets/BackendDataScene';
 import { ZoningScene } from '../../zoning/ZoningScene';
 import { DevelopmentScene } from '../../zoning/DevelopmentScene';
+import { PlanBuildingsScene } from '../../zoning/PlanBuildingsScene';
 import { ZoningLabels } from '../../zoning/ZoningLabels';
 
 export function UrbanMap(props: UrbanMapProps) {
@@ -261,6 +262,7 @@ export function UrbanMap(props: UrbanMapProps) {
         interactive={!props.zoning?.active && measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
       {props.zoning && <ZoningScene map={mapRef.current} bridge={props.zoning}/>}
       {props.zoning && <DevelopmentScene map={mapRef.current} bridge={props.zoning} mode={mode}/>}
+      {props.zoning && <PlanBuildingsScene map={mapRef.current} bridge={props.zoning} mode={mode}/>}
       {props.zoning && <ZoningLabels map={mapRef.current} bridge={props.zoning}/>}
       {props.viewshed && <ViewshedScene map={mapRef.current} projection={measurementLayerRef.current?.projection ?? null}
         mode={mode} bridge={props.viewshed} />}

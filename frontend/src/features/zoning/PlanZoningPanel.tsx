@@ -27,6 +27,7 @@ export function PlanZoningPanel({ workspace: w }: { workspace: ZoningWorkspace }
     void w.execute('reorder_types', { ids });
   };
   return <>
+    <details><summary>Current land use</summary><CurrentParcelUse plan={plan}/></details>
     <section className="zoning-distribution" aria-label="Zoning in scenario">
       <h3>Zoning in scenario</h3>
       <div className="zoning-area-strip" role="img" aria-label={`${areaText(assigned)} zoned, ${areaText(unassigned)} unassigned in ${scenario.name}`}>
