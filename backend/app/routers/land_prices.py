@@ -1,14 +1,21 @@
 import json
+import re
+import unicodedata
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
-from src.pipelines.flood_history.transform import normalize
 
 from app.repository import directory
 
 from .layers import get_features
 
 router = APIRouter(prefix="/api/v1", tags=["land prices"])
+
+
+def normalize(value):
+    """Search normalization without importing the ETL's optional dependencies."""
+    value = unicodedata.normalize('NFD', str(value)).lower().replace('đ', 'd')
+    return re.sub(r'[^a-z0-9]', '', ''.join(c for c in value if not unicodedata.combining(c)))
 
 
 @router.get("/land-prices")
