@@ -17,7 +17,7 @@ jobs:
     runs-on: [self-hosted, linux]
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Create deployment environment from Actions secrets
         env:
           MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}
@@ -45,7 +45,7 @@ jobs:
     runs-on: [self-hosted, linux]
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Create deployment environment from Actions secrets
         env:
           MLAI_FRONTEND_GOONG: ${{ secrets.MLAI_FRONTEND_GOONG }}

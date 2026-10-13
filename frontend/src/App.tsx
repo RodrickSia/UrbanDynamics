@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { LayerPanel } from './features/map/components/LayerPanel';
 import { MapControls } from './features/map/components/MapControls';
@@ -10,6 +10,8 @@ import { getMapConfiguration } from './features/map/config/mapConfig';
 import { useMapWorkspace } from './features/map/hooks/useMapWorkspace';
 import { ViewshedPanel } from './features/map/viewshed/ViewshedPanel';
 import { useBackendLayers } from './features/map/datasets/useBackendLayers';
+import { useZoning } from './features/zoning/useZoning';
+import { ZoningWorkspace } from './features/zoning/ZoningWorkspace';
 
 export default function App() {
   const configuration = useMemo(
@@ -18,16 +20,33 @@ export default function App() {
   );
   const workspace = useMapWorkspace();
   const backend = useBackendLayers(workspace.layers);
+  const zoning = useZoning(backend.catalog.parcels?.available === true);
+  const [searchPanelHeight, setSearchPanelHeight] = useState(0);
+  const activateZoning = () => {
+    workspace.cancelMeasurement();
+    workspace.handleViewshedAction({ type: 'done' });
+    workspace.clearSelection();
+    workspace.closeRightPanel();
+    workspace.setIsSearchOpen(false);
+    workspace.handleModeChange('2d');
+  };
 
   return (
     <main className="app-shell theme-light">
       <section
         className="map-workspace"
         data-layers-open={workspace.rightPanel === 'layers'}
+        data-zoning-open={zoning.active && !workspace.isSearchOpen}
         aria-label="Interactive urban map"
         onPointerDownCapture={workspace.handleMapPointerDown}
       >
         <UrbanMap
+          zoning={{ active: zoning.active, plan: zoning.plan, scenario: zoning.scenario,
+            selected: zoning.selected, sketch: zoning.sketch, preview: zoning.preview,
+            opacity: zoning.opacity, visible: zoning.visible, showParcels: zoning.showParcels,
+            parcelAvailable: zoning.parcelAvailable, busy: zoning.busy,
+            onPick: zoning.pick, onSketch: zoning.setSketch, onFinish: () => void zoning.finish(),
+            onCancel: zoning.cancel, focus: zoning.focus }}
           backend={{selections:backend.selections,opacity:workspace.opacityByLayer,revision:backend.revision,report:backend.report}}
           viewshed={{state:workspace.viewsheds,onAction:workspace.handleViewshedAction,onStatus:workspace.setViewshedStatus}}
           configuration={configuration}
@@ -66,8 +85,12 @@ export default function App() {
             isOpen={workspace.isSearchOpen}
             onOpenChange={workspace.setIsSearchOpen}
             onSelectPlace={workspace.selectPlace}
+            onWorkspaceHeightChange={setSearchPanelHeight}
           />
         </div>
+
+        <ZoningWorkspace workspace={zoning} onActivate={activateZoning}
+          searchOpen={workspace.isSearchOpen} searchPanelHeight={searchPanelHeight}/>
 
         {workspace.rightPanel === 'layers' && (
           <LayerPanel
@@ -84,14 +107,14 @@ export default function App() {
           mode={workspace.mode}
           rightPanelOpen={workspace.rightPanel === 'layers'}
           layersOpen={workspace.rightPanel === 'layers'}
-          onModeChange={workspace.handleModeChange}
-          onToggleLayers={workspace.toggleLayers}
+          onModeChange={mode => { if (zoning.busy) return; zoning.close(); workspace.handleModeChange(mode); }}
+          onToggleLayers={() => { if (zoning.busy) return; zoning.close(); workspace.toggleLayers(); }}
           onCommand={workspace.handleMapCommand}
         />
 
         <MapControls
           viewshedActive={workspace.viewsheds.phase !== 'idle'}
-          onViewshed={() => workspace.handleViewshedAction({type:'start'})}
+          onViewshed={() => { if (zoning.busy) return; zoning.close(); workspace.handleViewshedAction({type:'start'}); }}
           mode={workspace.mode}
           onToggleMeasurementComponents={workspace.toggleMeasurementComponents}
           measurement={workspace.measurement}
@@ -101,7 +124,7 @@ export default function App() {
           timeRange={workspace.timeRange}
           onMapStyleChange={workspace.setMapStyle}
           onTimeRangeChange={workspace.setTimeRange}
-          onStartMeasurement={workspace.startMeasurement}
+          onStartMeasurement={kind => { if (zoning.busy) return; zoning.close(); workspace.startMeasurement(kind); }}
           onMeasurementUnitsChange={workspace.changeMeasurementUnits}
           onUndoMeasurementPoint={workspace.undoMeasurementPoint}
           onCancelMeasurement={workspace.cancelMeasurement}

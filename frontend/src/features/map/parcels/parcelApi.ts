@@ -11,12 +11,13 @@ export interface ParcelDetail {
   area_source: 'map_geometry';
   planning: Array<{ label: string; area_m2: number }>;
   price: {
-    status: 'reference' | 'unavailable' | 'ambiguous' | 'unverified' | 'unsupported_land_use';
+    status: 'reference' | 'provisional' | 'unavailable' | 'ambiguous' | 'unverified' | 'unsupported_land_use';
     method: string;
     source_land_use: string | null;
     normalized_land_use: string | null;
     price_category: 'Residential' | 'Commercial' | 'Other non-agricultural' | null;
     classification_confidence: 'high' | 'medium' | 'low' | 'unmapped';
+    classification_basis: 'source_land_use' | 'planning' | 'unmapped';
     valuation_confidence: 'high' | 'medium' | 'low' | 'none';
     road_match_status: string;
     geometry_review_status: string;

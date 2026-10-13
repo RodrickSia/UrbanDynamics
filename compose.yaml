@@ -165,6 +165,18 @@ services:
       postgis:
         condition: service_healthy
 
+  etl-model-generation:
+    <<: *etl
+    profiles: ["etl-model-generation"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: model_generation
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
   khoi-checks:
     build:
       context: .

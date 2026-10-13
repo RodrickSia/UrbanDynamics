@@ -16,6 +16,7 @@ PIPELINES = (
     "parcels_hcmc",
     "buildings_footprint",
     "buildings_footprint_gba",
+    "model_generation",
 )
 STAGES = ("all", "extract", "transform", "load")
 
@@ -70,6 +71,17 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         from src.pipelines.buildings_footprint_gba.load import run
 
         run(options.source)
+        return
+
+    if pipeline_name == "model_generation":
+        from src.pipelines.model_generation import extract, load, transform
+
+        if stage == "extract":
+            extract.run()
+        elif stage == "transform":
+            transform.run()
+        elif stage == "load":
+            load.run()
         return
 
     if stage == "extract":

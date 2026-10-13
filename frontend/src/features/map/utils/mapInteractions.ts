@@ -22,6 +22,7 @@ export function createMapInteractionHandlers(
   return {
     click(event: MapMouseEvent) {
       const current = getCurrent();
+      if (current.zoning?.active) return;
       if (current.viewshed && current.viewshed.state.phase !== 'idle') return;
       if (current.measurement.status === 'active') {
         cancelAnimationFrame(previewFrame);

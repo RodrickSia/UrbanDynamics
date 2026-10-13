@@ -19,6 +19,7 @@ on:
           - parcels_hcmc
           - buildings_footprint
           - buildings_footprint_gba
+          - model_generation
       stage:
         description: ETL stage to run
         type: choice
@@ -48,7 +49,7 @@ jobs:
     # This runner needs Docker, database access, and persistent space for WorldPop files.
     runs-on: [self-hosted, linux]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Keep ignored ETL inputs and downloads between runs on this self-hosted runner.
           clean: false
@@ -89,6 +90,14 @@ jobs:
               echo "::error::The parcel migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
               exit 1
             fi
+          elif [ "$ETL_PIPELINE" = model_generation ]; then
+            model_generation_migration_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql') AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.footprint) AND EXISTS (SELECT 1 FROM buildings.gba_lod1)"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$model_generation_migration_query" | grep -Fxq t; then
+              echo "::error::Model generation requires the parcel, Overture, GBA, and model-generation migrations, with parcel and building source data already loaded." >&2
+              exit 1
+            fi
           elif [ "$ETL_PIPELINE" = buildings_footprint ] || [ "$ETL_PIPELINE" = all ]; then
             buildings_migration_query="to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.snapshot_metadata') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql')"
             if ! docker compose exec -T postgis sh -c \
@@ -107,8 +116,17 @@ jobs:
               exit 1
             fi
           fi
+          if [ "$ETL_PIPELINE" = all ]; then
+            synthetic_migration_query="to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$synthetic_migration_query" | grep -Fxq t; then
+              echo "::error::The model-generation migration is missing. Run the protected Deploy database workflow before selecting all ETL pipelines." >&2
+              exit 1
+            fi
+          fi
           if [ "$ETL_PIPELINE" != parcels_hcmc ] && [ "$ETL_PIPELINE" != buildings_footprint ] && \
-             [ "$ETL_PIPELINE" != buildings_footprint_gba ] && [ "$ETL_PIPELINE" != all ] && \
+             [ "$ETL_PIPELINE" != buildings_footprint_gba ] && [ "$ETL_PIPELINE" != model_generation ] && [ "$ETL_PIPELINE" != all ] && \
              { [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; }; then
             echo "::error::The transform and load stages are currently supported only for parcels_hcmc and building-footprint pipelines." >&2
             exit 1
@@ -224,6 +242,19 @@ jobs:
               fi
               run_pipeline "$pipeline"
             done
+            model_sources_ready=false
+            model_source_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.footprint) AND EXISTS (SELECT 1 FROM buildings.gba_lod1) AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql')"
+            if docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$model_source_query" | grep -Fxq t; then
+              model_sources_ready=true
+            fi
+            if [ "$model_sources_ready" = true ]; then
+              run_pipeline model_generation
+            else
+              echo "::warning::Skipping model_generation: parcel data, building sources, or its migration are not ready."
+              skipped+=(model_generation)
+            fi
             if [ "${#skipped[@]}" -gt 0 ]; then
               printf 'Skipped pipelines due to missing inputs: %s\n' "${skipped[*]}" >> "$GITHUB_STEP_SUMMARY"
             fi

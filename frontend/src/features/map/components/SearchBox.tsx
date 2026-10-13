@@ -9,6 +9,7 @@ interface SearchBoxProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectPlace: (place: PlaceDetails) => void;
+  onWorkspaceHeightChange: (height: number) => void;
 }
 
 const INITIAL_RECENT_PLACES: PlaceDetails[] = [
@@ -51,7 +52,7 @@ const CURRENT_AREA: PlaceDetails = {
   weatherLabel: 'Partly cloudy',
 };
 
-export function SearchBox({ isOpen, onOpenChange, onSelectPlace }: SearchBoxProps) {
+export function SearchBox({ isOpen, onOpenChange, onSelectPlace, onWorkspaceHeightChange }: SearchBoxProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [recentPlaces, setRecentPlaces] = useState(INITIAL_RECENT_PLACES);
@@ -64,6 +65,21 @@ export function SearchBox({ isOpen, onOpenChange, onSelectPlace }: SearchBoxProp
     document.addEventListener('pointerdown', closeOutside);
     return () => document.removeEventListener('pointerdown', closeOutside);
   }, [isOpen, onOpenChange]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      onWorkspaceHeightChange(0);
+      return;
+    }
+    const panel = rootRef.current?.querySelector('.search-workspace');
+    if (!panel) return;
+    const updateHeight = () => onWorkspaceHeightChange(panel.getBoundingClientRect().height);
+    updateHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [isOpen, onWorkspaceHeightChange]);
 
   useGSAP(
     () => {

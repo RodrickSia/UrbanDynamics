@@ -44,11 +44,29 @@ def positive(value):
         return None
 
 
+def planning_residential_reference(parcel):
+    """A source L parcel may use a unit-price category from explicit apartment planning."""
+    if str(parcel.get('mdsdd') or '').strip().upper() != 'L':
+        return False
+    rows = planning_breakdown(parcel.get('loai_dat_qh'))
+    parts = [part for part in str(parcel.get('loai_dat_qh') or '').split(';') if part.strip()]
+    labels = {row['label'].casefold() for row in rows}
+    return (len(rows) == len(parts) and
+            any(row['label'].casefold() == 'đất chung cư phức hợp' and row['area_m2'] > 0
+                for row in rows) and
+            labels <= {'đất chung cư phức hợp', 'đất giao thông'})
+
+
 def price_reference(parcel, candidates):
     classification = classify(parcel.get('mdsdd'))
+    classification['classification_basis'] = 'source_land_use' if classification['price_category'] else 'unmapped'
     if parcel.get('conflicting_land_use'):
         classification.update(normalized_land_use=None, price_category=None,
-                              classification_confidence='unmapped')
+                              classification_confidence='unmapped', classification_basis='unmapped')
+    elif not classification['price_category'] and planning_residential_reference(parcel):
+        classification.update(normalized_land_use='Planned apartment use',
+                              price_category='Residential', classification_confidence='low',
+                              classification_basis='planning')
     result = {'status': 'unavailable', 'method': 'nearby_road_geometry',
               'unit_price_vnd_m2': None, 'estimated_land_total_vnd': None,
               'candidates': candidates, 'selected': None,
@@ -60,6 +78,10 @@ def price_reference(parcel, candidates):
         return result
     # Boundaries near a road are evidence of proximity, not legal frontage.
     nearby = [item for item in candidates if item['distance_m'] <= 15]
+    if not nearby:
+        # A centerline across a road can be farther than 15 m from the plot.
+        # Keep this wider association provisional and require one unique road.
+        nearby = [item for item in candidates if item['distance_m'] <= 40]
     if not nearby:
         return result
     identities = {(item['properties'].get('road'), item['properties'].get('start'),
@@ -82,14 +104,16 @@ def price_reference(parcel, candidates):
     unit_price = positive(props.get(field))
     if not unit_price:
         return result
-    result.update(status='reference', unit_price_vnd_m2=unit_price)
+    provisional = classification['classification_basis'] == 'planning' or selected['distance_m'] > 15
+    result.update(status='provisional' if provisional else 'reference',
+                  unit_price_vnd_m2=unit_price)
     result['valuation_confidence'] = (
-        'low' if classification['classification_confidence'] == 'low' else
+        'low' if provisional or classification['classification_confidence'] == 'low' else
         'high' if result['geometry_review_status'] == 'reviewed' and
                   classification['classification_confidence'] == 'high' else 'medium')
     area = positive(parcel.get('area_m2'))
     identity = str(parcel.get('uniq_id') or '').strip().lower()
-    if area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
+    if not provisional and area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
         result['estimated_land_total_vnd'] = round(unit_price * area)
     return result
 
@@ -155,4 +179,32 @@ def vector_tile(z, x, y):
                 FROM selected p, bounds b
             ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile
         """, (z, x, y, tolerance, min_area, Jsonb(COLORS))).fetchone()
+    return bytes(row[0]) if row and row[0] else b''
+
+
+def plan_vector_tile(study_area, z, x, y):
+    """Clip parcel polygons to a saved plan before vector-tile encoding."""
+    if z < MIN_ZOOM:
+        return b''
+    resolution = 40075016.68557849 / (512 * 2**z)
+    min_area = (resolution * 2)**2 if z < 16 else 0
+    tolerance = resolution * 0.3 if z < 16 else 0
+    with connect_to_warehouse() as connection:
+        connection.execute("SET LOCAL statement_timeout = '5s'")
+        row = connection.execute("""
+            WITH bounds AS (SELECT ST_TileEnvelope(%s,%s,%s) AS geom),
+            study AS (SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s),4326),3857) AS geom),
+            clipped AS (
+                SELECT p.id,
+                       ST_CollectionExtract(ST_Intersection(
+                           ST_SimplifyPreserveTopology(p.geom_web,%s),s.geom),3) AS geom
+                FROM parcels.plot p, bounds b, study s
+                WHERE p.geom_web && b.geom AND p.geom_web && s.geom
+                  AND ST_Intersects(p.geom_web,s.geom) AND p.area_web >= %s
+            ), tile AS (
+                SELECT p.id AS feature_id,
+                       ST_AsMVTGeom(p.geom,b.geom,4096,64,true) AS geom
+                FROM clipped p, bounds b WHERE NOT ST_IsEmpty(p.geom)
+            ) SELECT ST_AsMVT(tile,'features',4096,'geom','feature_id') FROM tile
+        """, (z, x, y, json.dumps(study_area), tolerance, min_area)).fetchone()
     return bytes(row[0]) if row and row[0] else b''
