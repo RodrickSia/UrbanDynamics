@@ -18,6 +18,7 @@ LAYERS = (
     "flood_risk",
     "land_price",
     "parcels",
+    "synthetic_buildings",
 )
 POPULATION_PALETTES = {"pseudocolor", "greyscale", "fire"}
 LAYER_INFO = {
@@ -109,6 +110,13 @@ LAYER_INFO = {
         "time_enabled": False,
         "time_field": None,
     },
+    "synthetic_buildings": {
+        "title": "Parcel-based synthetic residential buildings",
+        "geometry": ["Polygon", "MultiPolygon"],
+        "fields": ["parcel_id", "mdsdd", "height_m", "floors", "inset_m", "height_source", "generator_version"],
+        "time_enabled": False,
+        "time_field": None,
+    },
 }
 
 
@@ -172,6 +180,29 @@ def metadata(layer: str) -> dict:
                 if not row or not row[1]:
                     raise LayerUnavailable(layer)
                 return {"feature_count": row[0], "tile_count": row[1], "updated_at": row[2].isoformat() if row[2] else None}
+            if layer == "synthetic_buildings":
+                exists = connection.execute(
+                    "SELECT to_regclass('buildings.synthetic_residential')"
+                ).fetchone()[0]
+                if exists is None:
+                    raise LayerUnavailable(layer)
+                row = connection.execute(
+                    "SELECT c.reltuples::bigint, "
+                    "(SELECT generated_at FROM buildings.synthetic_residential "
+                    " ORDER BY generated_at DESC LIMIT 1), "
+                    "(SELECT generator_version FROM buildings.synthetic_residential "
+                    " ORDER BY generated_at DESC LIMIT 1), "
+                    "EXISTS (SELECT 1 FROM buildings.synthetic_residential) "
+                    "FROM pg_class AS c "
+                    "WHERE c.oid = 'buildings.synthetic_residential'::regclass"
+                ).fetchone()
+                if not row or not row[3]:
+                    raise LayerUnavailable(layer)
+                return {
+                    "estimated_feature_count": max(0, row[0]),
+                    "generator_version": row[2],
+                    "updated_at": row[1].isoformat() if row[1] else None,
+                }
             row = connection.execute(
                 "SELECT metadata, updated_at FROM public.layer_snapshots WHERE layer=%s",
                 (layer,),
@@ -211,6 +242,41 @@ def features(layer, bounds=None, start=None, end=None, limit=5000):
             matches = [{"type":"Feature", "id":row[0], "geometry":json.loads(row[1]), "properties":row[2]} for row in rows]
             info = metadata(layer)
             return {"type":"FeatureCollection", "features":matches[:limit], "metadata":{**info,"truncated":len(matches)>limit,"returned":min(len(matches),limit)}}
+        if layer == "synthetic_buildings":
+            info = metadata(layer)
+            clauses = ["geom IS NOT NULL"]
+            arguments = []
+            if bounds:
+                clauses.append(
+                    "geom && ST_MakeEnvelope(%s,%s,%s,%s,4326) "
+                    "AND ST_Intersects(geom, ST_MakeEnvelope(%s,%s,%s,%s,4326))"
+                )
+                arguments.extend((*bounds, *bounds))
+            arguments.append(limit + 1)
+            with connect_to_warehouse() as connection:
+                rows = connection.execute(
+                    "SELECT parcel_id, ST_AsGeoJSON(geom), "
+                    "jsonb_build_object('parcel_id', parcel_id, 'mdsdd', mdsdd, "
+                    "'height_m', height_m, 'floors', floors, 'inset_m', inset_m, "
+                    "'height_source', height_source, 'generator_version', generator_version) "
+                    "FROM buildings.synthetic_residential WHERE "
+                    + " AND ".join(clauses)
+                    + " ORDER BY parcel_id LIMIT %s",
+                    arguments,
+                ).fetchall()
+            matches = [
+                {"type": "Feature", "id": row[0], "geometry": json.loads(row[1]), "properties": row[2]}
+                for row in rows
+            ]
+            return {
+                "type": "FeatureCollection",
+                "features": matches[:limit],
+                "metadata": {
+                    **info,
+                    "truncated": len(matches) > limit,
+                    "returned": min(len(matches), limit),
+                },
+            }
         clauses = ["layer=%s"]
         arguments = [layer]
         if bounds:
@@ -293,9 +359,16 @@ def readiness() -> dict:
             population_years = connection.execute(
                 "SELECT count(DISTINCT year) FROM population.population_raster"
             ).fetchone()[0]
+            generated_buildings = connection.execute(
+                "SELECT to_regclass('buildings.synthetic_residential') IS NOT NULL"
+            ).fetchone()[0]
+            if generated_buildings:
+                generated_buildings = connection.execute(
+                    "SELECT EXISTS (SELECT 1 FROM buildings.synthetic_residential)"
+                ).fetchone()[0]
         return {
             "storage": "postgis",
-            "loaded_layers": count + int(parcel_tiles > 0),
+            "loaded_layers": count + int(parcel_tiles > 0) + int(generated_buildings),
             "loaded_parcel_tiles": parcel_tiles,
             "loaded_population_years": population_years,
         }
@@ -308,6 +381,24 @@ def vector_tile(layer, z, x, y, start=None, end=None) -> bytes:
     if layer == "parcels":
         from app.services.parcels import vector_tile as parcel_tile
         return parcel_tile(z, x, y)
+    if layer == "synthetic_buildings":
+        sql = """
+            SELECT ST_AsMVT(tile_features, 'features', 4096, 'geom', 'feature_id')
+            FROM (
+                SELECT parcel_id, parcel_id AS feature_id, mdsdd, height_m, floors, inset_m,
+                       height_source, generator_version,
+                       ST_AsMVTGeom(
+                           ST_Transform(geom, 3857),
+                           ST_TileEnvelope(%s, %s, %s), 4096, 64, true
+                       ) AS geom
+                FROM buildings.synthetic_residential
+                WHERE geom && ST_Transform(ST_TileEnvelope(%s, %s, %s), 4326)
+                  AND geom IS NOT NULL
+            ) AS tile_features
+        """
+        with connect_to_warehouse() as connection:
+            row = connection.execute(sql, (z, x, y, z, x, y)).fetchone()
+        return bytes(row[0]) if row and row[0] else b""
     clauses = [
         "f.layer = %s",
         "f.geom && ST_Transform(ST_TileEnvelope(%s, %s, %s), 4326)",

@@ -19,7 +19,7 @@ export default function App() {
     [],
   );
   const workspace = useMapWorkspace();
-  const backend = useBackendLayers(workspace.layers);
+  const backend = useBackendLayers(workspace.layers, workspace.mode);
   const zoning = useZoning(backend.catalog.parcels?.available === true);
   const [searchPanelHeight, setSearchPanelHeight] = useState(0);
   const activateZoning = () => {

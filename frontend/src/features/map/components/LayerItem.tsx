@@ -1,4 +1,5 @@
 import {
+  Building2,
   Box,
   CloudRain,
   Layers3,
@@ -24,6 +25,7 @@ const ICONS: Partial<Record<UrbanLayerDefinition['id'], LucideIcon>> = {
   parcels: MapPinned,
   poi: MapPin,
   'buildings-3d': Box,
+  'synthetic-buildings': Building2,
 };
 export function LayerItem({
   layer,

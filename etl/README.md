@@ -39,14 +39,29 @@ python -m src.main run flood_history --stage all \
 
 The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
 stage choices for most pipelines, plus `transform` / `load` for parcels and
-building footprints. Its **all** choice runs eligible full pipelines
+building footprints and parcel-based model generation. Its **all** choice runs eligible full pipelines
 sequentially in this order: population, flood history, flood satellite, flood
-risk, land price, HCMC Overture footprints, and HCMC GBA LoD1 buildings. If rainfall inputs are missing,
+risk, land price, HCMC cadastral parcels, HCMC Overture footprints, HCMC GBA
+LoD1 buildings, and parcel-based model generation. If rainfall inputs are missing,
 it downloads forecast/history from Open-Meteo. Land-price source rows and OSM
 road candidates are prepared automatically. Selecting all pipelines requires
 stage `all`. Parcel and buildings-footprint ETL support separate
 `transform` and `load` stages. Model generation runs last when parcel,
 Overture, and GBA source data are available.
+
+`model_generation` runs after the parcel, Overture, and GBA source datasets are
+available. It selects eligible vacant residential parcels, insets each parcel
+outline, samples a height from the observed GBA residential-height distribution,
+and replaces `buildings.synthetic_residential` in one transaction. The backend
+serves this table as `synthetic_buildings` vector tiles; the frontend renders
+the layer in 3D. These are approximate models, not surveyed building outlines
+or heights. Apply the `20261013-model-generation.sql` migration before running it.
+
+Run the pipeline independently:
+
+```sh
+docker compose --profile etl-model-generation run --rm etl-model-generation run --stage all
+```
 
 Run Overture building footprints independently:
 

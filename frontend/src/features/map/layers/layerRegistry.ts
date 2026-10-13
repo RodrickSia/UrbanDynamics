@@ -17,6 +17,16 @@ export const URBAN_LAYERS: ReadonlyArray<UrbanLayerDefinition> = [
     supportsOpacity: true,
   },
   {
+    id: 'synthetic-buildings',
+    label: 'Generated residential buildings',
+    description: 'Estimated 3D buildings generated from residential parcel shapes.',
+    category: 'built-environment',
+    enabledByDefault: true,
+    status: 'loading',
+    supportsTimeRange: false,
+    supportsOpacity: true,
+  },
+  {
     id: 'population',
     label: 'Population',
     description: 'WorldPop persons per source raster cell (100 m nominal).',
