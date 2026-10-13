@@ -1,4 +1,5 @@
-.zoning-workspace { --zoning-left-width: min(17rem, calc(100vw - 4rem)); --zoning-detail-width: min(23rem, calc(100vw - 6rem)); }
+/* The left drawer starts at the viewport edge and ends with the search dock. */
+.zoning-workspace { --zoning-left-width: calc(1rem + min(23rem, calc(100vw - 6rem))); --zoning-detail-width: min(23rem, calc(100vw - 6rem)); }
 .zoning-nav { position: absolute; z-index: 45; top: 5rem; left: 1rem; display: grid; overflow: hidden; border-radius: var(--radius-control); }
 .zoning-nav[data-search-open="true"] { top: calc(5.6rem + var(--search-panel-height)); }
 .zoning-nav-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; color: var(--accent-strong); background: transparent; cursor: pointer; }
@@ -135,7 +136,7 @@
 .zoning-map-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .zoning-map-labels span { position: absolute; left: 0; top: 0; padding: .2rem .4rem; border-radius: .35rem; background: var(--surface-raised); color: var(--text); font-size: .72rem; font-weight: 700; }
 @media (max-width: 1100px) {
-  .zoning-workspace { --zoning-left-width: 15rem; --zoning-detail-width: min(21rem, calc(100vw - 5rem)); }
+  .zoning-workspace { --zoning-left-width: calc(1rem + min(21rem, calc(100vw - 5rem))); --zoning-detail-width: min(21rem, calc(100vw - 5rem)); }
   .map-workspace[data-zoning-plan-open='true'] .navigation-cluster,
   .map-workspace[data-zoning-plan-open='true'] .corner-tools { transform: translateX(calc(-1 * min(21rem, calc(100vw - 5rem)))); }
   .zoning-scenario-bar { top: 5rem; }

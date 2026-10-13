@@ -92,6 +92,15 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await expect(page.getByLabel('Plan details')).toHaveCount(0);
+  for (const width of [800, 1000, 1440]) {
+    await page.setViewportSize({ width, height: 700 });
+    await expect.poll(() => page.evaluate(() => Math.abs(
+      document.querySelector('.zoning-plan-drawer')!.getBoundingClientRect().right -
+      document.querySelector('.search-dock')!.getBoundingClientRect().right,
+    ))).toBeLessThan(1);
+  }
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.screenshot({ path: 'test-results/zoning-plans-aligned.png' });
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
   const outlines = page.getByRole('checkbox', { name: 'Show parcel outlines', exact: true });
   await expect(outlines).toBeChecked();
