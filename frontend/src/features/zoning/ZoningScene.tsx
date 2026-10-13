@@ -16,6 +16,7 @@ const PARCEL_PICK = 'zoning-plan-parcels-pick';
 const ZONED_SOURCE = 'zoning-colored-parcels', ZONED_FILL = 'zoning-colored-parcels-fill';
 const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
+const DRAW_COLOR = '#FF6D00';
 function feature(geometry: Geometry, properties: Record<string, unknown>): Feature { return { type: 'Feature', geometry, properties }; }
 
 function data(bridge: ZoningBridge): FeatureCollection {
@@ -29,13 +30,13 @@ function data(bridge: ZoningBridge): FeatureCollection {
       width: bridge.selected.includes(zone.id) ? 4 : 1.5 }));
   }
   const draft = sketchGeometry(bridge.sketch);
-  if (draft) features.push(feature(draft, { kind: 'draft', color: '#005b65', alpha: 0, width: 3 }));
+  if (draft) features.push(feature(draft, { kind: 'draft', color: DRAW_COLOR, alpha: 0, width: 3 }));
   else if (bridge.sketch.points.length > 1) features.push(feature({ type: 'LineString', coordinates: bridge.sketch.points },
-    { kind: 'draft', color: '#005b65', alpha: 0, width: 3 }));
+    { kind: 'draft', color: DRAW_COLOR, alpha: 0, width: 3 }));
   const editableRings = bridge.sketch.geometry && bridge.sketch.geometry.type !== 'LineString'
     ? rings(bridge.sketch.geometry).map(r => r.slice(0, -1)) : [bridge.sketch.points];
   editableRings.forEach((ring, r) => ring.forEach((point, i) => {
-    features.push(feature({ type: 'Point', coordinates: point }, { kind: 'vertex', ring: r, index: i, color: '#005b65' }));
+    features.push(feature({ type: 'Point', coordinates: point }, { kind: 'vertex', ring: r, index: i, color: DRAW_COLOR }));
     if (bridge.sketch.geometry && bridge.sketch.geometry.type !== 'LineString') {
       const next = ring[(i + 1) % ring.length];
       features.push(feature({ type: 'Point', coordinates: [(point[0] + next[0]) / 2, (point[1] + next[1]) / 2] },
@@ -72,10 +73,10 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
       if (!map.getLayer(LINE)) map.addLayer({ id: LINE, source: SOURCE, type: 'line', filter: ['!=', '$type', 'Point'],
         paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'] } });
       if (!map.getLayer(VERTEX)) map.addLayer({ id: VERTEX, source: SOURCE, type: 'circle', filter: ['==', '$type', 'Point'],
-        paint: { 'circle-color': ['get', 'color'], 'circle-radius': 5, 'circle-stroke-color': '#005b65', 'circle-stroke-width': 2 } });
+        paint: { 'circle-color': ['get', 'color'], 'circle-radius': 5, 'circle-stroke-color': DRAW_COLOR, 'circle-stroke-width': 2 } });
       if (!map.getSource(SNAP_SOURCE)) map.addSource(SNAP_SOURCE, { type: 'geojson', data: EMPTY });
       if (!map.getLayer(SNAP_LAYER)) map.addLayer({ id: SNAP_LAYER, source: SNAP_SOURCE, type: 'circle',
-        paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#005b65', 'circle-stroke-width': 2.5 } });
+        paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': DRAW_COLOR, 'circle-stroke-width': 2.5 } });
     };
     const query = (e: MapMouseEvent, layer: string) => map.getLayer(layer) ? map.queryRenderedFeatures(e.point, { layers: [layer] }) : [];
     const snapCandidate = (e: MapMouseEvent) => {

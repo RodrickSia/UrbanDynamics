@@ -6,7 +6,7 @@ import { configureMapLibreWorker } from '../config/maplibreWorker';
 import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
-import { hideBasemapBuildingExtrusions } from '../layers/buildings3d';
+import { showGoongBuildingExtrusions } from '../layers/buildings3d';
 import { installLandPrice, LAND_PRICE_LAYER, type LandPriceStatus, type LandPriceProperties } from '../layers/landPrice';
 import { LandPriceLegend } from './LandPriceLegend';
 import {
@@ -126,11 +126,8 @@ export function UrbanMap(props: UrbanMapProps) {
           } catch {
             if (in3d) current.onStatusChange(true, 'Map ready · 3D terrain unavailable');
           }
-          try {
-            hideBasemapBuildingExtrusions(map);
-          } catch {
-            current.onStatusChange(true, 'Map ready · basemap building layers unavailable');
-          }
+          if (in3d) try { showGoongBuildingExtrusions(map); }
+          catch { current.onStatusChange(true, 'Map ready · Goong buildings unavailable'); }
         };
 
         const handleStyleLoad = () => {
@@ -206,9 +203,8 @@ export function UrbanMap(props: UrbanMapProps) {
     } catch {
       if (in3d) onStatusChange(true, 'Map ready · 3D terrain unavailable');
     }
-    try {
-      hideBasemapBuildingExtrusions(map);
-    } catch { /* The backend dataset reports its own availability. */ }
+    if (in3d) try { showGoongBuildingExtrusions(map); }
+    catch { onStatusChange(true, 'Map ready · Goong buildings unavailable'); }
     if (map.getLayer(MEASUREMENT_LAYER_ID)) map.moveLayer(MEASUREMENT_LAYER_ID);
   }, [
     configuration,

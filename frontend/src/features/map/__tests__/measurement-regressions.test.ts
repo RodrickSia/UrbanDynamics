@@ -8,7 +8,7 @@ import {
   MEASUREMENT_COLORS,
   MEASUREMENT_SURFACE_OFFSET_METERS,
 } from '../layers/measurementLayer';
-import { BUILDINGS_LAYER_ID, hideBasemapBuildingExtrusions } from '../layers/buildings3d';
+import { BUILDINGS_LAYER_ID, showGoongBuildingExtrusions } from '../layers/buildings3d';
 import { setTerrain, TERRAIN_TILEJSON_URL } from '../layers/terrain';
 import {
   refreshMeasurementPointElevation,
@@ -41,18 +41,18 @@ describe('3D measurement regressions', () => {
     expect(readBuildingHeight({ max_height: '0', height: 18 })).toBe(18);
     expect(readBuildingHeight({ max_height: -2, render_height: 24 })).toBe(24);
   });
-  it('hides Goong extrusions while leaving streamed building models visible', () => {
+  it('shows Goong extrusions without changing the streamed model layer', () => {
     const setLayoutProperty = vi.fn();
     const map = {
       setLayoutProperty,
       getStyle: () => ({ layers: [
-        { id: 'building', type: 'fill-extrusion', source: 'composite', 'source-layer': 'VN_Building' },
+        { id: 'building', type: 'fill-extrusion', source: 'composite', 'source-layer': 'VN_Building', layout: { visibility: 'none' } },
         { id: BUILDINGS_LAYER_ID, type: 'fill-extrusion', source: BUILDINGS_LAYER_ID },
       ] }),
     } as unknown as MapLibreMap;
-    hideBasemapBuildingExtrusions(map);
-    expect(setLayoutProperty).toHaveBeenCalledWith('building', 'visibility', 'none');
-    expect(setLayoutProperty).not.toHaveBeenCalledWith(BUILDINGS_LAYER_ID, 'visibility', 'none');
+    showGoongBuildingExtrusions(map);
+    expect(setLayoutProperty).toHaveBeenCalledWith('building', 'visibility', 'visible');
+    expect(setLayoutProperty).not.toHaveBeenCalledWith(BUILDINGS_LAYER_ID, 'visibility', expect.anything());
   });
   it('does not mistake the unloaded DEM zero for acquired sea-level elevation', () => {
     const map = {
@@ -218,7 +218,7 @@ describe('3D measurement regressions', () => {
     expect(Math.abs(vertices[3] - (expected.x - origin.x)) / origin.meterInMercatorCoordinateUnits()).toBeLessThan(0.001);
   });
 
-  it('does not add a Goong building layer when the basemap lacks one', () => {
+  it('does not add another building layer when the basemap lacks one', () => {
     const addLayer = vi.fn();
     const map = {
       addLayer, setLayoutProperty: vi.fn(),
@@ -231,7 +231,7 @@ describe('3D measurement regressions', () => {
       }),
     } as unknown as MapLibreMap;
 
-    hideBasemapBuildingExtrusions(map);
+    showGoongBuildingExtrusions(map);
     expect(addLayer).not.toHaveBeenCalled();
   });
 });

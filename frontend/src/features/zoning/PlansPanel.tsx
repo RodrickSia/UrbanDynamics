@@ -22,9 +22,7 @@ export function PlansPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
     <footer><button type="button" onClick={w.cancel} disabled={w.busy}>Cancel</button><button className="zoning-primary" disabled={w.busy || !sketchGeometry(w.sketch)}>Create plan</button></footer>
   </form>;
   return <>
-    <button className="zoning-primary zoning-wide" disabled={w.busy} onClick={() => {
-      w.begin('study'); w.zoomTo({ type: 'Polygon', coordinates: [[[106.755, 10.817], [106.770, 10.817], [106.770, 10.832], [106.755, 10.832], [106.755, 10.817]]] });
-    }}><Plus size={17}/>New plan</button>
+    <button className="zoning-primary zoning-wide" disabled={w.busy} onClick={() => w.begin('study')}><Plus size={17}/>New plan</button>
     {w.loading && <p role="status">Loading plans…</p>}
     {!w.loading && !w.plans.length && <div className="zoning-empty"><h3>No plans yet</h3><p>Draw a study area to begin.</p></div>}
     <ul className="zoning-plan-list">{w.plans.map(p => <li key={p.id} data-selected={w.plan?.id === p.id}>

@@ -92,16 +92,21 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await expect(page.getByLabel('Plan details')).toHaveCount(0);
-  for (const width of [800, 1000, 1440]) {
+  for (const width of [320, 500, 800, 1000, 1050, 1440]) {
     await page.setViewportSize({ width, height: 700 });
     await expect.poll(() => page.evaluate(() => Math.abs(
-      document.querySelector('.zoning-plan-drawer')!.getBoundingClientRect().right -
-      document.querySelector('.search-dock')!.getBoundingClientRect().right,
+      document.querySelector('.zoning-plan-drawer')!.getBoundingClientRect().width -
+      document.querySelector('.search-dock')!.getBoundingClientRect().width -
+      document.querySelector('.search-dock')!.getBoundingClientRect().left,
     ))).toBeLessThan(1);
   }
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.screenshot({ path: 'test-results/zoning-plans-aligned.png' });
+  await page.evaluate(() => window.dataMap.jumpTo({ center: [106.762, 10.821], zoom: 16 }));
+  const beforeCreate = await page.evaluate(() => ({ center: window.dataMap.getCenter().toArray(), zoom: window.dataMap.getZoom() }));
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => ({ center: window.dataMap.getCenter().toArray(), zoom: window.dataMap.getZoom() }))).toEqual(beforeCreate);
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-vertices', 'circle-stroke-color'))).toBe('#FF6D00');
   const outlines = page.getByRole('checkbox', { name: 'Show parcel outlines', exact: true });
   await expect(outlines).toBeChecked();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline') && window.dataMap.getZoom() >= 12);
@@ -133,7 +138,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect(page.getByLabel('Overlap policy')).toHaveValue('preserve');
   await page.getByRole('button', { name: 'Development' }).click();
-  await expect(page.getByLabel('Plan details')).toContainText('Add a zoning type');
+  await expect(page.getByLabel('Plan details')).toContainText('Select a parcel on the map.');
   await page.getByRole('button', { name: 'Zoning', exact: true }).click();
   const scenarioBox = await page.locator('.zoning-scenario-bar').boundingBox();
   const navigationBox = await page.locator('.navigation-cluster').boundingBox();
@@ -148,6 +153,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.screenshot({ path: 'test-results/zoning-panel-right-plan-320.png' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1000, height: 700 });
+  await page.getByRole('button', { name: 'Zoning', exact: true }).click();
   await page.getByRole('button', { name: 'Add zoning type' }).click();
   const editor = page.getByRole('dialog', { name: 'New zoning type' });
   await editor.getByLabel('Code', { exact: true }).click();
