@@ -128,9 +128,13 @@ def build(study, inputs, library, model_version, background=None):
             elif entry["id"] == "regional_population":
                 entry.update(source_kind="estimated", version=study.system_snapshot_id,
                              note="Inclusive WorldPop bbox prior; unknown selected-parcel occupancy prevents exact subtraction. Not a census or an established population change.")
+                if study.background_snapshot and study.background_snapshot.id == "synthetic_capacity_v1":
+                    entry.update(source_kind="synthetic", version="synthetic_capacity_v1", note=study.background_snapshot.source)
             elif entry["id"] in ("traffic_background", "utility_zones"):
                 if entry['id']!='traffic_background' or study.traffic_prior is None:
                     entry.update(source_kind="unknown", note="No verified traffic background or utility capacity. Numerical scenario placeholders do not establish observed loads.")
+                if entry["id"] == "utility_zones" and study.background_snapshot and study.background_snapshot.id == "synthetic_capacity_v1":
+                    entry.update(source_kind="synthetic", note="Fixed fictional external utility loads and capacities; no surveyed service network")
             elif entry["id"] == "traffic_network" and study.traffic_network_mode == "osm_snapshot":
                 entry.update(source_kind="mixed_sourced_inputs",version=study.system_snapshot_id,
                              note="Public road topology imported from installed OSM extract. Private accesses, phase timings and OD prior are hypothetical. Frozen coverage counts source ways; actual directed edge geometry is exported with native artifacts.")
@@ -166,6 +170,8 @@ def build(study, inputs, library, model_version, background=None):
         "Synthetic coverage is complete only for the declared generated model; it does not establish observed data coverage.",
         "Background population, utility loads, OD and school groups exclude registered parcels; regional aggregates need explicit deduplication before ingestion.",
         "No observation timestamps are fabricated; declared source kinds do not override this study's synthetic mode."]
+    if study.background_snapshot and study.background_snapshot.id == "synthetic_capacity_v1":
+        limitations[1] = "Explicit synthetic capacity v1 replaces population demand; WorldPop is context only. Occupancy assumptions are hashed and subtracted; this is not a surveyed baseline."
     manifest = canonical_numbers({"version": model_version, "source_kind": "mixed_demo" if study.data_mode == "demo_system" else "synthetic", "entries": sources,
                                   "coverage": {"modules": modules}, "limitations": limitations})
     manifest["sha256"] = digest(manifest)

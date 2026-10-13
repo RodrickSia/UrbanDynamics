@@ -33,7 +33,12 @@
 <label><span>Dùng mạng đường OSM</span><input id="system-osm" type="checkbox" checked></label>
 <label>Tham chiếu counting<select id="system-counting"><option value="">Tự dùng mặc định đã cài</option></select></label>
 <label>Thay đỉnh OD nền (xe/giờ, tùy chọn)<input id="system-traffic-peak" type="number" min="0" max="6000" placeholder="Để trống: tự lấy counting"></label>
-<button id="system-prepare">Dùng parcel và nền này</button></div>
+<label>Nền / capacity<select id="system-background"><option value="sourced">Nguồn thật — giữ thông tin thiếu</option><option value="synthetic_capacity_v1">Minh họa capacity v1 — giả lập có nhãn</option></select></label>
+<label><span>Kèm kiểm tra độ nhạy</span><input id="system-sensitivity" type="checkbox" checked></label>
+<label>Engine độ nhạy<select id="system-sensitivity-engine"><option value="screening">Screening nhanh (không có SUMO/SWMM)</option><option value="native">SUMO + SWMM, 3 seed (chạy lâu)</option></select></label>
+<button id="system-prepare">2. Nạp plan và dữ liệu nền</button></div>
+<p class="small">Luồng: 1. Chọn parcel và nhập building plan → 2. Nạp → 3. Kiểm tra đầu vào → 4. Chạy Screening để xem tác động nhanh; chọn SUMO/SWMM hoặc Độ nhạy để kiểm tra sâu → 5. So sánh phương án và nguồn. Chế độ nguồn thật không tự điền thông tin chưa biết.</p>
+<details><summary>Hệ số nền giả lập v1 và phạm vi độ nhạy</summary><p>Giữ geometry thật; giả định công trình nền là nhà ở, 35 m² sàn/người, 3 người/căn; không có footprint chỉ là giả định không có cư dân được lập bản đồ, không xác nhận đất trống. Ngoài parcel: 1.200 người, điện 80 kW mỗi giờ, nước 140 m³/ngày, nước thải 112 m³/ngày. Capacity cố định: 95 kW, 160 m³ nước/ngày, 128 m³ nước thải/ngày; mỗi trường 240 chỗ, 216 học sinh nền đặt tại trường đầu. Chưa có khảo sát để hiệu chỉnh.</p><p>Độ nhạy: hệ số nhu cầu low/high; capacity điện/nước/nước thải và trường giảm 20%; mưa tăng 20%; OD nền ×0,5 và ×1,25 (giới hạn 6.000 xe/h). Native chạy 3 seed 2026–2028. Đây là dải thử giả định, không phải khoảng tin cậy. Screening không đánh giá hàng chờ hoặc delay SUMO.</p></details>
 <details><summary>Chương trình riêng từng parcel (khi không giữ cùng chương trình)</summary><div class="scroll"><table id="system-programs"><thead><tr><th>Parcel</th><th>Căn</th><th>Cư dân</th><th>Tầng</th><th>Tổng sàn m²</th></tr></thead><tbody></tbody></table></div></details>
 <details><summary>Tạo nhóm xây đồng thời tùy chọn</summary><p class="small">Trong chế độ cộng dồn, chọn các parcel của một phương án rồi thêm nhóm. Nếu không thêm nhóm, hệ thống tạo các phương án riêng và cộng dồn theo thứ tự danh sách.</p><div class="controls"><label>Parcel trong phương án<select id="system-group-parcels" multiple size="4"></select></label><button id="system-add-scenario">Thêm phương án</button></div><div id="system-scenarios" class="small"></div></details>
 <p class="small" id="system-traffic-default">Để trống đỉnh OD để dùng lưu lượng mặc định từ counting. Đây là giả định chuyển từ clip ngắn tại địa điểm khác, không phải quan trắc trên đường của parcel này; chưa có hiệu chỉnh OD hoặc nhãn kiểm chứng đầy đủ.</p>
@@ -59,4 +64,4 @@
 <h2>Độ nhạy và độ ổn định</h2><p id="stability" class="small"></p>
 <a id="download" class="download">Tải ZIP đầu vào, kết quả và artifact</a>
 <details><summary>Nguồn, giới hạn và kiểm tra mô hình</summary><pre id="audit" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
-</section></main><script src="/simulation/planning.js?v=sumo-table-20261013b" defer></script></body></html>
+</section></main><script src="/simulation/planning.js?v=capacity-sensitivity-20261013" defer></script></body></html>

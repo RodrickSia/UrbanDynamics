@@ -2,7 +2,11 @@
 
 **Branch:** `feat/khoi-building-impact-simulation` · **Cập nhật:** 13/10/2026.
 
+**Bổ sung nền/capacity, độ nhạy và luồng thao tác:** xem [hướng dẫn chi tiết](docs/simulation-capacity-sensitivity.md). Khi nạp parcel có thể chọn **Nguồn thật** (giữ dữ liệu thiếu) hoặc **Minh họa capacity v1** (occupancy, tải và capacity giả lập có nhãn, cố định giữa các phương án). Bộ độ nhạy thử nhu cầu low/high, capacity giảm 20%, mưa tăng 20%, OD ×0,5/×1,25; native dùng ba seed. Những mô tả capacity/occupancy “chưa biết” trong bảng bên dưới áp dụng cho case nguồn thật và các job cũ, không phải gói giả lập mới.
+
 ## Đọc nhanh: hệ thống làm gì?
+
+Kiểm thử lần bổ sung này: **27/27 backend**, hai job độ nhạy (Screening và native) và **4 nhóm UI** đạt. Xem [báo cáo kiểm thử](docs/simulation-capacity-test-report.md); không đồng nghĩa dữ liệu giả lập đã được hiệu chỉnh với thực địa.
 
 Demo trả lời: **Nếu xây công trình tại một khu đất, hoặc xây nhiều công trình theo giai đoạn, khu vực sẽ chịu tác động gì? Giữa các vị trí và phương án có những đánh đổi nào?**
 

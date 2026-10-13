@@ -81,6 +81,9 @@ class Prepare(BuildingProgram):
     traffic_peak_vehicles_hour: int | None = Field(default=None,ge=0,le=6000)
     # The map frontend can supply its own complete building plan, by parcel ID.
     developments: dict[str, Design] = Field(default_factory=dict)
+    background_mode: Literal["sourced", "synthetic_capacity_v1"] = "sourced"
+    sensitivity: bool = False
+    sensitivity_engine: Literal["screening", "native"] = "screening"
 
 
 def prepare(body):
@@ -190,7 +193,13 @@ def prepare(body):
             study["school_facilities"].append({"id": "OSM"+str(service["properties"]["osm_id"]),
                 "location": list(point.coords[0]), "capacity_places": None,
                 "source": "OSM school location; capacity and enrollment unavailable"})
-    # No capacity or OD is fabricated; missing demand is explicitly flagged.
+    if body.background_mode == "synthetic_capacity_v1":
+        from .demo_capacity import apply_package
+        study = apply_package(study)
+    if body.sensitivity:
+        from .demo_capacity import sensitivity_settings
+        study["uncertainty"] = sensitivity_settings(study, body.sensitivity_engine)
+    # Missing observations remain unknown unless an explicit synthetic package is selected.
     return PlanningStudy(**study).model_dump(mode="json")
 
 
@@ -226,6 +235,13 @@ def attach_context(study, context):
             "reconstructed_baseline_sha256": digest(Design(**reconstructed).model_dump(mode="json"))}
     context["system_background"]["baseline_reconstruction"] = quality
     context["system_background"]["landcover"] = document.get("landcover", {}).get("metadata")
+    if study.background_snapshot and study.background_snapshot.id == "synthetic_capacity_v1":
+        context["system_background"]["capacity_package"] = {
+            "id": "synthetic_capacity_v1", "source_kind": "synthetic",
+            "source": study.background_snapshot.source,
+            "utility_zones": [z.model_dump(mode="json") for z in sorted(study.utility_zones, key=lambda z: z.id)],
+            "school_facilities": [s.model_dump(mode="json") for s in sorted(study.school_facilities, key=lambda s: s.id)]}
+        context["system_background"]["limitations"][0] = "WorldPop is retained as context only. This explicit fictional case replaces demand with 1200 external residents plus hashed parcel occupancy assumptions; no occupancy survey or verified vacant land."
     context["system_background"]["limitations"].append("School walking uses installed OSM foot paths and estimated endpoint connectors; unreachable pairs remain unavailable. Capacity and enrollment are not inferred from locations.")
     context["system_background"]["planning_review"] = [review(p,registered[study.system_parcel_bindings[p.id]].get("properties",{})) for p in sorted(study.projects,key=lambda p:p.id)]
     if study.traffic_prior and study.traffic_prior.counting_reference_id:
