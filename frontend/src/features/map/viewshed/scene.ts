@@ -1,6 +1,6 @@
 import earcut from 'earcut';
 import type { Map as MapLibreMap, MapGeoJSONFeature } from 'maplibre-gl';
-import { BUILDINGS_LAYER_ID } from '../layers/buildings3d';
+import { BUILDING_LAYER_IDS } from '../layers/buildings3d';
 import { readBuildingHeight } from '../utils/measurementElevation';
 import { readTerrainElevation } from '../utils/terrainElevation';
 import { direction, frame, type GeoPoint, type Vec3, type Viewshed } from './math';
@@ -154,25 +154,21 @@ export function buildScene(view: Viewshed, input: SceneInput): SceneMesh {
 }
 
 export function readScene(map: MapLibreMap, view: Viewshed): SceneMesh {
-  const layer = map.getStyle().layers.find((l) => l.id === BUILDINGS_LAYER_ID);
-  const source = layer && 'source' in layer ? layer.source : null;
-  const sourceLayer = layer && 'source-layer' in layer ? layer['source-layer'] : undefined;
-  const active =
-    !!layer &&
+  const active = map.getStyle().layers.filter(layer => BUILDING_LAYER_IDS.includes(layer.id) &&
     layer.layout?.visibility !== 'none' &&
     map.getZoom() >= (layer.minzoom ?? 0) &&
     map.getZoom() < (layer.maxzoom ?? 24) &&
-    map.getPaintProperty(layer.id, 'fill-extrusion-opacity') !== 0;
+    map.getPaintProperty(layer.id, 'fill-extrusion-opacity') !== 0);
   // Source features include loaded offscreen geometry, unlike rendered-feature queries.
   // https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#querysourcefeatures
-  const buildings =
-    active && source ? map.querySourceFeatures(source, sourceLayer ? { sourceLayer } : {}) : [];
+  const buildings = active.flatMap(layer => 'source' in layer
+    ? map.querySourceFeatures(layer.source, 'source-layer' in layer ? { sourceLayer: layer['source-layer'] } : {}) : []);
   const mesh = buildScene(view, {
     buildings,
-    buildingsAvailable: !active || (!!source && map.isSourceLoaded(source)),
+    buildingsAvailable: active.every(layer => 'source' in layer && map.isSourceLoaded(layer.source)),
     elevation: (p) => readTerrainElevation(map, [p.longitude, p.latitude]),
   });
-  if (!active && mesh.complete)
+  if (!active.length && mesh.complete)
     mesh.message = `Terrain only · approximate · ${mesh.step.toFixed(1)} m grid`;
   return mesh;
 }

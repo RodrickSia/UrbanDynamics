@@ -97,7 +97,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
     await expect.poll(() => page.evaluate(() => Math.abs(
       document.querySelector('.zoning-plan-drawer')!.getBoundingClientRect().width -
       document.querySelector('.search-dock')!.getBoundingClientRect().width -
-      document.querySelector('.search-dock')!.getBoundingClientRect().left,
+      document.querySelector('.search-dock')!.getBoundingClientRect().left * 2,
     ))).toBeLessThan(1);
   }
   await page.setViewportSize({ width: 1000, height: 700 });

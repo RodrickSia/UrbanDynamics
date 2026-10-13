@@ -6,7 +6,7 @@ import { configureMapLibreWorker } from '../config/maplibreWorker';
 import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
 import { useMapCommands } from '../hooks/useMapCommands';
-import { showGoongBuildingExtrusions } from '../layers/buildings3d';
+import { setBuildings3d } from '../layers/buildings3d';
 import { installLandPrice, LAND_PRICE_LAYER, type LandPriceStatus, type LandPriceProperties } from '../layers/landPrice';
 import { LandPriceLegend } from './LandPriceLegend';
 import {
@@ -31,6 +31,7 @@ export function UrbanMap(props: UrbanMapProps) {
     configuration,
     mapStyle,
     mode,
+    buildingsOpacity = 0.8,
     landPriceEnabled = false,
     landPriceOpacity = 0.8,
     measurement,
@@ -126,7 +127,7 @@ export function UrbanMap(props: UrbanMapProps) {
           } catch {
             if (in3d) current.onStatusChange(true, 'Map ready · 3D terrain unavailable');
           }
-          if (in3d) try { showGoongBuildingExtrusions(map); }
+          try { setBuildings3d(map, in3d, current.buildingsOpacity ?? 0.8); }
           catch { current.onStatusChange(true, 'Map ready · Goong buildings unavailable'); }
         };
 
@@ -203,13 +204,14 @@ export function UrbanMap(props: UrbanMapProps) {
     } catch {
       if (in3d) onStatusChange(true, 'Map ready · 3D terrain unavailable');
     }
-    if (in3d) try { showGoongBuildingExtrusions(map); }
+    try { setBuildings3d(map, in3d, buildingsOpacity); }
     catch { onStatusChange(true, 'Map ready · Goong buildings unavailable'); }
     if (map.getLayer(MEASUREMENT_LAYER_ID)) map.moveLayer(MEASUREMENT_LAYER_ID);
   }, [
     configuration,
     mode,
     mapRevision,
+    buildingsOpacity,
     onStatusChange,
   ]);
 
@@ -258,7 +260,7 @@ export function UrbanMap(props: UrbanMapProps) {
           !(props.zoning?.active && selection.id === 'parcels')) }}
         interactive={!props.zoning?.active && measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
       {props.zoning && <ZoningScene map={mapRef.current} bridge={props.zoning}/>}
-      {props.zoning && <DevelopmentScene map={mapRef.current} bridge={props.zoning}/>}
+      {props.zoning && <DevelopmentScene map={mapRef.current} bridge={props.zoning} mode={mode}/>}
       {props.zoning && <ZoningLabels map={mapRef.current} bridge={props.zoning}/>}
       {props.viewshed && <ViewshedScene map={mapRef.current} projection={measurementLayerRef.current?.projection ?? null}
         mode={mode} bridge={props.viewshed} />}

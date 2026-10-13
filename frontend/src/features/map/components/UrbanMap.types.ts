@@ -21,6 +21,7 @@ export interface UrbanMapProps {
   configuration: MapConfiguration;
   mapStyle: MapStyleId;
   mode: MapMode;
+  buildingsOpacity?: number;
   landPriceEnabled?: boolean;
   landPriceOpacity?: number;
   measurement: MeasurementState;

@@ -1,5 +1,5 @@
 /* The left drawer starts at the viewport edge and ends with the search dock. */
-.zoning-workspace { --zoning-left-width: calc(var(--search-edge-gap) + var(--search-dock-width)); --zoning-detail-width: var(--search-dock-width); }
+.zoning-workspace { --zoning-left-width: calc(var(--search-edge-gap) * 2 + var(--search-dock-width)); --zoning-detail-width: var(--search-dock-width); }
 .zoning-nav { position: absolute; z-index: 45; top: 5rem; left: 1rem; display: grid; overflow: hidden; border-radius: var(--radius-control); }
 .zoning-nav[data-search-open="true"] { top: calc(5.6rem + var(--search-panel-height)); }
 .zoning-nav-button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; color: var(--accent-strong); background: transparent; cursor: pointer; }

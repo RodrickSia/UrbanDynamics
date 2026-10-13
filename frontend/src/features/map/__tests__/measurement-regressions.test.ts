@@ -8,7 +8,7 @@ import {
   MEASUREMENT_COLORS,
   MEASUREMENT_SURFACE_OFFSET_METERS,
 } from '../layers/measurementLayer';
-import { BUILDINGS_LAYER_ID, showGoongBuildingExtrusions } from '../layers/buildings3d';
+import { BUILDINGS_LAYER_ID, setBuildings3d } from '../layers/buildings3d';
 import { setTerrain, TERRAIN_TILEJSON_URL } from '../layers/terrain';
 import {
   refreshMeasurementPointElevation,
@@ -41,18 +41,20 @@ describe('3D measurement regressions', () => {
     expect(readBuildingHeight({ max_height: '0', height: 18 })).toBe(18);
     expect(readBuildingHeight({ max_height: -2, render_height: 24 })).toBe(24);
   });
-  it('shows Goong extrusions without changing the streamed model layer', () => {
+  it('removes the Goong extrusion in 2D without changing the generated layer', () => {
     const setLayoutProperty = vi.fn();
+    const removeLayer = vi.fn();
     const map = {
-      setLayoutProperty,
+      setLayoutProperty, removeLayer, getLayer: () => ({}),
       getStyle: () => ({ layers: [
-        { id: 'building', type: 'fill-extrusion', source: 'composite', 'source-layer': 'VN_Building', layout: { visibility: 'none' } },
-        { id: BUILDINGS_LAYER_ID, type: 'fill-extrusion', source: BUILDINGS_LAYER_ID },
+        { id: 'building', type: 'fill-extrusion', source: 'composite', 'source-layer': 'VN_Building' },
+        { id: 'dataset-synthetic-buildings', type: 'fill-extrusion', source: 'dataset-synthetic-buildings' },
       ] }),
     } as unknown as MapLibreMap;
-    showGoongBuildingExtrusions(map);
-    expect(setLayoutProperty).toHaveBeenCalledWith('building', 'visibility', 'visible');
-    expect(setLayoutProperty).not.toHaveBeenCalledWith(BUILDINGS_LAYER_ID, 'visibility', expect.anything());
+    setBuildings3d(map, false);
+    expect(setLayoutProperty).toHaveBeenCalledWith('building', 'visibility', 'none');
+    expect(setLayoutProperty).toHaveBeenCalledTimes(1);
+    expect(removeLayer).toHaveBeenCalledWith(BUILDINGS_LAYER_ID);
   });
   it('does not mistake the unloaded DEM zero for acquired sea-level elevation', () => {
     const map = {
@@ -221,17 +223,17 @@ describe('3D measurement regressions', () => {
   it('does not add another building layer when the basemap lacks one', () => {
     const addLayer = vi.fn();
     const map = {
-      addLayer, setLayoutProperty: vi.fn(),
+      addLayer, setLayoutProperty: vi.fn(), getLayer: () => undefined,
       getStyle: () => ({
         layers: [
           { id: 'urban-terrain-hillshade', type: 'hillshade' },
-          { id: BUILDINGS_LAYER_ID, type: 'fill-extrusion', source: BUILDINGS_LAYER_ID },
+          { id: 'dataset-synthetic-buildings', type: 'fill-extrusion', source: 'dataset-synthetic-buildings' },
           { id: 'place-labels', type: 'symbol', layout: { 'text-field': ['get', 'name'] } },
         ],
       }),
     } as unknown as MapLibreMap;
 
-    showGoongBuildingExtrusions(map);
+    expect(setBuildings3d(map, true)).toBe(false);
     expect(addLayer).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import type { LngLatLike, Map as MapLibreMap, MapGeoJSONFeature, PointLike } from 'maplibre-gl';
 
-import { BUILDINGS_LAYER_ID } from '../layers/buildings3d';
+import { BUILDING_LAYER_IDS } from '../layers/buildings3d';
 import type { MapMode, MeasurementPoint } from '../types/map';
 import type { MeasurementProjection } from './measurementProjection';
 import { invalidateBuildingSurfaces, pickBuildingSurface } from './measurementPicking';
@@ -43,13 +43,14 @@ export function resolveMeasurementPoint(
   const queryPoint = screenPoint ?? map.project(clickedCoordinate);
   let building: MapGeoJSONFeature | undefined;
   let surfaceHit: ReturnType<typeof pickBuildingSurface> = null;
-  if (mode === '3d' && map.getLayer(BUILDINGS_LAYER_ID)) {
+  const layers = BUILDING_LAYER_IDS.filter(id => map.getLayer(id));
+  if (mode === '3d' && layers.length) {
     if (projection && screenPoint) {
       // MapLibre's extrusion point query projects heights without the terrain
       // offset. Gather visible candidates, then perform the real 3D ray test.
       let candidates = buildingCandidates.get(map);
       if (!candidates) {
-        candidates = map.queryRenderedFeatures({ layers: [BUILDINGS_LAYER_ID] });
+        candidates = map.queryRenderedFeatures({ layers });
         buildingCandidates.set(map, candidates);
       }
       const canvas = map.getCanvas();
@@ -100,7 +101,7 @@ export function resolveMeasurementPoint(
           buildingHeightMeters: m.toAltitude() - (ground ?? 0), snap: snap.snap };
       }
     } else {
-      building = queryBuilding(map, queryPoint);
+      building = queryBuilding(map, queryPoint, layers);
     }
   }
   const buildingHeight = readBuildingHeight(building?.properties);
@@ -183,14 +184,14 @@ export function refreshMeasurementPointElevation(
   };
 }
 
-function queryBuilding(map: MapLibreMap, point: PointLike) {
+function queryBuilding(map: MapLibreMap, point: PointLike, layers: string[]) {
   const [x, y] = Array.isArray(point) ? point : [point.x, point.y];
   const hitRadius = 7;
-  const exactHit = map.queryRenderedFeatures(point, { layers: [BUILDINGS_LAYER_ID] })[0];
+  const exactHit = map.queryRenderedFeatures(point, { layers })[0];
   if (exactHit) return exactHit;
   return map.queryRenderedFeatures(
     [[x - hitRadius, y - hitRadius], [x + hitRadius, y + hitRadius]],
-    { layers: [BUILDINGS_LAYER_ID] },
+    { layers },
   )[0];
 }
 

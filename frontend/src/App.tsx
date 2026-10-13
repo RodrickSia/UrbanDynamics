@@ -58,6 +58,7 @@ export default function App() {
           configuration={configuration}
           mapStyle={workspace.mapStyle}
           mode={workspace.mode}
+          buildingsOpacity={workspace.opacityByLayer['buildings-3d'] ?? 0.8}
           poiEnabled={workspace.layers.poi ?? true}
           landPriceEnabled={Boolean(workspace.layers['land-price'])}
           landPriceOpacity={workspace.opacityByLayer['land-price'] ?? 0.8}
