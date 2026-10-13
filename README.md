@@ -6,8 +6,9 @@ UrbanDynamics is a monorepo for an urban map application and its data pipelines.
 
 - `frontend/`: React, TypeScript, Vite, and MapLibre map workspace.
 - `backend/`: FastAPI API used by the frontend; reads shared layers from PostGIS.
-- `etl/`: population, flood, and land-price pipeline code. Flood-risk uses
-  rainfall forecast and history files as inputs.
+- `etl/`: population, flood, land-price, HCMC parcel, and Overture building
+  footprint pipelines. Flood-risk uses rainfall forecast and history files as
+  inputs.
 - `infra/warehouse/`: PostGIS 17 image, initialization, and versioned migrations.
 - `compose.yaml`: local services and one opt-in Compose profile per ETL pipeline.
 
@@ -51,7 +52,7 @@ explanation is deferred; advanced thermal/2D/water-pressure solvers are pending.
 - `Integration tests` runs flood, land-price, and API checks against an isolated
   PostGIS database.
 - `Run ETL pipelines` is manually triggered and lets you choose a pipeline and
-  either the full pipeline or extraction stage.
+  extract, transform, load, or full-pipeline execution where supported.
 - `Deploy database` applies pending migrations. `Deploy` updates backend and
   frontend in separate jobs.
 

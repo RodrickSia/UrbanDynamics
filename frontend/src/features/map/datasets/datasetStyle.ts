@@ -78,5 +78,18 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
       };
     case 'parcels':
       return parcelFill();
+    case 'synthetic_buildings':
+      return {
+        ...common,
+        type: 'fill-extrusion',
+        minzoom: 14,
+        paint: {
+          'fill-extrusion-color': '#879b91',
+          'fill-extrusion-height': ['to-number', ['get', 'height_m'], 3],
+          'fill-extrusion-base': 0,
+          'fill-extrusion-opacity': 0.82,
+          'fill-extrusion-vertical-gradient': true,
+        },
+      };
   }
 }

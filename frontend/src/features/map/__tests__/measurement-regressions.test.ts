@@ -8,7 +8,7 @@ import {
   MEASUREMENT_COLORS,
   MEASUREMENT_SURFACE_OFFSET_METERS,
 } from '../layers/measurementLayer';
-import { setBuildings3d } from '../layers/buildings3d';
+import { BUILDINGS_LAYER_ID, hideBasemapBuildingExtrusions } from '../layers/buildings3d';
 import { setTerrain, TERRAIN_TILEJSON_URL } from '../layers/terrain';
 import {
   refreshMeasurementPointElevation,
@@ -41,17 +41,18 @@ describe('3D measurement regressions', () => {
     expect(readBuildingHeight({ max_height: '0', height: 18 })).toBe(18);
     expect(readBuildingHeight({ max_height: -2, render_height: 24 })).toBe(24);
   });
-  it('hides the duplicate Goong extrusion when managing the building layer', () => {
+  it('hides Goong extrusions while leaving streamed building models visible', () => {
     const setLayoutProperty = vi.fn();
     const map = {
-      getLayer: () => ({}), setPaintProperty: vi.fn(), moveLayer: vi.fn(), setLayoutProperty,
+      setLayoutProperty,
       getStyle: () => ({ layers: [
         { id: 'building', type: 'fill-extrusion', source: 'composite', 'source-layer': 'VN_Building' },
-        { id: 'urban-buildings-3d', type: 'fill-extrusion' },
+        { id: BUILDINGS_LAYER_ID, type: 'fill-extrusion', source: BUILDINGS_LAYER_ID },
       ] }),
     } as unknown as MapLibreMap;
-    setBuildings3d(map, true);
+    hideBasemapBuildingExtrusions(map);
     expect(setLayoutProperty).toHaveBeenCalledWith('building', 'visibility', 'none');
+    expect(setLayoutProperty).not.toHaveBeenCalledWith(BUILDINGS_LAYER_ID, 'visibility', 'none');
   });
   it('does not mistake the unloaded DEM zero for acquired sea-level elevation', () => {
     const map = {
@@ -67,7 +68,7 @@ describe('3D measurement regressions', () => {
       getLayer: () => ({}),
       getCanvas: () => ({ clientWidth: 1000, clientHeight: 700 }),
       queryRenderedFeatures: () => [{
-        layer: { id: 'urban-buildings-3d' },
+        layer: { id: BUILDINGS_LAYER_ID },
         properties: { height: 20 },
         geometry: {
           type: 'Polygon',
@@ -217,22 +218,20 @@ describe('3D measurement regressions', () => {
     expect(Math.abs(vertices[3] - (expected.x - origin.x)) / origin.meterInMercatorCoordinateUnits()).toBeLessThan(0.001);
   });
 
-  it('keeps existing 3D buildings above terrain shading and below labels', () => {
-    const moveLayer = vi.fn();
+  it('does not add a Goong building layer when the basemap lacks one', () => {
+    const addLayer = vi.fn();
     const map = {
-      getLayer: () => ({}),
-      setPaintProperty: vi.fn(),
-      moveLayer,
+      addLayer, setLayoutProperty: vi.fn(),
       getStyle: () => ({
         layers: [
           { id: 'urban-terrain-hillshade', type: 'hillshade' },
-          { id: 'urban-buildings-3d', type: 'fill-extrusion' },
+          { id: BUILDINGS_LAYER_ID, type: 'fill-extrusion', source: BUILDINGS_LAYER_ID },
           { id: 'place-labels', type: 'symbol', layout: { 'text-field': ['get', 'name'] } },
         ],
       }),
     } as unknown as MapLibreMap;
 
-    expect(setBuildings3d(map, true, 0.8)).toBe(true);
-    expect(moveLayer).toHaveBeenCalledWith('urban-buildings-3d', 'place-labels');
+    hideBasemapBuildingExtrusions(map);
+    expect(addLayer).not.toHaveBeenCalled();
   });
 });

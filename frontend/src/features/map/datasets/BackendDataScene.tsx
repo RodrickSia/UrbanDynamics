@@ -85,6 +85,13 @@ function DatasetSource({
         );
         return;
       }
+      if (selected.dataset === 'synthetic_buildings' && map.getZoom() < 14) {
+        publish(
+          tileError ? 'error' : 'ready',
+          tileError ? 'Building tiles unavailable · retry' : 'Zoom in to see generated buildings',
+        );
+        return;
+      }
       if (
         selected.dataset === 'population' &&
         (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) > 4
@@ -134,7 +141,12 @@ function DatasetSource({
             : {
                 type: 'vector',
                 tiles: [selectedAtAttach.url],
-                minzoom: selectedAtAttach.dataset === 'parcels' ? PARCEL_MIN_ZOOM : 0,
+                minzoom:
+                  selectedAtAttach.dataset === 'parcels'
+                    ? PARCEL_MIN_ZOOM
+                    : selectedAtAttach.dataset === 'synthetic_buildings'
+                      ? 14
+                      : 0,
                 maxzoom: selectedAtAttach.dataset === 'parcels' ? PARCEL_MAX_NATIVE_ZOOM : 18,
                 attribution: 'UrbanDynamics · published datasets',
               },
@@ -226,9 +238,11 @@ function applyOpacity(map: MapLibreMap, selection: DataSelection, opacity: numbe
       ? 'raster'
       : selection.dataset === 'flood_history'
         ? 'circle'
-        : selection.dataset === 'land_price'
-          ? 'line'
-          : 'fill';
+      : selection.dataset === 'land_price'
+        ? 'line'
+        : selection.dataset === 'synthetic_buildings'
+          ? 'fill-extrusion'
+        : 'fill';
   const multiplier = selection.dataset === 'parcels' ? 0.35 : type === 'fill' ? 0.6 : 1;
   map.setPaintProperty(id, `${type}-opacity`, opacity * multiplier);
   if (selection.dataset === 'parcels' && map.getLayer(PARCEL_OUTLINE)) {
@@ -273,6 +287,11 @@ const FIELDS: Record<string, string> = {
   quyet_dinh: 'Decision',
   do_an: 'Plan',
   population: 'People / source cell',
+  height_m: 'Estimated height (m)',
+  floors: 'Estimated floors',
+  inset_m: 'Footprint inset (m)',
+  height_source: 'Height source',
+  generator_version: 'Model generator',
 };
 export function BackendDataScene({
   map,

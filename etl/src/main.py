@@ -14,6 +14,9 @@ PIPELINES = (
     "flood_risk",
     "land_price",
     "parcels_hcmc",
+    "buildings_footprint",
+    "buildings_footprint_gba",
+    "model_generation",
 )
 STAGES = ("all", "extract", "transform", "load")
 
@@ -26,6 +29,8 @@ def _run(pipeline_name: str, stage: str, options) -> None:
             "flood_satellite": ("boundary", "catalog_only", "limit"),
             "flood_risk": ("weather_input", "history_input"),
             "land_price": ("source", "segments", "full_city"),
+            "buildings_footprint": ("source", "refresh"),
+            "buildings_footprint_gba": ("source", "refresh"),
         }.get(pipeline_name, ())
         kwargs = {name: getattr(options, name) for name in option_names}
         if pipeline_name == "flood_satellite" and kwargs["limit"] is None:
@@ -42,6 +47,41 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         normalized = transform.run(config.download_dir)
         if stage == "load":
             load.run(normalized)
+        return
+
+    if pipeline_name == "buildings_footprint" and stage == "transform":
+        from src.pipelines.buildings_footprint.transform import run
+
+        run(options.source)
+        return
+
+    if pipeline_name == "buildings_footprint_gba" and stage == "transform":
+        from src.pipelines.buildings_footprint_gba.transform import run
+
+        run(options.source)
+        return
+
+    if pipeline_name == "buildings_footprint" and stage == "load":
+        from src.pipelines.buildings_footprint.load import run
+
+        run(options.source)
+        return
+
+    if pipeline_name == "buildings_footprint_gba" and stage == "load":
+        from src.pipelines.buildings_footprint_gba.load import run
+
+        run(options.source)
+        return
+
+    if pipeline_name == "model_generation":
+        from src.pipelines.model_generation import extract, load, transform
+
+        if stage == "extract":
+            extract.run()
+        elif stage == "transform":
+            transform.run()
+        elif stage == "load":
+            load.run()
         return
 
     if stage == "extract":
@@ -61,10 +101,17 @@ def _run(pipeline_name: str, stage: str, options) -> None:
         elif pipeline_name == "land_price":
             from src.shared.data_io import data_dir, write_json
 
-            rows, _provenance = extractor.run(options.source, full_city=options.full_city)
+            rows, _provenance = extractor.run(
+                options.source, full_city=options.full_city
+            )
             output = data_dir() / "review" / "land_price_rows.json"
             write_json(output, rows)
             logging.getLogger(__name__).info("Extracted land-price rows to %s", output)
+        elif (
+            pipeline_name == "buildings_footprint"
+            or pipeline_name == "buildings_footprint_gba"
+        ):
+            extractor.run(refresh=options.refresh)
         else:
             extractor.run()
         return
@@ -110,6 +157,11 @@ def main() -> None:
     )
     run_parser.add_argument(
         "--limit", type=int, default=None, help="Maximum satellite items to process"
+    )
+    run_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Re-fetch cached source data for building-footprint pipelines",
     )
     run_parser.add_argument(
         "--stage",

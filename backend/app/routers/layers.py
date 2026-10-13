@@ -87,8 +87,8 @@ def layer_tilejson(layer: str, request: Request):
             f"{str(request.base_url).rstrip('/')}/api/v1/layers/{layer}/tiles/{{z}}/{{x}}/{{y}}.pbf"
             + ("?schema=2" if layer in ("flood_history", "parcels") else "")
         ],
-        "minzoom": 12 if layer == 'parcels' else 0,
-        "maxzoom": 16 if layer == 'parcels' else 18,
+        "minzoom": 14 if layer == "synthetic_buildings" else 12 if layer == "parcels" else 0,
+        "maxzoom": 18 if layer == "synthetic_buildings" else 16 if layer == "parcels" else 18,
         "vector_layers": [{"id": "features", "fields": repository.LAYER_INFO[layer]["fields"]}],
         "metadata": metadata,
     }

@@ -21,8 +21,6 @@ export interface UrbanMapProps {
   configuration: MapConfiguration;
   mapStyle: MapStyleId;
   mode: MapMode;
-  buildingsEnabled: boolean;
-  buildingsOpacity: number;
   landPriceEnabled?: boolean;
   landPriceOpacity?: number;
   measurement: MeasurementState;
@@ -36,5 +34,4 @@ export interface UrbanMapProps {
   onPointSelect: (selection: PointSelection) => void;
   onUserLocationChange: (location: UserLocation) => void;
   onStatusChange: (ready: boolean, message: string) => void;
-  onBuildingsAvailabilityChange: (available: boolean) => void;
 }

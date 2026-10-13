@@ -162,6 +162,23 @@ def test_vector_tiles_are_mapbox_tiles_and_have_snapshot_etags(client, monkeypat
     assert client.get("/api/v1/layers/not-a-layer/tiles/2/1/1.pbf").status_code == 404
 
 
+def test_generated_buildings_are_exposed_as_streamed_vector_tiles(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.repository.metadata",
+        lambda layer: {"updated_at": "2026-10-13T00:00:00+00:00"},
+    )
+    monkeypatch.setattr("app.repository.vector_tile", lambda *args: b"building-tile")
+
+    tilejson = client.get("/api/v1/layers/synthetic_buildings/tilejson.json")
+    assert tilejson.status_code == 200
+    assert tilejson.json()["minzoom"] == 14
+    assert "synthetic_buildings" in tilejson.json()["tiles"][0]
+    tile = client.get("/api/v1/layers/synthetic_buildings/tiles/14/13205/7475.pbf")
+    assert tile.status_code == 200
+    assert tile.content == b"building-tile"
+    assert tile.headers["content-type"] == "application/vnd.mapbox-vector-tile"
+
+
 def test_static_land_price_layer_rejects_time_filters(client):
     response = client.get(
         "/api/v1/layers/land_price/features",

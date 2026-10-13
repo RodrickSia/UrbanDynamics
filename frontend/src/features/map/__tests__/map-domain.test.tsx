@@ -15,9 +15,10 @@ import { readBuildingHeight, resolveMeasurementPoint } from '../utils/measuremen
 
 describe('map domain', () => {
   it('lists priority urban layers before future integrations', () => {
-    expect(URBAN_LAYERS.slice(0, 6).map((layer) => layer.id)).toEqual([
+    expect(URBAN_LAYERS.slice(0, 7).map((layer) => layer.id)).toEqual([
       'poi',
       'buildings-3d',
+      'synthetic-buildings',
       'population',
       'public-facilities',
       'traffic',

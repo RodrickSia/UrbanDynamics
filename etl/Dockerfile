@@ -15,6 +15,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends postgresql-client-17 postgresql-17-postgis-3 postgis \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir -r requirements.txt \
+    && python -c "import duckdb; connection = duckdb.connect(); connection.execute('INSTALL httpfs'); connection.execute('INSTALL spatial'); connection.close()" \
     && raster2pgsql_path="$(command -v raster2pgsql || find /usr -type f -name raster2pgsql -print -quit)" \
     && test -n "$raster2pgsql_path" \
     && ln -s "$raster2pgsql_path" /usr/local/bin/raster2pgsql \

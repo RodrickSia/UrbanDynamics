@@ -11,6 +11,7 @@ function fixture(
     reviewed?: boolean;
     automatic?: boolean;
     spatial?: boolean;
+    buildings?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -48,6 +49,7 @@ function fixture(
             { id: 'land_price', available: true },
             { id: 'flood_risk', available: true, stale: true },
             { id: 'flood_satellite', available: false },
+            { id: 'synthetic_buildings', available: options.buildings ?? false },
           ],
         }),
       );
@@ -55,6 +57,22 @@ function fixture(
   );
 }
 describe('backend layer availability and selections', () => {
+  it('streams generated 3D tiles only in 3D mode when the model snapshot exists', async () => {
+    fixture({ buildings: true });
+    const { result, rerender } = renderHook(
+      ({ mode }) => useBackendLayers({ 'synthetic-buildings': true }, mode),
+      { initialProps: { mode: '2d' as '2d' | '3d' } },
+    );
+    await waitFor(() => expect(result.current.catalog['synthetic-buildings']?.available).toBe(true));
+    expect(result.current.selections).toEqual([]);
+    rerender({ mode: '3d' });
+    expect(result.current.selections).toEqual([
+      expect.objectContaining({
+        id: 'synthetic-buildings', dataset: 'synthetic_buildings',
+        url: expect.stringContaining('/synthetic_buildings/tiles/{z}/{x}/{y}.pbf'),
+      }),
+    ]);
+  });
   it('accepts main spatially checked prices without claiming manual review', async () => {
     fixture({ land: true, reviewed: false, spatial: true });
     const { result } = renderHook(() => useBackendLayers({ 'land-price': true }));

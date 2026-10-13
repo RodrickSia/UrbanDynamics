@@ -19,7 +19,7 @@ export default function App() {
     [],
   );
   const workspace = useMapWorkspace();
-  const backend = useBackendLayers(workspace.layers);
+  const backend = useBackendLayers(workspace.layers, workspace.mode);
   const zoning = useZoning(backend.catalog.parcels?.available === true);
   const [searchPanelHeight, setSearchPanelHeight] = useState(0);
   const activateZoning = () => {
@@ -58,9 +58,7 @@ export default function App() {
           configuration={configuration}
           mapStyle={workspace.mapStyle}
           mode={workspace.mode}
-          buildingsEnabled={Boolean(workspace.layers['buildings-3d'])}
           poiEnabled={workspace.layers.poi ?? true}
-          buildingsOpacity={workspace.opacityByLayer['buildings-3d'] ?? 0.8}
           landPriceEnabled={Boolean(workspace.layers['land-price'])}
           landPriceOpacity={workspace.opacityByLayer['land-price'] ?? 0.8}
           measurement={workspace.measurement}
@@ -74,7 +72,6 @@ export default function App() {
           onPointSelect={workspace.handlePointSelect}
           onUserLocationChange={workspace.setUserLocation}
           onStatusChange={workspace.handleStatusChange}
-          onBuildingsAvailabilityChange={workspace.handleBuildingsAvailability}
         />
 
         {workspace.selectedPlace && (

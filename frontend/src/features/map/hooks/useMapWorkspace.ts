@@ -217,10 +217,6 @@ export function useMapWorkspace() {
     [],
   );
 
-  const handleBuildingsAvailability = useCallback((available: boolean) => {
-    if (!available) setMapStatus('Map ready · 3D building source unavailable');
-  }, []);
-
   const toggleLayers = useCallback(() => {
     if (rightPanel === 'layers') {
       setRightPanel(null);
@@ -281,7 +277,6 @@ export function useMapWorkspace() {
     handleMapPointerDown,
     handleMapCommand,
     handleStatusChange,
-    handleBuildingsAvailability,
     toggleLayers,
     handleOpacityChange,
     closeRightPanel,

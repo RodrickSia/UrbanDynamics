@@ -8,7 +8,7 @@ import { readTerrainElevation } from './terrainElevation';
 import { buildingObjectId, prepareSnapGeometry, rayParameter, snapCandidates, type SnapGeometry } from './measurementSnap';
 import type { MeasurementRay, Position3 } from './measurementProjection';
 
-const BUILDING_HEIGHT_KEYS = ['max_height', 'height', 'render_height', 'building:height'] as const;
+const BUILDING_HEIGHT_KEYS = ['height_m', 'max_height', 'height', 'render_height', 'building:height'] as const;
 const buildingCandidates = new WeakMap<MapLibreMap, MapGeoJSONFeature[]>();
 const snapGeometry = new WeakMap<MapLibreMap, Map<MapGeoJSONFeature, SnapGeometry>>();
 let pointSequence = 0;

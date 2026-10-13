@@ -17,6 +17,9 @@ on:
           - flood_risk
           - land_price
           - parcels_hcmc
+          - buildings_footprint
+          - buildings_footprint_gba
+          - model_generation
       stage:
         description: ETL stage to run
         type: choice
@@ -87,8 +90,45 @@ jobs:
               echo "::error::The parcel migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
               exit 1
             fi
-          elif [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; then
-            echo "::error::The transform and load stages are currently supported only for parcels_hcmc." >&2
+          elif [ "$ETL_PIPELINE" = model_generation ]; then
+            model_generation_migration_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '03-parcels-hcmc.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql') AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.gba_lod1)"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$model_generation_migration_query" | grep -Fxq t; then
+              echo "::error::Model generation requires parcel, GBA, and model-generation migrations, with parcel and GBA source data already loaded." >&2
+              exit 1
+            fi
+          elif [ "$ETL_PIPELINE" = buildings_footprint ] || [ "$ETL_PIPELINE" = all ]; then
+            buildings_migration_query="to_regclass('buildings.footprint') IS NOT NULL AND to_regclass('buildings.snapshot_metadata') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '04-buildings-footprint.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$buildings_migration_query" | grep -Fxq t; then
+              echo "::error::The buildings-footprint migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          fi
+          if [ "$ETL_PIPELINE" = buildings_footprint_gba ] || [ "$ETL_PIPELINE" = all ]; then
+            gba_migration_query="to_regclass('buildings.gba_lod1') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '06-buildings-gba-feature-id.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$gba_migration_query" | grep -Fxq t; then
+              echo "::error::The GBA buildings migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          fi
+          if [ "$ETL_PIPELINE" = all ]; then
+            synthetic_migration_query="to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$synthetic_migration_query" | grep -Fxq t; then
+              echo "::error::The model-generation migration is missing. Run the protected Deploy database workflow before selecting all ETL pipelines." >&2
+              exit 1
+            fi
+          fi
+          if [ "$ETL_PIPELINE" != parcels_hcmc ] && [ "$ETL_PIPELINE" != buildings_footprint ] && \
+             [ "$ETL_PIPELINE" != buildings_footprint_gba ] && [ "$ETL_PIPELINE" != model_generation ] && [ "$ETL_PIPELINE" != all ] && \
+             { [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; }; then
+            echo "::error::The transform and load stages are currently supported only for parcels_hcmc and building-footprint pipelines." >&2
             exit 1
           fi
 
@@ -160,6 +200,15 @@ jobs:
             docker compose --profile "$service" run --rm "$service" run --stage all "${arguments[@]}"
           }
 
+          require_gba_disk_space() {
+            mkdir -p etl/data
+            available_kib=$(df -Pk etl/data | awk 'NR==2 {print $4}')
+            if [ "$available_kib" -lt 20000000 ]; then
+              echo "::error::GBA LoD1 needs about 14 GiB of source data plus transform/load space; only $((available_kib / 1024)) MiB is available." >&2
+              exit 1
+            fi
+          }
+
           if [ "$ETL_PIPELINE" = all ]; then
             if [ "$ETL_STAGE" != all ]; then
               echo "::error::The all pipeline selection runs the complete ETL only; select stage all." >&2
@@ -177,7 +226,7 @@ jobs:
               echo "::warning::Could not prepare automatic land-price road matches; land_price will be skipped."
             fi
             skipped=()
-            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price; do
+            for pipeline in population_hcmc flood_history flood_satellite flood_risk land_price buildings_footprint buildings_footprint_gba; do
               if [ "$pipeline" = flood_risk ] && [ "$rainfall_ready" != true ]; then
                 echo "::warning::Skipping flood_risk: forecast/history inputs could not be prepared."
                 skipped+=(flood_risk)
@@ -188,8 +237,24 @@ jobs:
                 skipped+=(land_price)
                 continue
               fi
+              if [ "$pipeline" = buildings_footprint_gba ]; then
+                require_gba_disk_space
+              fi
               run_pipeline "$pipeline"
             done
+            model_sources_ready=false
+            model_source_query="to_regclass('parcels.plot') IS NOT NULL AND to_regclass('buildings.gba_lod1') IS NOT NULL AND to_regclass('buildings.synthetic_residential') IS NOT NULL AND EXISTS (SELECT 1 FROM parcels.plot) AND EXISTS (SELECT 1 FROM buildings.gba_lod1) AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '20261013-model-generation.sql')"
+            if docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$model_source_query" | grep -Fxq t; then
+              model_sources_ready=true
+            fi
+            if [ "$model_sources_ready" = true ]; then
+              run_pipeline model_generation
+            else
+              echo "::warning::Skipping model_generation: parcel data, GBA source data, or its migration are not ready."
+              skipped+=(model_generation)
+            fi
             if [ "${#skipped[@]}" -gt 0 ]; then
               printf 'Skipped pipelines due to missing inputs: %s\n' "${skipped[*]}" >> "$GITHUB_STEP_SUMMARY"
             fi
@@ -198,6 +263,9 @@ jobs:
             docker compose --profile etl-rainwater build etl-rainwater
             docker compose --profile etl-rainwater run --rm etl-rainwater --once --jobs forecast history
           else
+            if [ "$ETL_PIPELINE" = buildings_footprint_gba ]; then
+              require_gba_disk_space
+            fi
             service="etl-${ETL_PIPELINE//_/-}"
             docker compose --profile "$service" build "$service"
             case "$ETL_PIPELINE" in

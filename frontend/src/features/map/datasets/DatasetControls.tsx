@@ -115,6 +115,13 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           </DatasetNote>
         </>
       )}
+      {id === 'synthetic-buildings' && (
+        <DatasetNote>
+          Estimated parcel-based extrusions. Footprints are inset from residential parcel
+          boundaries, and heights are sampled from observed GBA residential buildings; they are
+          not surveyed building outlines or heights.
+        </DatasetNote>
+      )}
       {data.catalog[id]?.stale && (
         <small className="dataset-warning">Source expired · historical values</small>
       )}

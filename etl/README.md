@@ -38,17 +38,87 @@ python -m src.main run flood_history --stage all \
 ```
 
 The manual GitHub Actions workflow offers pipeline choices and `all` / `extract`
-stage choices for most pipelines, plus `transform` / `load` for parcels. Its
-**all** choice runs eligible full pipelines sequentially in
-this order: population, flood history, flood satellite, flood risk, and land
-price. If rainfall inputs are missing, it downloads forecast/history from
-Open-Meteo for one integration point. If land-price inputs are missing, it
-downloads and parses the official annex and fetches OSM road candidates. The
-boundary is also prepared automatically. Flood risk can then run; land-price
-publishing remains skipped until a person reviews the candidate geometry and
-price values. Selecting all pipelines requires stage `all`. Parcel ETL also
-supports independent `transform` and `load` stages; other pipelines require
-their full pipeline to execute those steps.
+stage choices for most pipelines, plus `transform` / `load` for parcels and
+building footprints and parcel-based model generation. Its **all** choice runs eligible full pipelines
+sequentially in this order: population, flood history, flood satellite, flood
+risk, land price, HCMC cadastral parcels, HCMC Overture footprints, HCMC GBA
+LoD1 buildings, and parcel-based model generation. If rainfall inputs are missing,
+it downloads forecast/history from Open-Meteo. Land-price source rows and OSM
+road candidates are prepared automatically. Selecting all pipelines requires
+stage `all`. Parcel and buildings-footprint ETL support separate
+`transform` and `load` stages. Model generation runs last when parcel and GBA
+source data are available.
+
+`model_generation` runs after the parcel and GBA source datasets are available.
+It selects eligible residential parcels regardless of building-footprint
+overlap, insets each parcel outline, and samples a height from the observed GBA
+residential-height distribution. It replaces `buildings.synthetic_residential`
+in one transaction. The backend
+serves this table as `synthetic_buildings` vector tiles; the frontend renders
+the layer in 3D. These are approximate models, not surveyed building outlines
+or heights. Apply the `20261013-model-generation.sql` migration before running it.
+
+Run the pipeline independently:
+
+```sh
+docker compose --profile etl-model-generation run --rm etl-model-generation run --stage all
+```
+
+Run Overture building footprints independently:
+
+```sh
+docker compose --profile etl-buildings-footprint run --rm etl-buildings-footprint run --stage all
+```
+
+The pipeline reads the pinned Overture `buildings/building` release using a
+bounding-box prefilter, then clips footprints to the checked-in expanded HCMC
+boundary. It fetches building features, not building parts. Source Parquet is
+cached under `etl/data/buildings_footprint/`; use `--refresh` to fetch the
+pinned release again. Extraction and transformation can also run separately
+with `--stage extract` and `--stage transform`; `--stage load` loads normalized
+Parquet without contacting Overture.
+
+Fetch the GlobalBuildingAtlas LoD1 models for HCMC independently:
+
+```sh
+docker compose --profile etl-buildings-footprint-gba run --rm etl-buildings-footprint-gba run --stage all
+```
+
+This uses the pinned `GBA.LoD1` HCMC tile (`asiawest/e105_n15_e110_n10`),
+joins the published height and variance estimates to its building polygons,
+transforms the tile from EPSG:3857, and clips it to the same expanded HCMC
+boundary used by the Overture pipeline. The source files are large (about
+14.6 GB combined); downloads resume from partial files and are cached under
+`etl/data/buildings_footprint_gba/`. Use `--refresh` to fetch the pinned files
+again. The stages can be run separately: `extract` downloads, `transform`
+clips and joins heights, and `load` publishes the saved GeoJSON to PostGIS.
+The `all` ETL workflow includes this pipeline, so selecting `all` also fetches
+the large GBA tile.
+
+GBA records are stored separately in `buildings.gba_lod1`; they never replace
+the Overture snapshot in `buildings.footprint`. Height estimates and their
+variance are approximate model outputs, not surveyed measurements. The
+`GBA.LoD1` data is distributed under CC BY-NC 4.0, which restricts commercial
+use. The `05-buildings-gba-lod1.sql` and
+`06-buildings-gba-feature-id.sql` migrations create and key its table;
+apply migrations through the protected database deployment workflow before
+running this pipeline.
+
+Generate inset residential building extrusions from parcels after the parcel
+and GBA datasets are loaded:
+
+```sh
+docker compose --profile etl-model-generation run --rm etl-model-generation run --stage all
+```
+
+The pipeline inventories all parcel land-use values, uses only the explicit
+residential codes `OTC`, `ODT`, and `ONT` without filtering for existing
+building-footprint overlap, and samples model heights from GBA
+buildings on residential parcels. It publishes the synthetic models separately
+to `buildings.synthetic_residential`. The `20261013-model-generation.sql`
+migration creates that table; apply it with the protected database deployment
+workflow. Extracted inventory and stage files are stored in
+`etl/data/model_generation/`.
 
 ## Warehouse and data
 
@@ -65,6 +135,20 @@ For an already downloaded tile tree, the parcel ETL can also run the stages
 separately with `--stage transform` (validate the XYZ tile tree) and
 `--stage load` (decode and stream the saved tiles to PostGIS). This avoids
 re-fetching tiles when only the database load needs to be completed.
+
+Buildings are bulk-loaded into `buildings.footprint`, with source release,
+attributes, and MultiPolygon geometry, and a latest-import record in
+`buildings.snapshot_metadata`. The load stages rows into a temporary table and
+replaces the previous snapshot in one transaction, so a failed import leaves
+the last successful dataset intact. The `04-buildings-footprint.sql` migration
+creates these tables and spatial indexes; apply it through the existing
+database deployment workflow before running the pipeline.
+
+The checked-in HCMC boundary is from the Vietnamese Provinces Database GIS
+dataset, revision `86361845ba60ee779905ef07f04d7db33c798d04`. Its maintainers
+say the geometry derives from the Vietnam Administrative Units Reference Map
+published by the Ministry of Agriculture and Environment's mapping publisher.
+The source repository is MIT licensed and is not a government agency.
 
 All pipeline services share the host directory `etl/data/`. Flood risk reads a
 previously published `flood_history` layer and forecast/history JSON from

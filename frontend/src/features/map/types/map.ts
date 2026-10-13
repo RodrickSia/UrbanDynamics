@@ -92,6 +92,7 @@ export const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: TimeRange; label: string
 export type UrbanLayerId =
   | 'poi'
   | 'buildings-3d'
+  | 'synthetic-buildings'
   | 'population'
   | 'public-facilities'
   | 'traffic'

@@ -5,7 +5,8 @@ export type VectorDataset =
   | 'flood_satellite'
   | 'flood_risk'
   | 'land_price'
-  | 'parcels';
+  | 'parcels'
+  | 'synthetic_buildings';
 export type Dataset = VectorDataset | 'population';
 export type Palette = 'pseudocolor' | 'greyscale' | 'fire';
 export type Bounds = [number, number, number, number];

@@ -9,7 +9,7 @@ import {
   type CatalogLayer,
 } from '../../../services/api';
 import { URBAN_LAYERS } from '../layers/layerRegistry';
-import type { LayerState } from '../types/map';
+import type { LayerState, MapMode } from '../types/map';
 import {
   DATASETS,
   isDataLayer,
@@ -23,7 +23,7 @@ interface CatalogState {
   available: boolean;
   stale?: boolean;
 }
-export function useBackendLayers(layers: LayerState) {
+export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
   const [catalog, setCatalog] = useState<Partial<Record<DataLayerId, CatalogState>>>({});
   const [years, setYears] = useState<number[]>([]);
   const [chosenYear, setYear] = useState<number | null>(null);
@@ -50,7 +50,7 @@ export function useBackendLayers(layers: LayerState) {
     void getLayerCatalog(controller.signal)
       .then(async (result) => {
         const values: Partial<Record<DataLayerId, CatalogState>> = {};
-        const ids = ['flood', 'flood-history', 'flood-satellite', 'land-price', 'parcels'] as const;
+        const ids = ['flood', 'flood-history', 'flood-satellite', 'land-price', 'parcels', 'synthetic-buildings'] as const;
         for (const id of ids) {
           const entry: CatalogLayer | undefined = result.find((row) => row.id === DATASETS[id]);
           values[id] = {
@@ -90,7 +90,7 @@ export function useBackendLayers(layers: LayerState) {
       .catch(() =>
         save(
           Object.fromEntries(
-            ['flood', 'flood-history', 'flood-satellite', 'land-price', 'parcels'].map((id) => [
+            ['flood', 'flood-history', 'flood-satellite', 'land-price', 'parcels', 'synthetic-buildings'].map((id) => [
               id,
               { status: 'error', available: false },
             ]),
@@ -121,12 +121,13 @@ export function useBackendLayers(layers: LayerState) {
     () =>
       definitions.flatMap((layer) => {
         if (!isDataLayer(layer.id) || !layers[layer.id] || layer.status !== 'available') return [];
+        if (layer.id === 'synthetic-buildings' && mode !== '3d') return [];
         const dataset = DATASETS[layer.id];
         return [
           { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette), year, dates },
         ];
       }),
-    [definitions, layers, year, palette, dates],
+    [definitions, layers, year, palette, dates, mode],
   );
   const report = useCallback(
     (id: DataLayerId, value: LayerReport) =>
