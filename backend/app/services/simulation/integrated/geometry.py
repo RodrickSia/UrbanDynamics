@@ -1,7 +1,7 @@
 import math
 
 from shapely import affinity
-from shapely.geometry import Point, Polygon, mapping
+from shapely.geometry import Point, Polygon, mapping, shape
 from shapely.ops import transform, unary_union
 
 from ..engine import polygon_and_area
@@ -74,16 +74,19 @@ def sweep(polygon, dx, dy):
     return unary_union(pieces)
 
 
-def shadows(geometry, design, conditions):
+def shadows(geometry, design, conditions, surroundings=None):
     site = geometry["metric_site"]
-    roofs = unary_union(geometry["footprints"])
+    context_features = (surroundings or {}).get("features", [])
+    context_objects = [(transform(geometry["forward"], shape(f["geometry"])), f["properties"]["height_m"])
+                       for f in context_features]
+    roofs = unary_union(geometry["footprints"] + [p for p, _ in context_objects])
     outdoor = site.difference(roofs)
     center = geometry["site"].centroid
     results, features = [], []
     for hour in range(8, 18):
         east, north, up = solar_position(conditions.solar_date, hour, center.y, center.x)
         pieces = []
-        objects = list(zip(geometry["footprints"], geometry["heights"])) + list(zip(
+        objects = context_objects + list(zip(geometry["footprints"], geometry["heights"])) + list(zip(
             geometry["trees"], [tree.height_m for tree in design.trees]))
         for polygon, height in objects:
             if up > .01:
@@ -96,7 +99,9 @@ def shadows(geometry, design, conditions):
         if hour in (9, 12, 15) and not shadow.is_empty:
             features.append({"type": "Feature", "geometry": mapping(transform(geometry["backward"], shadow)),
                              "properties": {"hour_local": hour, "kind": "estimated", "feature": "shadow"}})
-    return {"engine": "solar-geometry-1", "kind": "estimated", "date": str(conditions.solar_date),
+    return {"engine": "solar-geometry-2", "kind": "estimated", "date": str(conditions.solar_date),
             "hourly": results, "mean_outdoor_shaded_percent": sum(x["outdoor_shaded_percent"] for x in results)/10,
             "map": {"type": "FeatureCollection", "features": features},
-            "limitations": "Flat ground, opaque tree prisms, no surrounding buildings/terrain; shade is not air temperature or Tmrt"}
+            "surrounding_buildings": surroundings or {"type": "FeatureCollection", "features": []},
+            "surrounding_building_count": len(context_features),
+            "limitations": "Flat ground, opaque tree prisms, fixed mapped surrounding buildings clipped within 300 m; coverage/heights may be incomplete or assumed. Neighbour shadow includes fixed context shadows on outdoor ground. Shade is not air temperature or Tmrt."}

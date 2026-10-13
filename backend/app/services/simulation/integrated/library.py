@@ -1,7 +1,7 @@
 """Demo assumptions, deliberately labelled synthetic rather than local observations."""
 from copy import deepcopy
 
-VERSION = "thu-duc-demo-library-1.1"
+VERSION = "thu-duc-demo-library-1.3"
 SOURCE = "Synthetic hackathon scenario; not calibrated or a Vietnamese regulatory standard"
 
 USES = {
@@ -27,7 +27,7 @@ def normalized(values):
     return [value / sum(values) for value in values]
 
 
-def parameters(level):
+def parameters(level, coefficient_profile="reviewed"):
     factor = {"low": .7, "base": 1, "high": 1.3}[level]
     library = {
         "version": VERSION, "kind": "synthetic", "source": SOURCE,
@@ -65,4 +65,37 @@ def parameters(level):
     library["parameter_provenance"] = {k: {"kind": "synthetic", "source": SOURCE, "version": VERSION,
                                             "unit": library["units"].get(k, "see parameter name / group")}
                                         for k, v in library.items() if isinstance(v, (int, float))}
+    # References describe methods, not validation of our numerical defaults.
+    references = {
+        "water": {"url": "https://congbao.chinhphu.vn/van-ban/thong-tu-so-01-2021-tt-bxd-33751.htm",
+                  "title": "QCVN 01:2021/BXD published by Government Gazette", "use": "Planning reference to review; default rates are not claimed to be extracted regulatory values"},
+        "energy": {"url": "https://www.energy.gov/cmei/buildings/commercial-reference-buildings",
+                   "title": "DOE Commercial Reference Buildings", "use": "Archetype method; US climate/buildings are not calibrated Vietnamese demand"},
+        "drainage": {"url": "https://www.epa.gov/water-research/storm-water-management-model-swmm",
+                     "title": "EPA SWMM", "use": "Hydrological/hydraulic method, not local coefficients or observed sewers"},
+        "traffic": {"url": "https://sumo.dlr.de/docs/Networks/Import/OpenStreetMap.html",
+                    "title": "SUMO OSM network import", "use": "Topology import; not observed OD, traffic volume or signal timing"},
+    }
+    library["references"] = references
+    def register(prefix, values, unit, reference):
+        for key, value in values.items():
+            if isinstance(value, dict):
+                register(f"{prefix}{key}.", value, unit, reference)
+            elif isinstance(value, (int, float, list)):
+                library["parameter_provenance"][f"{prefix}{key}"] = {
+                    "kind": "synthetic", "value_status": "unvalidated_scenario_default", "source": SOURCE,
+                    "unit": unit.get(key, "see field definition"), "version": VERSION,
+                    "method_reference": reference, "numeric_source": None,
+                    "needs_local_calibration": True}
+    register("uses.", library["uses"], {"water_l_person_day": "L/person/day", "visitor_l_day": "L/visit",
+             "staff_l_day": "L/person/day", "user_l_day": "L/user/day", "energy_kwh_m2_day": "kWh/m2/day",
+             "resident_trips_day": "trips/person/day", "visitor_trips_day": "trips/visit", "user_trips_day": "trips/user/day"}, "water/energy/traffic")
+    register("runoff_coefficients.", library["runoff_coefficients"], {}, "drainage")
+    register("swmm.", library["swmm"], {}, "drainage")
+    register("profiles.", library["profiles"], {}, "water/energy/traffic")
+    register("costs_vnd.", library["costs_vnd"], {}, None)
+    library["parameter_validation"] = {"local_calibration": False, "numeric_defaults_verified_from_references": False,
+                                       "note": "Method references do not make scenario rates measured data, legal compliance or a quoted price."}
+    from .parameter_catalog import install
+    install(library, coefficient_profile)
     return library

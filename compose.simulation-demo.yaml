@@ -1,0 +1,32 @@
+services:
+  simulation-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "127.0.0.1:${SIMULATION_DEMO_PORT:-8007}:8000"
+    environment:
+      PLANNING_SQLITE_PATH: /runtime/studies.sqlite
+      SIMULATION_WORK_DIR: /runtime/solvers
+      PLANNING_SYSTEM_DEMO_ENABLED: "1"
+      PLANNING_SYSTEM_SNAPSHOT_DIR: /system-snapshots
+      PLANNING_SOLVER_TIMEOUT_SECONDS: "600"
+    volumes:
+      - simulation-demo-runtime:/runtime
+      - ./.runtime/planning-system/snapshots:/system-snapshots:ro
+  simulation-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.services.simulation.planning.worker"]
+    environment:
+      PLANNING_SQLITE_PATH: /runtime/studies.sqlite
+      SIMULATION_WORK_DIR: /runtime/solvers
+      PLANNING_SYSTEM_DEMO_ENABLED: "1"
+      PLANNING_SYSTEM_SNAPSHOT_DIR: /system-snapshots
+      PLANNING_SOLVER_TIMEOUT_SECONDS: "600"
+    volumes:
+      - simulation-demo-runtime:/runtime
+      - ./.runtime/planning-system/snapshots:/system-snapshots:ro
+volumes:
+  simulation-demo-runtime:

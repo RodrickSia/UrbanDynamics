@@ -8,6 +8,7 @@ from app.repository import readiness
 from app.routers import parcels
 from app.routers import zoning
 from app.routers import floods, land_prices, layers, population, scenarios, urban, building_scenarios, weather, integrated_scenarios
+from app.routers import planning_scenarios, planning_system_demo
 
 app = FastAPI(
     title="UrbanDynamics Data API",
@@ -47,6 +48,9 @@ for router in (
     building_scenarios.router,
     weather.router,
     integrated_scenarios.router,
+    planning_scenarios.router,
+    planning_scenarios.preview_router,
+    planning_system_demo.router,
 ):
     app.include_router(router)
 

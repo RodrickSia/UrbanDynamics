@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrbanDynamics — nhiều khu đất và cộng dồn</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#173046;background:#eef3f5}body{margin:0}main{max-width:1250px;margin:auto;padding:24px}h1{font-size:26px;margin-bottom:8px}h2{font-size:19px}.note{background:#fff2ca;border-left:4px solid #b47d00;padding:12px;line-height:1.5}.panel{background:white;border:1px solid #d1dce3;border-radius:10px;padding:18px;margin:16px 0}.controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap}label{display:grid;gap:5px;font-size:14px}button,select,input{font:inherit;padding:9px;border:1px solid #91a5b4;border-radius:6px}button{cursor:pointer;background:#eaf1f6}button.primary{background:#145e85;color:white}button:disabled{opacity:.5;cursor:default}textarea{width:100%;height:280px;box-sizing:border-box;margin-top:12px;font:12px monospace}#status{white-space:pre-wrap;overflow-wrap:anywhere}#status[data-error="true"]{color:#a00}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.map{width:100%;height:350px;background:#f5f8fa;border:1px solid #c5d3dc}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:9px;text-align:left;border-bottom:1px solid #dce4ea}th{background:#edf3f7}.bad{color:#a42217}.small{font-size:13px;line-height:1.5}#power{width:100%;height:180px}a{color:#075a8a}.download{display:inline-block;margin:12px 0}details{margin:12px 0}svg text{font:12px system-ui}.legend{display:flex;gap:15px;flex-wrap:wrap}.legend span::before{content:'●';margin-right:5px}#selected{font-weight:600}@media(max-width:760px){main{padding:12px}.grid{grid-template-columns:1fr}h1{font-size:22px}button{min-height:42px}}
+</style><style>label{max-width:100%;grid-template-columns:minmax(0,1fr)}input{max-width:100%;min-width:0;box-sizing:border-box}#saved-job{width:360px}.grid>*{min-width:0}</style></head>
+<body><main>
+<h1>So sánh khu đất và tác động cộng dồn</h1>
+<p>Chọn vị trí xây dựng, xem đánh đổi và ảnh hưởng khi nhiều công trình cùng vận hành.</p>
+<p class="note"><strong>Demo kiểm thử.</strong> Có chế độ dữ liệu giả lập và chế độ parcel/dữ liệu nền hệ thống. Loại nguồn được ghi trong từng kết quả; OD, đèn tín hiệu, mạng cống và công suất chưa được khảo sát. SUMO/SWMM tính kết quả từ các đầu vào này. Không dùng để kết luận tình trạng thực tế hay phê duyệt quy hoạch.</p>
+<section class="panel"><div class="controls">
+<label>Bài toán<select id="study-mode"><option value="site_selection">So sánh vị trí A / B / C</option><option value="single_site">Một khu đất trên nền chung</option><option value="cumulative">Cộng dồn A + trường B + C</option><option value="rehousing">Di dời 100 cư dân A sang C</option><option value="inclusive">Snapshot tổng vùng đã chứa A</option></select></label>
+<button id="load-preset">Nạp mẫu</button>
+<label>Cách chạy<select id="run-mode"><option value="screening">Screening</option><option value="native">SUMO + SWMM</option><option value="uncertainty">Độ nhạy + 3 seed</option></select></label>
+<button id="preflight">Kiểm tra đầu vào</button><button class="primary" id="run">Chạy và lưu</button><button id="cancel" disabled>Hủy job</button><button id="retry" disabled>Chạy tiếp job cũ</button>
+</div><p id="preset-description" class="small">Chọn mẫu để xem chương trình phát triển và điều kiện chung.</p>
+<details><summary>Building plan, dữ liệu nền và giả định (JSON)</summary><textarea id="input" aria-label="Đầu vào study JSON" spellcheck="false"></textarea></details>
+<div class="controls"><label>Mở lại job đã lưu<input id="saved-job" placeholder="Job UUID" size="38"></label><button id="restore">Mở lại</button><button id="jump-sumo">Đi đến bảng SUMO</button></div>
+<p id="status" role="status" aria-live="polite">Đang tải mẫu…</p></section>
+<section class="panel" id="system-demo" hidden>
+<h2>Parcel và dữ liệu nền của hệ thống — chỉ trong demo kiểm thử</h2>
+<p class="note">Dữ liệu parcel/WorldPop/OSM có nguồn. Lưu lượng, cống và công suất chưa được đo; simulation vẫn là kịch bản chưa hiệu chỉnh.</p>
+<div class="controls"><label>Snapshot<select id="system-snapshot"></select></label><button id="system-load">Nạp parcel thật</button></div>
+<p id="system-info" class="small"></p>
+<p class="small">Bấm polygon để thêm/bỏ parcel; lựa chọn trước được giữ lại. Tối đa 6 parcel.</p>
+<svg id="system-parcel-map" class="map" viewBox="0 0 700 350" aria-label="Parcel của hệ thống trong snapshot demo"></svg>
+<div class="controls"><label>Parcel (chọn tối đa 6)<select id="system-parcels" multiple size="5"></select></label>
+<label>Số căn<input id="system-units" type="number" min="1" value="20"></label><label>Cư dân<input id="system-residents" type="number" min="1" value="60"></label><label>Số tầng<input id="system-floors" type="number" min="1" value="8"></label>
+<label>Tổng sàn mỗi công trình (m²)<input id="system-floor-area" type="number" min="100" value="1600"></label>
+<label>Kịch bản<select id="system-mode"><option value="site_selection">Xây ở một trong các vị trí</option><option value="cumulative">Xây riêng và cộng dồn nhiều vị trí</option></select></label>
+<label><span>Cùng chương trình khi so vị trí</span><input id="system-equal" type="checkbox" checked></label>
+<label><span>Dùng mạng đường OSM</span><input id="system-osm" type="checkbox" checked></label>
+<label>Tham chiếu counting<select id="system-counting"><option value="">Tự dùng mặc định đã cài</option></select></label>
+<label>Thay đỉnh OD nền (xe/giờ, tùy chọn)<input id="system-traffic-peak" type="number" min="0" max="6000" placeholder="Để trống: tự lấy counting"></label>
+<label>Nền / capacity<select id="system-background"><option value="sourced">Nguồn thật — giữ thông tin thiếu</option><option value="synthetic_capacity_v1">Minh họa capacity v1 — giả lập có nhãn</option></select></label>
+<label><span>Kèm kiểm tra độ nhạy</span><input id="system-sensitivity" type="checkbox" checked></label>
+<label>Engine độ nhạy<select id="system-sensitivity-engine"><option value="screening">Screening nhanh (không có SUMO/SWMM)</option><option value="native">SUMO + SWMM, 3 seed (chạy lâu)</option></select></label>
+<button id="system-prepare">2. Nạp plan và dữ liệu nền</button></div>
+<p class="small">Luồng: 1. Chọn parcel và nhập building plan → 2. Nạp → 3. Kiểm tra đầu vào → 4. Chạy Screening để xem tác động nhanh; chọn SUMO/SWMM hoặc Độ nhạy để kiểm tra sâu → 5. So sánh phương án và nguồn. Chế độ nguồn thật không tự điền thông tin chưa biết.</p>
+<details><summary>Hệ số nền giả lập v1 và phạm vi độ nhạy</summary><p>Giữ geometry thật; giả định công trình nền là nhà ở, 35 m² sàn/người, 3 người/căn; không có footprint chỉ là giả định không có cư dân được lập bản đồ, không xác nhận đất trống. Ngoài parcel: 1.200 người, điện 80 kW mỗi giờ, nước 140 m³/ngày, nước thải 112 m³/ngày. Capacity cố định: 95 kW, 160 m³ nước/ngày, 128 m³ nước thải/ngày; mỗi trường 240 chỗ, 216 học sinh nền đặt tại trường đầu. Chưa có khảo sát để hiệu chỉnh.</p><p>Độ nhạy: hệ số nhu cầu low/high; capacity điện/nước/nước thải và trường giảm 20%; mưa tăng 20%; OD nền ×0,5 và ×1,25 (giới hạn 6.000 xe/h). Native chạy 3 seed 2026–2028. Đây là dải thử giả định, không phải khoảng tin cậy. Screening không đánh giá hàng chờ hoặc delay SUMO.</p></details>
+<details><summary>Chương trình riêng từng parcel (khi không giữ cùng chương trình)</summary><div class="scroll"><table id="system-programs"><thead><tr><th>Parcel</th><th>Căn</th><th>Cư dân</th><th>Tầng</th><th>Tổng sàn m²</th></tr></thead><tbody></tbody></table></div></details>
+<details><summary>Tạo nhóm xây đồng thời tùy chọn</summary><p class="small">Trong chế độ cộng dồn, chọn các parcel của một phương án rồi thêm nhóm. Nếu không thêm nhóm, hệ thống tạo các phương án riêng và cộng dồn theo thứ tự danh sách.</p><div class="controls"><label>Parcel trong phương án<select id="system-group-parcels" multiple size="4"></select></label><button id="system-add-scenario">Thêm phương án</button></div><div id="system-scenarios" class="small"></div></details>
+<p class="small" id="system-traffic-default">Để trống đỉnh OD để dùng lưu lượng mặc định từ counting. Đây là giả định chuyển từ clip ngắn tại địa điểm khác, không phải quan trắc trên đường của parcel này; chưa có hiệu chỉnh OD hoặc nhãn kiểm chứng đầy đủ.</p>
+<p class="small">Sau khi nạp, chỉnh building plan trong JSON nếu cần, kiểm tra đầu vào rồi chạy bằng các nút ở trên. Chỉ hiện parcel một polygon liên tục, 500–100.000 m², trong vùng snapshot; không tự bỏ các phần của parcel nhiều mảnh.</p>
+</section>
+<section class="panel" id="results" hidden>
+<div class="controls"><label>Giả định đầu vào<select id="assumption-case"><option value="reference">Reference</option></select></label><label>Trạng thái / phương án<select id="option"></select></label><label>Lớp tác động<select id="layer"><option value="parcels">Khu đất</option><option value="school">Tiếp cận và chỗ học</option><option value="shadow">Bóng đổ</option><option value="roads">Đường SUMO</option><option value="drainage">Nút thoát nước SWMM</option><option value="drainage_links">Cống SWMM</option></select></label>
+<label>Khung nhìn<select id="map-extent"><option value="impact">Vùng tác động</option><option value="study">Toàn vùng nghiên cứu</option></select></label><label>Giờ bóng<select id="shadow-hour"><option>9</option><option>12</option><option>15</option></select></label><label>Giờ giao thông<select id="traffic-hour"></select></label>
+<label>Khoảng SUMO<select id="interval"></select></label><label>Seed SUMO<select id="traffic-seed"></select></label><label>Thời điểm SWMM<select id="drainage-sample"><option value="event">Tổng trận mưa</option></select></label></div>
+<p id="selected"></p><div class="grid"><div><svg id="map" class="map" viewBox="0 0 700 350" aria-label="Sơ đồ không gian của kịch bản synthetic"></svg><p id="map-note" class="small"></p></div><div><h2>Tải điện dùng chung theo giờ</h2><svg id="power" viewBox="0 0 500 180" aria-label="Biểu đồ điện 24 giờ"></svg><div id="capacities" class="small"></div><p id="source" class="small"></p></div></div>
+<details><summary>Đối chiếu công năng với nhãn quy hoạch nguồn</summary><div id="planning-review" class="small"></div></details>
+<section id="sumo-results" tabindex="-1" style="scroll-margin-top:24px"><h2>Thông số SUMO của lượt chạy</h2>
+<p id="sumo-summary" class="small"></p>
+<p class="small">Các số dưới đây là kết quả mô hình với đầu vào và giả định của study đã lưu. Hiện trạng mô phỏng cũng có giả định khi thiếu occupancy; đây chưa phải số liệu quan trắc hoặc chênh lệch tác động đã xác minh. Độ trễ chỉ tính xe hoàn thành; xem cùng tỷ lệ hoàn thành và xe tồn đọng.</p>
+<div class="scroll"><table id="sumo-metrics"><thead><tr><th>Thông số</th><th>Hiện trạng mô phỏng</th><th>Phương án đang xem</th><th>Đơn vị</th></tr></thead><tbody></tbody></table></div></section>
+<h2>So với hiện trạng</h2><div class="scroll"><table id="metrics"><thead><tr><th>Chỉ số</th><th>Hiện trạng</th><th>Phương án</th><th>Chênh lệch</th><th>Đơn vị</th><th>Khả năng so sánh</th></tr></thead><tbody></tbody></table></div>
+<details id="normalization-details"><summary>Tác động trên quy mô phương án</summary><p id="normalization-note" class="small"></p><div class="scroll"><table id="normalized"><thead><tr><th>Chỉ số</th><th>Mẫu số khai báo</th><th>Tác động / đơn vị phục vụ</th><th>Đơn vị</th><th>Khả năng so sánh</th></tr></thead><tbody></tbody></table></div></details>
+<h2>Đánh đổi và giai đoạn</h2><div id="ranking" class="small"></div><div id="phases" class="small"></div>
+<h2>Hiện trạng, thay thế và di dời</h2><p id="population-ledger" class="small"></p><p id="ledger-note" class="small"></p>
+<p id="background-normalization" class="small"></p>
+<details id="coverage-details"><summary>Nguồn dữ liệu và phạm vi từng tác động</summary><p id="manifest-summary" class="small"></p><div class="scroll"><table id="coverage"><thead><tr><th>Tác động</th><th>Phạm vi mô hình</th><th>Giới hạn dữ liệu</th></tr></thead><tbody></tbody></table></div></details>
+<details id="ledger-details"><summary>Tải hiện hữu bị trừ và phương án được thêm theo từng khu đất</summary><div class="scroll"><table id="ledger"><thead><tr><th>Khu đất</th><th>Chỉ số</th><th>Hiện hữu</th><th>Trừ để thay thế</th><th>Phương án thêm</th><th>Sau xây</th><th>Nguồn / trạng thái</th></tr></thead><tbody></tbody></table></div></details>
+<h2>Độ nhạy và độ ổn định</h2><p id="stability" class="small"></p>
+<a id="download" class="download">Tải ZIP đầu vào, kết quả và artifact</a>
+<details><summary>Nguồn, giới hạn và kiểm tra mô hình</summary><pre id="audit" class="small" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+</section></main><script src="/simulation/planning.js?v=capacity-sensitivity-20261013" defer></script></body></html>

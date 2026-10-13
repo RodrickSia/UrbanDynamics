@@ -1,0 +1,45 @@
+const {chromium}=require('../.runtime/ui-check/node_modules/playwright-core');
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const out=path.resolve(__dirname,'../test-results/planning-flow-default');
+(async()=>{
+ const seed=JSON.parse(fs.readFileSync(out+'/equal-program-study.json','utf8'));
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:1100}}),errors=[],checks=[];
+  page.setDefaultTimeout(10000);
+  page.setDefaultNavigationTimeout(15000);
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('http://127.0.0.1:8007/simulation/planning');
+  console.log('Loaded demo page');
+  await page.waitForFunction(()=>!document.querySelector('#system-demo').hidden&&document.querySelector('#system-traffic-default').textContent.includes('3'));
+  assert.match(await page.locator('#system-traffic-default').textContent(),/4[.,\s]?104/);
+  assert.equal(await page.locator('#system-traffic-peak').inputValue(),'');
+  assert.equal(await page.locator('#system-counting').inputValue(),'');
+  await page.locator('#system-snapshot').selectOption(seed.system_snapshot_id);
+  await page.locator('#system-load').click();
+  const ids=Object.values(seed.system_parcel_bindings);
+  await page.waitForFunction(id=>[...document.querySelector('#system-parcels').options].some(o=>o.value===id),ids[0]);
+  await page.locator('#system-parcels').selectOption(ids);
+  await page.locator('#system-floors').fill('4');
+  await page.locator('#system-prepare').click();
+  console.log('Preparing with automatic default');
+  await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Đã nối parcel'));
+  let study=JSON.parse(await page.locator('#input').inputValue());
+  assert.equal(study.traffic_prior.source_kind,'synthetic');
+  assert.equal(study.traffic_prior.cars[18],216);assert.equal(study.traffic_prior.motorcycles[18],3672);
+  checks.push('Blank input uses installed 19-crossing reference, 3888 supported vehicles/hour');
+  console.log('Default verified');
+  await page.locator('#system-traffic-peak').fill('0');
+  await page.locator('#system-prepare').click();
+  await page.waitForFunction(()=>JSON.parse(document.querySelector('#input').value).traffic_prior.cars[18]===0);
+  study=JSON.parse(await page.locator('#input').inputValue());assert.equal(study.traffic_prior.motorcycles[18],0);
+  checks.push('Explicit zero overrides default');
+  await page.locator('#system-traffic-peak').fill('');
+  await page.locator('#system-prepare').click();
+  await page.waitForFunction(()=>JSON.parse(document.querySelector('#input').value).traffic_prior.motorcycles[18]===3672);
+  await page.locator('#system-demo').screenshot({path:out+'/flow-default-builder.png'});
+  assert.deepEqual(errors,[]);checks.push('Default is visibly labelled as transferred assumption; no JavaScript errors');
+  fs.writeFileSync(out+'/flow-default-ui-report.json',JSON.stringify({status:'passed',checks},null,2));
+  console.log(JSON.stringify({status:'passed',checks}));
+ }finally{await browser.close()}
+})().catch(e=>{console.error(e.message);process.exitCode=1});

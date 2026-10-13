@@ -1,0 +1,12 @@
+const fs=require('fs'),path=require('path'),cp=require('child_process');
+const root=path.resolve(__dirname,'..');
+const out=path.join(root,'test-results','demo-capacity');fs.mkdirSync(out,{recursive:true});
+const python=process.env.SIMULATION_TEST_PYTHON||path.join(root,'..','UrbanDynamics','.venv','Scripts','python.exe');
+const files=['test_planning_demo_capacity.py','test_planning_system_demo.py','test_planning_background.py','test_planning_uncertainty.py'];
+const args=['-m','pytest','-q',...files.map(f=>'backend/tests/'+f),'--tb=short','--junitxml='+path.join(out,'regression.xml')];
+const log=fs.openSync(path.join(out,'pytest.log'),'w');
+fs.writeFileSync(path.join(out,'execution.json'),JSON.stringify({status:'running',started_at:new Date().toISOString(),files}));
+const p=cp.spawn(python,args,{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'backend')+path.delimiter+path.join(root,'etl')},stdio:['ignore',log,log]});
+p.on('error',e=>{fs.writeFileSync(path.join(out,'execution.json'),JSON.stringify({status:'error',error:e.message}));});
+p.on('close',code=>{fs.closeSync(log);fs.writeFileSync(path.join(out,'execution.json'),JSON.stringify({status:code===0?'passed':'failed',code,finished_at:new Date().toISOString(),files}));console.log('Tests finished: '+code);});
+console.log('Started tests; results: '+out);

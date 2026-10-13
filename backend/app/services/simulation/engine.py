@@ -28,7 +28,7 @@ LIMITATIONS = [
 ]
 
 
-def polygon_and_area(value: PolygonInput):
+def polygon_and_area(value: PolygonInput, *, maximum_area_m2=1_000_000):
     rings = value.coordinates
     if sum(map(len, rings)) > 500:
         raise ValueError("Polygon supports at most 500 vertices")
@@ -45,8 +45,8 @@ def polygon_and_area(value: PolygonInput):
     if east - west > 0.1 or north - south > 0.1:
         raise ValueError("Use a local site, not a regional or antimeridian polygon")
     area = abs(GEOD.geometry_area_perimeter(orient(polygon, sign=1))[0])
-    if not 1 <= area <= 1_000_000:
-        raise ValueError("Site or footprint must cover between 1 and 1,000,000 m2")
+    if not 1 <= area <= maximum_area_m2:
+        raise ValueError(f"Site or footprint must cover between 1 and {maximum_area_m2:,} m2")
     return polygon, area
 
 

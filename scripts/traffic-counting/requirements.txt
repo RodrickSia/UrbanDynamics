@@ -1,0 +1,7 @@
+# Install torch/torchvision first using the CUDA 12.6 index in README.md.
+ultralytics==8.3.221
+gdown==5.2.0
+pytest==8.4.2
+lap==0.5.12
+# Server 152 has a legacy CPU; do not suppress Polars' CPU compatibility check.
+polars[rtcompat]==2.0.0

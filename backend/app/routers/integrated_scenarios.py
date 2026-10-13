@@ -7,6 +7,7 @@ from pathlib import Path
 import psycopg
 from threading import BoundedSemaphore
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -15,8 +16,11 @@ from app.services.simulation.engine import polygon_and_area
 from app.services.simulation.models import PolygonInput
 from app.services.simulation.integrated.engine import predict, recommend, VERSION
 from app.services.simulation.integrated.library import parameters, USES
-from app.services.simulation.integrated.models import IntegratedRequest, RecommendationRequest
+from app.services.simulation.integrated.models import IntegratedRequest, RecommendationRequest, SensitivityRequest
+from app.services.simulation.integrated.parameter_catalog import catalog
+from app.services.simulation.integrated.sensitivity import analyze_source
 from app.services.simulation.integrated.solvers import SolverUnavailable
+from app.services.simulation.integrated.context import build_context
 from app.services.simulation.store import load, save, StorageUnavailable
 
 router = APIRouter(tags=["integrated-scenarios"])
@@ -56,7 +60,12 @@ def integrated_script():
 @router.get("/api/v1/scenarios/integrated/presets")
 def presets():
     return {"default": demo_payload(), "building_presets": {use: demo_payload(use) for use in USES},
-            "library": parameters("base"), "baseline_note": "Synthetic vacant parcel unless user supplies baseline with source"}
+            "library": parameters("base"), "baseline_note": "Priority: explicit baseline, client map plus snapshot buildings/surfaces, synthetic assumptions. Missing mapped buildings do not establish vacant land."}
+
+
+@router.get("/api/v1/scenarios/integrated/parameters")
+def coefficient_catalog(profile: Literal["reviewed", "demo"] = "reviewed"):
+    return catalog(parameters("base", profile))
 
 
 def run(operation):
@@ -70,6 +79,8 @@ def run(operation):
         raise HTTPException(503, str(error)) from None
     except StorageUnavailable:
         raise HTTPException(503, "Scenario storage unavailable; result was not saved") from None
+    except OSError:
+        raise HTTPException(503, "Simulation snapshot or artifact storage unavailable") from None
     except psycopg.Error:
         raise HTTPException(503, "Simulation context warehouse unavailable") from None
     finally:
@@ -79,6 +90,26 @@ def run(operation):
 @router.post("/api/v1/scenarios/integrated/predict", status_code=201)
 def prediction(body: IntegratedRequest):
     return run(lambda: predict(body))
+
+
+@router.post("/api/v1/scenarios/integrated/context")
+def prepare_context(body: IntegratedRequest):
+    """Frontend preflight: source coverage and baseline before running solvers.
+
+Same input as predict, no persistence or solver execution. No caller URLs/paths.
+"""
+    try:
+        context = build_context(body)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    except psycopg.Error:
+        raise HTTPException(503, "Simulation context warehouse unavailable") from None
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(503, "Simulation snapshot storage unavailable") from None
+    return {key: context[key] for key in ("baseline", "baseline_provenance", "population_provenance", "service_provenance",
+                                         "data_inventory", "traffic_network_kind", "background_population", "services",
+                                         "roads", "surrounding_buildings",
+                                         "demand_parameter_catalog", "synthetic_components", "sha256")}
 
 
 def find(identifier):
@@ -98,6 +129,12 @@ def get_run(identifier: UUID):
     return find(identifier)
 
 
+@router.post("/api/v1/scenarios/integrated/{identifier}/sensitivity", status_code=201)
+def sensitivity_analysis(identifier: UUID, body: SensitivityRequest):
+    source = find(identifier)
+    return run(lambda: analyze_source(source, body))
+
+
 @router.post("/api/v1/scenarios/integrated/{identifier}/recommendations", status_code=201)
 def suggestions(identifier: UUID, body: RecommendationRequest):
     source = find(identifier)
@@ -111,7 +148,9 @@ def artifacts(identifier: UUID):
     document = find(identifier)
     root = Path(os.getenv("SIMULATION_WORK_DIR", str(Path(tempfile.gettempdir())/"urban-dynamics-solvers"))).resolve()
     states = list(document["variants"].values())+[r["predicted"] for r in document["recommendations"]]
+    states.extend(state for case in document.get("sensitivity", {}).get("cases", []) for state in case.get("variants", {}).values())
     buffer = io.BytesIO()
+    written = set()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("scenario.json", json.dumps(document, ensure_ascii=False, allow_nan=False))
         for state in states:
@@ -126,6 +165,9 @@ def artifacts(identifier: UUID):
                     file = (directory/name).resolve()
                     if file.parent != directory or not file.is_file():
                         raise HTTPException(410, "Engine artifacts incomplete")
-                    archive.write(file, f"{directory.name}/{file.name}")
+                    archive_name = f"{directory.name}/{file.name}"
+                    if archive_name not in written:
+                        archive.write(file, archive_name)
+                        written.add(archive_name)
     return Response(buffer.getvalue(), media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="integrated-{identifier}.zip"'})

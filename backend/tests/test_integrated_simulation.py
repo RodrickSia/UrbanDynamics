@@ -9,6 +9,12 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
+
+@pytest.fixture(autouse=True)
+def isolate_published_background(monkeypatch, tmp_path):
+    # Regression fixtures must not pick up the user's downloaded pilot snapshots.
+    monkeypatch.setenv("SIMULATION_SNAPSHOT_DIR", str(tmp_path/"snapshots"))
+
 from app.main import app
 from app.routers.integrated_scenarios import demo_payload
 from app.services.simulation.integrated import engine, geometry, solvers

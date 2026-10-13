@@ -8,6 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
+from copy import deepcopy
 
 
 class SolverUnavailable(RuntimeError):
@@ -50,6 +51,89 @@ def traffic(design, demand, context):
     binary = binary_directory / ("sumo"+suffix)
     netconvert = binary_directory / ("netconvert"+suffix)
     # Scenario graph, not the city's road network. Both directions and traffic signals are explicit.
+    real_network = context.get("traffic_network_kind") == "osm"
+    network_info = None
+    network_map = {"type": "FeatureCollection", "features": deepcopy(context["roads"])}
+    route_choices = None
+    if real_network:
+        from .road_network import prepare
+        route_choices, network_map, network_info = prepare(directory, netconvert, context["source_osm"], context["site_center"], design, execute, context["data_inventory"]["bbox"])
+    else:
+        synthetic_network(directory, netconvert, design)
+    routes = ET.Element("routes")
+    ET.SubElement(routes, "vType", id="car", accel="2.6", decel="4.5", sigma="0.3", length="4.5", width="1.8", minGap="2.5")
+    ET.SubElement(routes, "vType", id="motorcycle", vClass="motorcycle", accel="3", decel="5", sigma="0.3",
+                  length="2", width=".8", minGap="1", latAlignment="arbitrary")
+    if route_choices:
+        for group, choices in route_choices.items():
+            for index, choice in enumerate(choices):
+                ET.SubElement(routes, "route", id=f"{group}_{index}", edges=choice["edges"])
+    else:
+        for name, value in {"through_w": "wc ce", "through_e": "ec cw", "in": "wc cg", "out": "gc ce"}.items():
+            ET.SubElement(routes, "route", id=name, edges=value)
+    peak = context.get("traffic_peak_hour", max(range(24), key=lambda h: demand["hourly"]["cars"][h]+demand["hourly"]["motorcycles"][h]))
+    car_count = round(demand["hourly"]["cars"][peak])
+    bike_count = round(demand["hourly"]["motorcycles"][peak])
+    background = context["library"]["background_vehicles_hour"]
+    background_bikes = round(background*.75) if real_network else 0
+    planned = background+car_count+bike_count
+    if planned > 8000:
+        raise ValueError("Pilot traffic workload exceeds 8,000 vehicles in the common-hour scenario")
+    rng = random.Random(context["seed"])
+    vehicles = []
+    for group, count, kind in (("background", background-background_bikes, "car"), ("background_motorcycle", background_bikes, "motorcycle"),
+                               ("project_car", car_count, "car"), ("project_motorcycle", bike_count, "motorcycle")):
+        for i in range(count):
+            departure = (i+rng.random())/max(1, count)*3600
+            route = ("through_w" if i % 2 else "through_e") if group.startswith("background") else ("in" if i % 2 else "out")
+            if route_choices:
+                category = "background" if group.startswith("background") else route
+                choices = route_choices[category]
+                index = rng.choices(range(len(choices)), weights=[v["weight"] for v in choices], k=1)[0]
+                route = f"{category}_{index}"
+            vehicles.append((departure, group, i, kind, route))
+    for departure, group, i, kind, route in sorted(vehicles):
+        vehicle = ET.SubElement(routes, "vehicle", id=f"{group}_{i}", type=kind, route=route,
+                                depart=f"{departure:.3f}", departLane="best")
+        if not group.startswith("background"):
+            inbound = route.startswith("in")
+            lane = ("project_in_0" if inbound else "project_out_0") if real_network else ("cg_0" if inbound else "gc_0")
+            ET.SubElement(vehicle, "stop", lane=lane, duration=str(design.gate_service_seconds))
+    ET.ElementTree(routes).write(directory/"routes.xml", encoding="utf-8")
+    additional = ET.Element("additional")
+    ET.SubElement(additional, "edgeData", id="map_metrics", file="edge-data.xml", begin="0", end="4200", period="4200")
+    ET.ElementTree(additional).write(directory/"additional.xml", encoding="utf-8")
+    output = execute([str(binary), "--net-file", "network.xml", "--route-files", "routes.xml", "--additional-files", "additional.xml", "--end", "4200",
+                      "--seed", str(context["seed"]), "--lateral-resolution", ".8", "--no-step-log", "true",
+                      "--duration-log.disable", "true", "--tripinfo-output", "trips.xml", "--tripinfo-output.write-unfinished", "true",
+                      "--summary-output", "summary.xml", "--queue-output", "queues.xml", "--queue-output.period", "60",
+                      "--statistic-output", "statistics.xml", "--time-to-teleport", "-1"], directory, timeout=120 if real_network else 60)
+    (directory/"engine.log").write_text(output, encoding="utf-8")
+    trips = list(ET.parse(directory/"trips.xml").getroot().findall("tripinfo"))
+    completed = [t for t in trips if float(t.get("arrival", "-1")) >= 0]
+    summary = ET.parse(directory/"summary.xml").getroot().findall("step")
+    last = summary[-1].attrib
+    departed = int(float(last.get("inserted", "0")))
+    queues = [float(l.get("queueing_length", "0")) for step in ET.parse(directory/"queues.xml").getroot() for l in step.iter("lane")]
+    edge_stats = {e.get("id"): e.attrib for interval in ET.parse(directory/"edge-data.xml").getroot() for e in interval.findall("edge")}
+    for feature in network_map["features"]:
+        values = edge_stats.get(feature["properties"]["id"], {})
+        feature["properties"]["simulated"] = {k: float(values[k]) for k in ("speed", "traveltime", "waitingTime", "timeLoss", "entered", "left", "occupancy") if k in values}
+    safety = ET.parse(directory/"statistics.xml").getroot().find("safety")
+    return {"engine": "SUMO", "version": "1.27.1", "kind": "mixed_osm_and_estimates" if real_network else "synthetic", "peak_hour_local": peak,
+            "comparison_hour_basis": "same frozen hour for baseline/development/recommendations",
+            "planned_vehicles": planned, "project_vehicles": car_count+bike_count, "departed_vehicles": departed,
+            "completed_vehicles": len(completed), "unfinished_vehicles": departed-len(completed), "undeparted_vehicles": max(0, planned-departed),
+            "mean_completed_delay_seconds": sum(float(t.get("timeLoss", "0")) for t in completed)/max(1, len(completed)),
+            "mean_departed_wait_seconds": sum(float(t.get("waitingTime", "0")) for t in trips)/max(1, len(trips)),
+            "max_queue_length_m": max(queues, default=0), "collisions": int(safety.get("collisions", "0")) if safety is not None else None,
+            "simulation_seconds": 4200, "network": network_map, "network_provenance": network_info,
+            "background_provenance": context["library"]["parameter_provenance"]["background_vehicles_hour"],
+            "artifacts": manifest(directory, "SUMO", "1.27.1"),
+            "limitations": "OSM topology where configured; OD, mode mix (75% background motorcycles on OSM), driver behaviour, missing road attributes, signal timing and private access are estimated. No camera calibration yet. Gate service uses lane 0. Mean delay excludes incomplete trips."}
+
+
+def synthetic_network(directory, netconvert, design):
     (directory/"nodes.xml").write_text('<nodes><node id="w" x="-250" y="0"/><node id="c" x="0" y="0" type="traffic_light"/>'
                                         '<node id="e" x="250" y="0"/><node id="g" x="0" y="100"/></nodes>', encoding="utf-8")
     edges = ET.Element("edges")
@@ -59,61 +143,6 @@ def traffic(design, demand, context):
     ET.ElementTree(edges).write(directory/"edges.xml", encoding="utf-8")
     execute([str(netconvert), "--node-files", "nodes.xml", "--edge-files", "edges.xml", "--output-file", "network.xml",
              "--no-turnarounds", "true"], directory)
-    routes = ET.Element("routes")
-    ET.SubElement(routes, "vType", id="car", accel="2.6", decel="4.5", sigma="0.3", length="4.5", width="1.8", minGap="2.5")
-    ET.SubElement(routes, "vType", id="motorcycle", vClass="motorcycle", accel="3", decel="5", sigma="0.3",
-                  length="2", width=".8", minGap="1", latAlignment="arbitrary")
-    for name, value in {"through_w": "wc ce", "through_e": "ec cw", "in": "wc cg", "out": "gc ce"}.items():
-        ET.SubElement(routes, "route", id=name, edges=value)
-    peak = max(range(24), key=lambda h: demand["hourly"]["cars"][h]+demand["hourly"]["motorcycles"][h])
-    car_count = round(demand["hourly"]["cars"][peak])
-    bike_count = round(demand["hourly"]["motorcycles"][peak])
-    background = context["library"]["background_vehicles_hour"]
-    planned = background+car_count+bike_count
-    if planned > 8000:
-        raise ValueError("Pilot traffic workload exceeds 8,000 vehicles in the peak-hour scenario")
-    rng = random.Random(context["seed"])
-    vehicles = []
-    for group, count, kind in (("background", background, "car"), ("project_car", car_count, "car"),
-                               ("project_motorcycle", bike_count, "motorcycle")):
-        for i in range(count):
-            departure = (i+rng.random())/max(1, count)*3600
-            route = ("through_w" if i % 2 else "through_e") if group == "background" else ("in" if i % 2 else "out")
-            vehicles.append((departure, group, i, kind, route))
-    for departure, group, i, kind, route in sorted(vehicles):
-        vehicle = ET.SubElement(routes, "vehicle", id=f"{group}_{i}", type=kind, route=route,
-                                depart=f"{departure:.3f}", departLane="best")
-        if group != "background":
-            # An actual stop on the gate lane models entrance/exit service and its queue.
-            ET.SubElement(vehicle, "stop", lane="cg_0" if route == "in" else "gc_0", endPos="75",
-                          duration=str(design.gate_service_seconds))
-    ET.ElementTree(routes).write(directory/"routes.xml", encoding="utf-8")
-    output = execute([str(binary), "--net-file", "network.xml", "--route-files", "routes.xml", "--end", "4200",
-                      "--seed", str(context["seed"]), "--lateral-resolution", ".8", "--no-step-log", "true",
-                      "--duration-log.disable", "true", "--tripinfo-output", "trips.xml", "--tripinfo-output.write-unfinished", "true",
-                      "--summary-output", "summary.xml", "--queue-output", "queues.xml", "--queue-output.period", "60",
-                      "--statistic-output", "statistics.xml", "--time-to-teleport", "-1"], directory)
-    (directory/"engine.log").write_text(output, encoding="utf-8")
-    trips = list(ET.parse(directory/"trips.xml").getroot().findall("tripinfo"))
-    completed = [t for t in trips if float(t.get("arrival", "-1")) >= 0]
-    summary = ET.parse(directory/"summary.xml").getroot().findall("step")
-    last = summary[-1].attrib
-    departed = int(float(last.get("inserted", "0")))
-    queues = [float(l.get("queueing_length", "0")) for step in ET.parse(directory/"queues.xml").getroot()
-              for l in step.iter("lane")]
-    statistics = ET.parse(directory/"statistics.xml").getroot()
-    safety = statistics.find("safety")
-    return {"engine": "SUMO", "version": "1.27.1", "kind": "synthetic", "peak_hour_local": peak,
-            "planned_vehicles": planned, "project_vehicles": car_count+bike_count, "departed_vehicles": departed,
-            "completed_vehicles": len(completed), "unfinished_vehicles": departed-len(completed),
-            "undeparted_vehicles": max(0, planned-departed),
-            "mean_completed_delay_seconds": sum(float(t.get("timeLoss", "0")) for t in completed)/max(1, len(completed)),
-            "mean_departed_wait_seconds": sum(float(t.get("waitingTime", "0")) for t in trips)/max(1, len(trips)),
-            "max_queue_length_m": max(queues, default=0),
-            "collisions": int(safety.get("collisions", "0")) if safety is not None else None,
-            "simulation_seconds": 4200, "network": {"type": "FeatureCollection", "features": context["roads"]},
-            "artifacts": manifest(directory, "SUMO", "1.27.1"),
-            "limitations": "Synthetic signalized graph, OD and vehicle behaviour; selected peak-hour only. Gate service uses lane 0; extra gate lanes change approach, not service-station count. Incomplete trips are reported separately; mean delay excludes them."}
 
 
 def drainage(design, surfaces, context):
