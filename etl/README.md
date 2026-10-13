@@ -45,7 +45,8 @@ risk, land price, HCMC Overture footprints, and HCMC GBA LoD1 buildings. If rain
 it downloads forecast/history from Open-Meteo. Land-price source rows and OSM
 road candidates are prepared automatically. Selecting all pipelines requires
 stage `all`. Parcel and buildings-footprint ETL support separate
-`transform` and `load` stages.
+`transform` and `load` stages. Model generation runs last when parcel,
+Overture, and GBA source data are available.
 
 Run Overture building footprints independently:
 
@@ -86,6 +87,22 @@ use. The `05-buildings-gba-lod1.sql` and
 `06-buildings-gba-feature-id.sql` migrations create and key its table;
 apply migrations through the protected database deployment workflow before
 running this pipeline.
+
+Generate inset residential building extrusions from parcels after the parcel,
+Overture, and GBA datasets are loaded:
+
+```sh
+docker compose --profile etl-model-generation run --rm etl-model-generation run --stage all
+```
+
+The pipeline inventories all parcel land-use values, uses only the explicit
+residential codes `OTC`, `ODT`, and `ONT`, skips parcels overlapped by existing
+Overture or GBA building footprints, and samples model heights from GBA
+buildings on residential parcels. It publishes the synthetic models separately
+to `buildings.synthetic_residential`. The `20261013-model-generation.sql`
+migration creates that table; apply it with the protected database deployment
+workflow. Extracted inventory and stage files are stored in
+`etl/data/model_generation/`.
 
 ## Warehouse and data
 
