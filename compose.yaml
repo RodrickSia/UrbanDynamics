@@ -59,6 +59,8 @@ services:
       retries: 3
 
   frontend:
+    environment:
+      BACKEND_UPSTREAM: ${COMPOSE_PROJECT_NAME:-urbandynamics}-backend-1:8000
     build:
       context: ./frontend
       args:
