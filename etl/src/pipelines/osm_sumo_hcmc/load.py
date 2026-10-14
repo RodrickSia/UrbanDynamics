@@ -46,7 +46,11 @@ def run(settings: OsmSumoConfig = config) -> dict[str, int]:
     try:
         with db.transaction():
             with db.cursor() as cursor:
-                cursor.execute(sql.SQL("TRUNCATE {}, {}, {}").format(connection_table, edge_table, junction_table))
+                cursor.execute(sql.SQL("TRUNCATE {}, {}").format(connection_table, junction_table))
+                # TomTom observations reference SUMO edges with ON DELETE SET NULL.
+                # DELETE preserves those observations and clears their stale edge
+                # matches; TRUNCATE would fail while the referencing rows exist.
+                cursor.execute(sql.SQL("DELETE FROM {}").format(edge_table))
                 edge_rows, junction_rows, connection_rows = [], [], []
                 transformer = offset_x = offset_y = None
 
