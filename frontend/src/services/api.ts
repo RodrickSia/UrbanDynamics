@@ -8,7 +8,8 @@ export type VectorDataset =
   | 'parcels'
   | 'synthetic_buildings'
   | 'sumo_network'
-  | 'traffic';
+  | 'traffic'
+  | 'sumo_simulation';
 export type Dataset = VectorDataset | 'population';
 export type Palette = 'pseudocolor' | 'greyscale' | 'fire';
 export type Bounds = [number, number, number, number];
@@ -19,6 +20,12 @@ export interface DateQuery {
 export interface TrafficPeriod {
   weekday: number;
   period: string;
+}
+export interface SumoSimulationCatalog {
+  available: boolean;
+  network_input: boolean;
+  network_edges: number;
+  matched_observations: number;
 }
 export interface CatalogLayer {
   id: string;
@@ -37,6 +44,42 @@ export async function getTrafficCatalog(signal?: AbortSignal) {
   return {
     available: result.available === true,
     networkAvailable: result.network_available === true,
+  };
+}
+export async function getSumoSimulationCatalog(signal?: AbortSignal): Promise<SumoSimulationCatalog> {
+  const result = await requestJson('/api/v1/traffic/sumo-simulations/catalog', signal);
+  requireShape(typeof result.available === 'boolean');
+  return {
+    available: result.available === true,
+    network_input: result.network_input === true,
+    network_edges: Number(result.network_edges ?? 0),
+    matched_observations: Number(result.matched_observations ?? 0),
+  };
+}
+export async function runSumoSimulation(period: TrafficPeriod, signal?: AbortSignal) {
+  const response = await fetch(`${API_BASE_URL}/api/v1/traffic/sumo-simulations/runs`, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(period),
+  });
+  if (!response.ok) {
+    const failure = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof failure.detail === 'string' ? failure.detail : `SUMO request failed (${response.status})`,
+    );
+  }
+  const result = object(await response.json());
+  requireShape(typeof result.run_id === 'string');
+  return { runId: result.run_id as string, status: String(result.status ?? 'queued') };
+}
+export async function getSumoSimulationRun(runId: string, signal?: AbortSignal) {
+  const result = await requestJson(`/api/v1/traffic/sumo-simulations/runs/${runId}`, signal);
+  requireShape(typeof result.status === 'string');
+  return {
+    status: result.status as 'queued' | 'running' | 'completed' | 'failed',
+    error: typeof result.error === 'string' ? result.error : undefined,
+    metadata: result.metadata && typeof result.metadata === 'object' ? object(result.metadata) : undefined,
   };
 }
 export class ApiError extends Error {
@@ -116,6 +159,7 @@ export function tileUrl(
   year = 2024,
   palette: Palette = 'pseudocolor',
   trafficPeriod?: TrafficPeriod,
+  sumoRunId?: string,
 ) {
   const path =
     dataset === 'population'
@@ -124,6 +168,8 @@ export function tileUrl(
         ? `/api/v1/traffic/prediction/tiles/{z}/{x}/{y}.pbf${queryString(trafficPeriod ? { weekday: String(trafficPeriod.weekday), period: trafficPeriod.period } : {})}`
       : dataset === 'sumo_network'
         ? `/api/v1/traffic/network/tiles/{z}/{x}/{y}.pbf`
+      : dataset === 'sumo_simulation'
+        ? `/api/v1/traffic/sumo-simulations/runs/${sumoRunId ?? ''}/features`
       : `/api/v1/layers/${dataset}/tiles/{z}/{x}/{y}.pbf${queryString(
           dataset === 'land_price' || dataset === 'parcels'
             ? (dataset === 'parcels' ? { schema: '2' } : {})
@@ -137,9 +183,12 @@ export async function getFeatures(
   dates: DateQuery = {},
   signal?: AbortSignal,
   trafficPeriod?: TrafficPeriod,
+  sumoRunId?: string,
 ): Promise<FeatureSummary> {
   const result = await requestJson(
-    dataset === 'sumo_network'
+    dataset === 'sumo_simulation'
+      ? `/api/v1/traffic/sumo-simulations/runs/${sumoRunId ?? ''}/features`
+      : dataset === 'sumo_network'
       ? `/api/v1/traffic/network${queryString({ bbox: bounds?.join(','), limit: '1' })}`
       : dataset === 'traffic'
       ? `/api/v1/traffic/prediction${queryString({ ...(trafficPeriod ? { weekday: String(trafficPeriod.weekday), period: trafficPeriod.period } : {}), bbox: bounds?.join(','), limit: '1' })}`

@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/app/.venv/bin:$PATH
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 libgomp1 libatomic1 libx11-6 libxext6 libxrender1 libgl1 \
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 libgomp1 libatomic1 libx11-6 libxext6 libxrender1 libgl1 osmium-tool \
     && rm -rf /var/lib/apt/lists/*
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev

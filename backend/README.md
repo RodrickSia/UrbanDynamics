@@ -27,6 +27,9 @@ order. Spatial query bboxes use `west,south,east,north`.
 | Population XYZ PNG tiles | `/api/v1/population/{year}/tiles/{z}/{x}/{y}.png?palette=pseudocolor` |
 | Population point sample | `/api/v1/population/{year}/value?lng=106.7&lat=10.8` |
 | Population viewport statistics | `/api/v1/population/{year}/stats?bbox=west,south,east,north` |
+| Historical weekday/time traffic congestion layer | `/api/v1/traffic/prediction` |
+| Standalone SUMO congestion runs | `POST /api/v1/traffic/sumo-simulations/runs` |
+| SUMO run status and map GeoJSON | `/api/v1/traffic/sumo-simulations/runs/{run_id}` and `/features` |
 
 The vector catalog exposes layer availability, geometry types, fields, source
 metadata, and known limitations. Flood history is reported point observations
@@ -57,6 +60,15 @@ in `population.population_raster`, while vector snapshots remain in
 `public.layer_snapshots` and `public.layer_features`.
 Population PNG rendering is done in the API process from resampled pixel
 values, so it does not require enabling GDAL output drivers in PostGIS.
+
+The standalone SUMO traffic predictor is separate from development/zoning
+simulation. It queues a weekday/30-minute run to the `traffic-prediction-worker`
+Compose service, builds/caches a SUMO road network from the HCMC OSM PBF, and
+returns edge-level simulated speeds and LOS for the map. It derives one global
+random-trip rate from historical LOS because the current traffic sources do
+not provide vehicle counts or an observed origin-destination matrix. Treat the
+result as an estimated-demand scenario, not a validated forecast. Apply
+`11-sumo-congestion-simulation.sql` before using the queue API.
 
 ## Configuration and operation
 

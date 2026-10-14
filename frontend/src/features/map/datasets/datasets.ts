@@ -11,6 +11,7 @@ export const DATASETS = {
   'synthetic-buildings': 'synthetic_buildings',
   traffic: 'traffic',
   'sumo-network': 'sumo_network',
+  'sumo-simulation': 'sumo_simulation',
 } as const satisfies Partial<Record<UrbanLayerId, Dataset>>;
 export type DataLayerId = keyof typeof DATASETS;
 export const DATA_LAYER_IDS = Object.keys(DATASETS) as DataLayerId[];
@@ -30,6 +31,7 @@ export interface DataSelection {
   dates: DateQuery;
   visible?: boolean;
   trafficPeriod?: TrafficPeriod;
+  sumoRunId?: string;
 }
 // Keep synchronized with backend/app/services/raster_tiles.py; values are people/cell.
 export const PALETTE_STOPS: Record<Palette, ReadonlyArray<readonly [number, string]>> = {

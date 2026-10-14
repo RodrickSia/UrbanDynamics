@@ -4,6 +4,9 @@ import {
   getPopulationCatalog,
   getFeatures,
   getTrafficCatalog,
+  getSumoSimulationCatalog,
+  getSumoSimulationRun,
+  runSumoSimulation,
   tileUrl,
   type Palette,
   type DateQuery,
@@ -42,6 +45,10 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
     const weekdayNumber = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(weekday) + 1;
     return { weekday: weekdayNumber, period: `${value.hour}:${minute}` };
   });
+  const [sumoRunId, setSumoRunId] = useState<string | null>(null);
+  const [sumoRunStatus, setSumoRunStatus] = useState<'queued' | 'running' | 'completed' | 'failed' | null>(null);
+  const [sumoRunError, setSumoRunError] = useState<string | null>(null);
+  const [sumoRunMetadata, setSumoRunMetadata] = useState<Record<string, unknown> | null>(null);
   const [revision, setRevision] = useState(0);
   const [reports, setReports] = useState<Partial<Record<DataLayerId, LayerReport>>>({});
   const year =
@@ -122,8 +129,39 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
         traffic: { status: 'error', available: false },
         'sumo-network': { status: 'error', available: false },
       }));
+    void getSumoSimulationCatalog(controller.signal)
+      .then((result) => save({
+        'sumo-simulation': { status: 'ready', available: result.available },
+      }))
+      .catch(() => save({ 'sumo-simulation': { status: 'error', available: false } }));
     return () => controller.abort();
   }, [revision]);
+  useEffect(() => {
+    if (!sumoRunId || !sumoRunStatus || ['completed', 'failed'].includes(sumoRunStatus)) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const run = await getSumoSimulationRun(sumoRunId, controller.signal);
+        if (controller.signal.aborted) return;
+        setSumoRunStatus(run.status);
+        setSumoRunError(run.error ?? null);
+        setSumoRunMetadata(run.metadata ?? null);
+        if (!['completed', 'failed'].includes(run.status)) {
+          timer = setTimeout(() => void poll(), 2000);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          timer = setTimeout(() => void poll(), 3000);
+        }
+      }
+    };
+    timer = setTimeout(() => void poll(), 250);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [sumoRunId, sumoRunStatus]);
   const definitions = useMemo(
     () =>
       URBAN_LAYERS.map((layer) =>
@@ -147,15 +185,30 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
       definitions.flatMap((layer) => {
         if (!isDataLayer(layer.id) || !layers[layer.id] || layer.status !== 'available') return [];
         const dataset = DATASETS[layer.id];
+        if (dataset === 'sumo_simulation' && (!sumoRunId || sumoRunStatus !== 'completed')) return [];
         return [
-          { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette, dataset === 'traffic' ? trafficSchedule : undefined), year, dates,
+          { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette,
+            dataset === 'traffic' ? trafficSchedule : undefined, dataset === 'sumo_simulation' ? sumoRunId ?? undefined : undefined), year, dates,
             visible: layer.id !== 'synthetic-buildings' || mode === '3d',
             ...(dataset === 'traffic' ? { trafficPeriod: trafficSchedule } : {}),
+            ...(dataset === 'sumo_simulation' ? { sumoRunId: sumoRunId ?? undefined } : {}),
           },
         ];
       }),
-    [definitions, layers, year, palette, dates, trafficSchedule, mode],
+    [definitions, layers, year, palette, dates, trafficSchedule, sumoRunId, sumoRunStatus, mode],
   );
+  const runSumo = useCallback(async (period: TrafficPeriod) => {
+    const result = await runSumoSimulation(period);
+    setSumoRunId(result.runId);
+    setSumoRunStatus(result.status as 'queued' | 'running');
+    setSumoRunError(null);
+    setSumoRunMetadata(null);
+    setCatalog((current) => ({
+      ...current,
+      'sumo-simulation': { status: 'ready', available: true },
+    }));
+    return result;
+  }, []);
   const report = useCallback(
     (id: DataLayerId, value: LayerReport) =>
       setReports((current) =>
@@ -181,6 +234,11 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
     setDates,
     trafficSchedule,
     setTrafficSchedule,
+    sumoRunId,
+    sumoRunStatus,
+    sumoRunError,
+    sumoRunMetadata,
+    runSumo,
     reports,
     report,
     retry,

@@ -4,7 +4,11 @@ import { parcelFill } from './parcelStyle';
 export const dataSourceId = (id: DataLayerId) => `dataset-${id}`;
 export function datasetStyle(selection: DataSelection): LayerSpecification {
   const source = dataSourceId(selection.id);
-  const common = { id: source, source, 'source-layer': 'features' };
+  const common = {
+    id: source,
+    source,
+    ...(selection.dataset === 'sumo_simulation' ? {} : { 'source-layer': 'features' }),
+  };
   switch (selection.dataset) {
     case 'population':
       return {
@@ -107,6 +111,21 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
           'line-color': '#647987',
           'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.45, 12, 1.2, 17, 3],
           'line-opacity': 0.72,
+        },
+      };
+    case 'sumo_simulation':
+      return {
+        ...common,
+        type: 'line',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': [
+            'match', ['get', 'simulated_los'],
+            'A', '#168a58', 'B', '#71ad45', 'C', '#d2b83f',
+            'D', '#e58b32', 'E', '#d9583c', 'F', '#8c3047', '#8a9199',
+          ],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.1, 13, 2.7, 17, 5],
+          'line-opacity': 0.9,
         },
       };
     case 'parcels':

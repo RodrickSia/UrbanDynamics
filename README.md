@@ -18,11 +18,12 @@ outputs are modeled results, not forecasts or official determinations.
 - A background planning worker for computational planning scenarios.
 
 The existence of a dataset or ETL pipeline does not mean it is already loaded
-in your database or connected to a frontend layer. In particular, the HCMC SUMO
-network and traffic-history ETL are not, by themselves, a time-of-day congestion
-prediction service. The traffic inputs do not provide calibrated vehicle counts
-or SUMO demand routes. Treat simulation outputs as scenarios until calibrated
-and validated against held-out observations.
+in your database or connected to a frontend layer. Traffic has separate map
+layers for a historical congestion profile, the static SUMO network, and
+standalone SUMO scenario output. The SUMO runner derives estimated demand from
+historical LOS because the available sources do not provide calibrated vehicle
+counts or observed OD routes. Treat its results as modeled scenarios, not
+validated forecasts.
 
 ## Architecture
 
@@ -108,10 +109,13 @@ docker compose --profile etl-traffic-history run --rm \
   etl-traffic-history run --stage all
 ```
 
-These commands populate warehouse data; they do not create SUMO demand or a
-congestion prediction endpoint. For the available ETL profiles, inputs,
-outputs, and limitations, see [`etl/README.md`](etl/README.md). For the
-frontend's current layers and development commands, see
+These commands populate warehouse data; they do not create SUMO demand. The
+separate SUMO congestion simulation can be started from the map's Data layers
+sidebar after applying migration `11-sumo-congestion-simulation.sql` and
+starting the `traffic-prediction-worker` Compose service. For its assumptions
+and operations, see [`backend/README.md`](backend/README.md). For the available
+ETL profiles and input limitations, see [`etl/README.md`](etl/README.md). For
+frontend development commands, see
 [`frontend/README.md`](frontend/README.md).
 
 ## Development and checks

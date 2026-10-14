@@ -96,6 +96,7 @@ export type UrbanLayerId =
   | 'population'
   | 'public-facilities'
   | 'traffic'
+  | 'sumo-simulation'
   | 'sumo-network'
   | 'flood'
   | 'flood-history'

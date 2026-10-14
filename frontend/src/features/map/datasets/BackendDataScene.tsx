@@ -5,6 +5,7 @@ import {
   getFeatures,
   getPopulationStats,
   getPopulationValue,
+  getSumoSimulationRun,
   type Bounds,
 } from '../../../services/api';
 import type { LayerOpacityState } from '../types/map';
@@ -69,12 +70,29 @@ function DatasetSource({
       request?.abort();
       request = new AbortController();
       const signal = request.signal;
+      const selected = current.current;
+      if (selected.dataset === 'sumo_simulation' && selected.sumoRunId) {
+        try {
+          const run = await getSumoSimulationRun(selected.sumoRunId, signal);
+          if (signal.aborted) return;
+          publish(
+            run.status === 'completed' && !tileError ? 'ready' : tileError ? 'error' : 'empty',
+            run.status === 'completed' && !tileError
+              ? 'SUMO simulated edge results available'
+              : tileError
+                ? 'SUMO result layer unavailable · retry'
+                : 'SUMO run result is not ready',
+          );
+        } catch {
+          if (!signal.aborted) publish('error', 'SUMO run status unavailable · retry');
+        }
+        return;
+      }
       const bounds = viewportBounds(map);
       if (!bounds) {
         publish('ready', 'Move to Vietnam to inspect coverage');
         return;
       }
-      const selected = current.current;
       if (selected.dataset === 'parcels') {
         publish(
           tileError ? 'error' : 'ready',
@@ -108,7 +126,7 @@ function DatasetSource({
         const count =
           selected.dataset === 'population'
             ? await getPopulationStats(selected.year, bounds, signal)
-            : (await getFeatures(selected.dataset, bounds, selected.dates, signal, selected.trafficPeriod)).features.length;
+            : (await getFeatures(selected.dataset, bounds, selected.dates, signal, selected.trafficPeriod, selected.sumoRunId)).features.length;
         if (signal.aborted) return;
         publish(
           count === 0 ? 'empty' : tileError ? 'error' : 'ready',
@@ -135,9 +153,12 @@ function DatasetSource({
       tileError = false;
       if (!map.getSource(sourceId)) {
         const raster = selectedAtAttach.dataset === 'population';
+        const geojson = selectedAtAttach.dataset === 'sumo_simulation';
         map.addSource(
           sourceId,
-          raster
+          geojson
+            ? { type: 'geojson', data: selectedAtAttach.url }
+            : raster
             ? populationRasterSource(selectedAtAttach.url)
             : {
                 type: 'vector',
@@ -163,6 +184,7 @@ function DatasetSource({
           'land-price',
           'sumo-network',
           'traffic',
+          'sumo-simulation',
           'flood-history',
         ].map((id) => `dataset-${id}`);
         const before = map
@@ -252,6 +274,8 @@ function applyOpacity(map: MapLibreMap, selection: DataSelection, opacity: numbe
         ? 'line'
       : selection.dataset === 'sumo_network'
         ? 'line'
+        : selection.dataset === 'sumo_simulation'
+          ? 'line'
         : selection.dataset === 'synthetic_buildings'
           ? 'fill-extrusion'
         : 'fill';
@@ -276,6 +300,12 @@ const FIELDS: Record<string, string> = {
   threshold_p90_3h_mm: 'Threshold (mm)',
   issued_at: 'Issued',
   road: 'Road',
+  simulated_los: 'SUMO simulated LOS',
+  simulated_speed_kmh: 'SUMO speed (km/h)',
+  free_flow_speed_kmh: 'Free-flow speed (km/h)',
+  speed_ratio: 'Speed ratio',
+  vehicles_entered: 'Simulated vehicles entered',
+  occupancy_percent: 'Simulated occupancy (%)',
   start: 'From',
   end: 'To',
   residential_vnd_m2: 'Residential (VND/m²)',

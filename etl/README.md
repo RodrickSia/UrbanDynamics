@@ -181,8 +181,11 @@ and agreement of available historical days.
 The separate `SUMO road network` map layer reads the loaded edge graph from
 `transport.sumo_edge` using `/api/v1/traffic/network` and its vector-tile route.
 It displays SUMO edge geometry, road type, lane count, and network speed limit;
-it does not represent simulated traffic. The `Traffic` layer overlays the
-historical LOS estimate on the subset of roads matched to observations.
+it does not represent simulated traffic. The historical congestion layer
+overlays LOS on the subset of roads matched to observations. The independent
+SUMO congestion-simulation service is documented in `backend/README.md`; it
+uses these observations only as an estimated global demand prior and does not
+change the ETL datasets.
 
 ## Warehouse and data
 

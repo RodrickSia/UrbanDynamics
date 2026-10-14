@@ -52,7 +52,7 @@ jobs:
             echo "The PostGIS service must be running and migrated before traffic_feat." >&2
             exit 1
           fi
-          migration_query="SELECT to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND to_regclass('transport.tomtom_traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '09-traffic-speed-comparison.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '10-tomtom-traffic-observation.sql')"
+          migration_query="SELECT to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND to_regclass('transport.tomtom_traffic_observation') IS NOT NULL AND to_regclass('transport.sumo_congestion_run') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '09-traffic-speed-comparison.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '10-tomtom-traffic-observation.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '11-sumo-congestion-simulation.sql')"
           if ! docker compose exec -T postgis sh -c \
             'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"' \
             sh "$migration_query" | grep -Fxq t; then

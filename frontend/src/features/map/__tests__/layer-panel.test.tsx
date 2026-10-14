@@ -24,7 +24,7 @@ function mockCatalog() {
   vi.stubGlobal(
     'fetch',
     vi.fn(
-      async (input: string) =>
+      async (input: string, init?: RequestInit) =>
         new Response(
           JSON.stringify(
             input.endsWith('/population')
@@ -32,6 +32,14 @@ function mockCatalog() {
                   available: true,
                   years: Array.from({ length: 16 }, (_, index) => ({ year: 2015 + index })),
                 }
+              : input.endsWith('/traffic/sumo-simulations/catalog')
+                ? { available: true, network_input: true, network_edges: 1200, matched_observations: 4500 }
+              : input.endsWith('/traffic/sumo-simulations/runs') && init?.method === 'POST'
+                ? { run_id: 'a4b0baab-5b88-42e3-932d-72a8103fe870', status: 'queued' }
+              : input.includes('/traffic/sumo-simulations/runs/')
+                ? { status: 'completed', metadata: { features: 420 } }
+              : input.endsWith('/traffic/catalog')
+                ? { available: true, network_available: true }
               : {
                   layers: [
                     { id: 'flood_history', available: true },
@@ -49,8 +57,11 @@ it('groups connected datasets separately from map display and keeps future integ
   mockCatalog();
   render(<Panel />);
   const datasets = await screen.findByRole('group', { name: 'Datasets' });
-  await waitFor(() => expect(within(datasets).getByText('4 available')).toBeInTheDocument());
+  await waitFor(() => expect(within(datasets).getByText('7 available')).toBeInTheDocument());
   expect(within(datasets).getByRole('checkbox', { name: 'Population' })).toBeEnabled();
+  expect(within(datasets).getByRole('checkbox', { name: 'Traffic congestion prediction (historical)' })).toBeEnabled();
+  expect(within(datasets).getByRole('checkbox', { name: 'SUMO road network' })).toBeEnabled();
+  expect(within(datasets).getByRole('checkbox', { name: 'SUMO congestion simulation' })).toBeEnabled();
   expect(within(datasets).queryByText('WorldPop · 16 years')).not.toBeInTheDocument();
   expect(within(datasets).queryByText('Ready')).not.toBeInTheDocument();
   expect(screen.queryByText('Building extrusions')).not.toBeInTheDocument();
@@ -63,6 +74,32 @@ it('groups connected datasets separately from map display and keeps future integ
   expect(screen.getByRole('checkbox', { name: 'Rain' })).not.toBeVisible();
   await userEvent.click(screen.getByText('More layers'));
   expect(screen.getByRole('checkbox', { name: 'Rain' })).toBeDisabled();
+});
+it('lets users display historical traffic and the SUMO road graph when the API reports them available', async () => {
+  mockCatalog();
+  render(<Panel />);
+  const traffic = await screen.findByRole('checkbox', { name: 'Traffic congestion prediction (historical)' });
+  await waitFor(() => expect(traffic).toBeEnabled());
+
+  await userEvent.click(traffic);
+  expect(traffic).toBeChecked();
+  expect(screen.getByRole('combobox', { name: 'Traffic prediction day of week' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Traffic prediction time of day')).toBeInTheDocument();
+
+  const sumo = screen.getByRole('checkbox', { name: 'SUMO road network' });
+  await userEvent.click(sumo);
+  expect(sumo).toBeChecked();
+  expect(screen.getByText('SUMO network edge')).toBeInTheDocument();
+});
+it('runs SUMO separately from planning and exposes its simulation layer controls', async () => {
+  mockCatalog();
+  render(<Panel />);
+  const simulation = await screen.findByRole('checkbox', { name: 'SUMO congestion simulation' });
+  await waitFor(() => expect(simulation).toBeEnabled());
+  await userEvent.click(simulation);
+  expect(screen.getByText('Run SUMO congestion scenario')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Run separate SUMO simulation' }));
+  await waitFor(() => expect(screen.getByText(/SUMO simulation complete/)).toBeInTheDocument());
 });
 it('reveals compact controls only for active layers and supports keyboard toggling', async () => {
   mockCatalog();

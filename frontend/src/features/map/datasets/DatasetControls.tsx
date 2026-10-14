@@ -9,6 +9,10 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
   const report = data.reports[id];
   const [trafficWeekday, setTrafficWeekday] = useState(data.trafficSchedule.weekday);
   const [trafficPeriod, setTrafficPeriod] = useState(data.trafficSchedule.period);
+  const [sumoWeekday, setSumoWeekday] = useState(data.trafficSchedule.weekday);
+  const [sumoPeriod, setSumoPeriod] = useState(data.trafficSchedule.period);
+  const [sumoSubmitting, setSumoSubmitting] = useState(false);
+  const [sumoSubmitError, setSumoSubmitError] = useState('');
   const StatusIcon =
     report?.status === 'error'
       ? CircleAlert
@@ -178,8 +182,78 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           <Legend color="#647987" label="SUMO network edge" />
           <DatasetNote>
             Roads come from the loaded HCMC SUMO network. This layer shows network geometry and
-            attributes only; it is not a SUMO run or a congestion prediction. Turn on Traffic to
-            view the separate historical LOS estimate for matched roads.
+            attributes only; it is not a SUMO run or a congestion prediction. Turn on the
+            historical traffic or SUMO congestion simulation layer for traffic results.
+          </DatasetNote>
+        </>
+      )}
+      {id === 'sumo-simulation' && (
+        <>
+          <form
+            className="dataset-dates"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setSumoSubmitting(true);
+              setSumoSubmitError('');
+              try {
+                await data.runSumo({ weekday: sumoWeekday, period: sumoPeriod });
+              } catch (error) {
+                setSumoSubmitError(error instanceof Error ? error.message : 'Could not queue SUMO run');
+              } finally {
+                setSumoSubmitting(false);
+              }
+            }}
+          >
+            <strong>Run SUMO congestion scenario</strong>
+            <div className="dataset-fields">
+              <label>
+                Historical weekday
+                <select
+                  aria-label="SUMO prediction day of week"
+                  value={sumoWeekday}
+                  onChange={(event) => setSumoWeekday(Number(event.target.value))}
+                >
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => (
+                    <option key={day} value={index + 1}>{day}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Time of day (HCMC)
+                <input
+                  type="time"
+                  step={1800}
+                  aria-label="SUMO prediction time of day"
+                  value={sumoPeriod}
+                  onChange={(event) => setSumoPeriod(event.target.value)}
+                />
+              </label>
+            </div>
+            <button type="submit" disabled={sumoSubmitting || data.sumoRunStatus === 'queued' || data.sumoRunStatus === 'running'}>
+              {sumoSubmitting || data.sumoRunStatus === 'queued' || data.sumoRunStatus === 'running'
+                ? `SUMO ${data.sumoRunStatus ?? 'queueing'}…`
+                : 'Run separate SUMO simulation'}
+            </button>
+          </form>
+          {data.sumoRunStatus === 'failed' && (
+            <p className="dataset-status" role="alert">SUMO run failed: {data.sumoRunError ?? 'unknown error'}</p>
+          )}
+          {data.sumoRunStatus === 'completed' && (
+            <p className="dataset-status" role="status">
+              SUMO simulation complete · {String(data.sumoRunMetadata?.features ?? 0)} road edges
+            </p>
+          )}
+          {sumoSubmitError && <p className="dataset-status" role="alert">{sumoSubmitError}</p>}
+          <div className="dataset-legend">
+            {[
+              ['A', '#168a58'], ['B', '#71ad45'], ['C', '#d2b83f'],
+              ['D', '#e58b32'], ['E', '#d9583c'], ['F', '#8c3047'],
+            ].map(([grade, color]) => <Legend key={grade} color={color} label={grade} />)}
+          </div>
+          <DatasetNote>
+            This is a separate SUMO run. Demand is estimated from historical LOS, not measured
+            vehicle counts or an observed origin–destination matrix. Results are modeled scenarios,
+            not live traffic or a validated forecast.
           </DatasetNote>
         </>
       )}

@@ -46,6 +46,7 @@ services:
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-}
       SCENARIO_DATA_DIR: /runtime/scenarios
       SIMULATION_WORK_DIR: /runtime/solvers
+      TRAFFIC_SIMULATION_DIR: /runtime/traffic-prediction
     volumes:
       - ${URBANDYNAMICS_DATA_DIR:-./etl/data}:/data:ro
       - simulation_runtime:/runtime
@@ -90,6 +91,27 @@ services:
       PLANNING_MAX_RUNNING: 2
     volumes:
       - ./etl/data:/data:ro
+      - simulation_runtime:/runtime
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  traffic-prediction-worker:
+    image: urbandynamics-backend:latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "app.services.traffic_prediction_worker"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /data
+      TRAFFIC_SIMULATION_DIR: /runtime/traffic-prediction
+      TRAFFIC_SIMULATION_TIMEOUT_SECONDS: 600
+    volumes:
+      - ${URBANDYNAMICS_DATA_DIR:-./etl/data}:/data:ro
       - simulation_runtime:/runtime
     depends_on:
       postgis:

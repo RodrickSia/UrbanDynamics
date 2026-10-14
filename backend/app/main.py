@@ -1,18 +1,34 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.repository import readiness
-from app.routers import parcels
-from app.routers import zoning
-from app.routers import floods, land_prices, layers, population, scenarios, urban, building_scenarios, weather, integrated_scenarios, traffic
-from app.routers import planning_scenarios, planning_system_demo, area_indicators
+from app.routers import (
+    area_indicators,
+    building_scenarios,
+    floods,
+    integrated_scenarios,
+    land_prices,
+    layers,
+    parcels,
+    planning_scenarios,
+    planning_system_demo,
+    population,
+    scenarios,
+    traffic,
+    traffic_sumo,
+    urban,
+    weather,
+    zoning,
+)
 
 app = FastAPI(
     title="UrbanDynamics Data API",
-    summary="Map-ready population, building, flood, and official reference-price data from PostGIS.",
+    summary=(
+        "Map-ready population, building, flood, and official reference-price data from PostGIS."
+    ),
     version="1.0.0",
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
@@ -26,14 +42,20 @@ if settings.allowed_origins:
         allow_headers=["Content-Type", "Authorization"],
     )
 
+
 @app.exception_handler(RequestValidationError)
 async def invalid_request(_request, error):
     # Do not echo arbitrary input: NaN/Infinity cannot be serialized as JSON,
     # and submitted fields may contain private data.
-    return JSONResponse(status_code=422, content={"detail": [
-        {"type": item["type"], "loc": list(item["loc"]), "msg": item["msg"]}
-        for item in error.errors()
-    ]})
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [
+                {"type": item["type"], "loc": list(item["loc"]), "msg": item["msg"]}
+                for item in error.errors()
+            ]
+        },
+    )
 
 
 for router in (
@@ -53,6 +75,7 @@ for router in (
     planning_scenarios.preview_router,
     planning_system_demo.router,
     traffic.router,
+    traffic_sumo.router,
 ):
     app.include_router(router)
 
@@ -91,5 +114,6 @@ def api_index():
             "land_prices": "/api/v1/land-prices",
             "traffic_prediction": "/api/v1/traffic/prediction?weekday=1&period=08:00",
             "sumo_network": "/api/v1/traffic/network",
+            "sumo_congestion_simulations": "/api/v1/traffic/sumo-simulations/runs",
         },
     }

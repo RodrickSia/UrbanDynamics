@@ -117,6 +117,10 @@ jobs:
             IF (SELECT count(*) FROM public.schema_migrations WHERE version = '20261013-model-generation.sql') <> 1 THEN
               RAISE EXCEPTION 'model generation migration was not tracked exactly once';
             END IF;
+            IF to_regclass('transport.sumo_congestion_run') IS NULL OR
+               (SELECT count(*) FROM public.schema_migrations WHERE version = '11-sumo-congestion-simulation.sql') <> 1 THEN
+              RAISE EXCEPTION 'standalone SUMO congestion simulation migration is missing';
+            END IF;
           END
           $$;
           SQL

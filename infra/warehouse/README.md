@@ -27,6 +27,10 @@ skips versions already recorded. The manual `Deploy database` workflow invokes
 the same runner against the production Compose warehouse without replacing its
 database volume.
 
+The standalone SUMO congestion-prediction queue is created by
+`11-sumo-congestion-simulation.sql`. Apply that migration before starting runs
+from the map; the separate `traffic-prediction-worker` consumes queued jobs.
+
 ## Configuration and credentials
 
 Copy `.env.example` to `.env` and set a unique `WAREHOUSE_PASSWORD` before the
