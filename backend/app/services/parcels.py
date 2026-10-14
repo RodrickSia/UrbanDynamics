@@ -96,15 +96,23 @@ def price_reference(parcel, candidates):
     result['selected'] = selected
     result['road_match_status'] = str(props.get('match_confidence') or 'unknown')
     result['geometry_review_status'] = 'reviewed' if props.get('geometry_reviewed') is True else 'unreviewed'
+    automatic_reference = (
+        props.get('match_confidence') == 'automatic_reference'
+        and props.get('publication_match_mode') == 'automatic'
+        and props.get('price_kind') == 'table_reference'
+        and props.get('geometry_coverage') in {'citywide_road_reference', 'actual_road_piece_reference'}
+    )
     if (props.get('geometry_coverage') == 'whole_named_road_proxy' or
-        not (props.get('geometry_reviewed') is True or props.get('match_confidence') == 'spatially_checked')):
+        not (automatic_reference or props.get('geometry_reviewed') is True or props.get('match_confidence') == 'spatially_checked')):
         result['status'] = 'unverified'
         return result
     field = PRICE_CATEGORIES[classification['price_category']]
     unit_price = positive(props.get(field))
     if not unit_price:
         return result
-    provisional = classification['classification_basis'] == 'planning' or selected['distance_m'] > 15
+    # Citywide allocation can borrow a ward-table row. Show the published unit
+    # reference without presenting that assignment as a verified parcel valuation.
+    provisional = automatic_reference or classification['classification_basis'] == 'planning' or selected['distance_m'] > 15
     result.update(status='provisional' if provisional else 'reference',
                   unit_price_vnd_m2=unit_price)
     result['valuation_confidence'] = (
@@ -144,6 +152,7 @@ def detail(parcel_id):
     # Expose only public price provenance, not arbitrary source metadata.
     allowed = {'road', 'start', 'end', 'ward', 'source_url', 'pdf_page', 'effective_from',
                'geometry_reviewed', 'source_values_reviewed', 'match_confidence', 'geometry_coverage',
+               'publication_match_mode', 'price_kind', 'match_method', 'source_road', 'matched_road_name',
                *PRICE_CATEGORIES.values()}
     for candidate in candidates:
         candidate['properties'] = {k: v for k, v in candidate['properties'].items() if k in allowed}

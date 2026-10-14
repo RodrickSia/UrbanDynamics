@@ -79,6 +79,10 @@ export function ParcelDetails({ parcelId, onClose }: { parcelId: string; onClose
 function ParcelContent({ detail }: { detail: ParcelDetail }) {
   const { parcel, land_use: use, price } = detail;
   const selected = price.selected;
+  const unitOnly = price.unit_price_vnd_m2 !== null && price.estimated_land_total_vnd === null;
+  const automatic = price.road_match_status === 'automatic_reference';
+  const areaAllocated = automatic && ['ward_table_reference', 'nearest_ward_table_reference', 'same_ward_reference_road']
+    .includes(String(selected?.properties.match_method));
   const source = sourceLink(selected?.properties.source_url);
   const address = [parcel.phuong, parcel.quan, parcel.tinh].filter(value => text(value) !== 'Not provided').join(', ');
   return <>
@@ -91,19 +95,23 @@ function ParcelContent({ detail }: { detail: ParcelDetail }) {
     <section className="parcel-section"><div className="parcel-section-heading"><h3>Estimated Land Value</h3></div>
       <p className="parcel-category">{price.price_category ?? 'Unmapped land use'}{price.classification_basis === 'planning' && ' · from planning'}</p>
       {price.status === 'provisional' && <p className="parcel-fine-print">Indicative unit price · low confidence</p>}
-      <div className="parcel-price"><strong>{price.status === 'provisional' && price.unit_price_vnd_m2 !== null
-        ? number(price.unit_price_vnd_m2)
+      <div className="parcel-price"><strong>{unitOnly
+        ? number(price.unit_price_vnd_m2!)
         : price.estimated_land_total_vnd === null ? 'null' : number(price.estimated_land_total_vnd)}</strong>
-        {price.status === 'provisional' && price.unit_price_vnd_m2 !== null
+        {unitOnly
           ? <span>₫/m²</span> : price.estimated_land_total_vnd !== null && <span>₫</span>}</div>
       {price.status !== 'provisional' && <div className="parcel-formula" aria-label="Land value calculation">
         <span>{number(parcel.area_m2)} m²</span><span aria-hidden="true">×</span>
         <span>{price.unit_price_vnd_m2 === null ? 'null' : `${number(price.unit_price_vnd_m2)} ₫/m²`}</span>
         <span aria-hidden="true">=</span><strong>{price.estimated_land_total_vnd === null ? 'null' : `${number(price.estimated_land_total_vnd)} ₫`}</strong>
       </div>}
-      <p className="parcel-fine-print">{PRICE_NOTES[price.status]}</p>
+      <p className="parcel-fine-print">{automatic && price.status === 'provisional'
+        ? areaAllocated ? 'Area-table reference allocated to this road; not a verified price for this parcel.'
+          : 'Automatic road-table reference · parcel frontage and segment extent unverified.'
+        : PRICE_NOTES[price.status]}</p>
       {selected && <dl className="parcel-source-details">
         {text(selected.properties.road) !== 'Not provided' && <div><dt>Road</dt><dd>{text(selected.properties.road)}</dd></div>}
+        {automatic && text(selected.properties.source_road) !== 'Not provided' && <div><dt>Price-table road</dt><dd>{text(selected.properties.source_road)}</dd></div>}
         {(text(selected.properties.start) !== 'Not provided' || text(selected.properties.end) !== 'Not provided') &&
           <div><dt>Segment</dt><dd>{text(selected.properties.start)} → {text(selected.properties.end)}</dd></div>}
         <div><dt>Distance to plot</dt><dd>{number(selected.distance_m)} m</dd></div>

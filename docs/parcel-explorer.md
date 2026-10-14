@@ -44,6 +44,26 @@ use, so they are displayed without contributing to parcel value. The result
 retains the source code, normalized family, category, road match and geometry
 review status, confidence, and price provenance.
 
+### Citywide automatic road references
+
+The citywide publication uses `match_confidence=automatic_reference`,
+`publication_match_mode=automatic`, `price_kind=table_reference` and coverage
+`citywide_road_reference` or `actual_road_piece_reference`. These fields must
+survive the detail API's public metadata filter. Otherwise valid published
+prices are rejected as unverified even when a road is found next to the parcel.
+These references now provide the matching land-use category's unit price with
+low confidence, without an estimated total. Ward allocations may borrow another
+road's table row; the UI retains `source_road` and distinguishes these allocations
+from direct road-name matches. Existing distance, ambiguity and land-use checks
+still apply. Missing prices remain null; citywide publication is not proof of
+verified parcel frontage.
+
+On 2026-10-14 the running API returned `unverified` for parcels 1568422 and
+1568426 despite a Trần Quốc Thảo candidate at 8.69 m and 22.27 m respectively.
+Regression fixtures use that published rate triple (210,600,000 residential,
+147,400,000 commercial, 126,400,000 other non-agricultural VND/m²). Tests cover
+the metadata filter through the API and the resulting unit-price dialog.
+
 Python: `python -m pytest etl/tests/test_parcel_geometry.py backend/tests/test_parcels.py -q`.
 PostGIS regression fixtures verify union areas, normalized land-use colors, MVT
 features at zoom 12/14/16 and road-price association in an isolated test database.

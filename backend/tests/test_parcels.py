@@ -28,6 +28,71 @@ def test_unique_spatial_match_can_estimate_mapped_residential_area():
     assert result['classification_confidence'] == 'high'
 
 
+@pytest.mark.parametrize('distance', [8.69, 22.27])
+@pytest.mark.parametrize('code,field,expected', [
+    ('OTC', 'residential_vnd_m2', 210_600_000),
+    ('C.hang', 'commercial_vnd_m2', 147_400_000),
+    ('Tr.học', 'other_nonagricultural_vnd_m2', 126_400_000),
+])
+def test_citywide_automatic_prices_are_visible_as_unit_references(distance, code, field, expected):
+    # Current citywide publication: real Trần Quốc Thảo price triple, previously rejected.
+    candidate = road(road='Trần Quốc Thảo', source_road='TRẦN QUỐC THẢO',
+        match_confidence='automatic_reference', publication_match_mode='automatic',
+        price_kind='table_reference', geometry_coverage='citywide_road_reference',
+        geometry_reviewed=False, match_method='same_ward_road_name',
+        residential_vnd_m2=210_600_000, commercial_vnd_m2=147_400_000,
+        other_nonagricultural_vnd_m2=126_400_000)
+    candidate['distance_m'] = distance
+    result = parcels.price_reference({'uniq_id': '13808833', 'mdsdd': code, 'area_m2': 317.505}, [candidate])
+    assert result['status'] == 'provisional'
+    assert result['unit_price_vnd_m2'] == candidate['properties'][field] == expected
+    assert result['valuation_confidence'] == 'low'
+    assert result['estimated_land_total_vnd'] is None
+
+
+def test_automatic_references_still_require_valid_publication_and_unique_road():
+    parcel = {'uniq_id': 'known', 'mdsdd': 'ODT', 'area_m2': 100}
+    automatic = road(match_confidence='automatic_reference', publication_match_mode='automatic',
+                     price_kind='table_reference', geometry_coverage='actual_road_piece_reference')
+    assert parcels.price_reference(parcel, [automatic])['unit_price_vnd_m2'] == 10_000_000
+    for field in ['publication_match_mode', 'price_kind', 'geometry_coverage']:
+        bad = {**automatic, 'properties': {**automatic['properties'], field: None}}
+        assert parcels.price_reference(parcel, [bad])['unit_price_vnd_m2'] is None
+    assert parcels.price_reference(parcel, [automatic, road(road='Other road')])['status'] == 'ambiguous'
+
+
+def test_detail_preserves_automatic_price_provenance_through_api(monkeypatch):
+    from unittest.mock import MagicMock
+
+    parcel = {'id': 1568422, 'uniq_id': '13808833', 'mdsdd': 'OTC',
+              'area_m2': 317.505, 'conflicting_land_use': False, 'loai_dat_qh': None}
+    candidate = road(road='Trần Quốc Thảo', source_road='TRẦN QUỐC THẢO',
+                     match_confidence='automatic_reference', publication_match_mode='automatic',
+                     price_kind='table_reference', geometry_coverage='citywide_road_reference',
+                     match_method='same_ward_road_name', residential_vnd_m2=210_600_000,
+                     internal_metadata='not public')
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchone.return_value = parcel
+    cursor.fetchall.return_value = [candidate]
+
+    @contextmanager
+    def warehouse():
+        yield connection
+
+    monkeypatch.setattr(parcels, 'connect_to_warehouse', warehouse)
+    response = TestClient(app).get('/api/v1/parcels/1568422')
+    assert response.status_code == 200
+    price = response.json()['price']
+    assert price['status'] == 'provisional'
+    assert price['unit_price_vnd_m2'] == 210_600_000
+    assert price['estimated_land_total_vnd'] is None
+    props = price['selected']['properties']
+    assert props['source_road'] == 'TRẦN QUỐC THẢO'
+    assert props['match_method'] == 'same_ward_road_name'
+    assert 'internal_metadata' not in props
+
+
 @pytest.mark.parametrize('source,category,field,family', [
     ('OTC', 'Residential', 'residential_vnd_m2', 'Residential land'),
     ('K.sạn', 'Commercial', 'commercial_vnd_m2', 'Hotel'),
