@@ -152,10 +152,12 @@ traffic speed, and writes `traffic_observations.csv`. The load
 stage matches source node pairs first, then uses a 40 m spatial search against
 `transport.sumo_edge`; results, including unmatched source rows, are upserted to
 `transport.traffic_observation`, replacing that pipeline's previous snapshot on
-each run. Apply `07-sumo-road-network.sql` and then
-`08-traffic-history.sql` before loading. This records observed conditions for
-analytics and calibration; it does not infer vehicle counts, measured speeds,
-or generate SUMO routes/demand.
+each run. Apply migrations `07-sumo-road-network.sql` through
+`09-traffic-speed-comparison.sql` before loading. Each observation also stores
+the matched SUMO edge's mean lane speed and the difference from `max_velocity`,
+interpreted as km/h for comparison. The source value is retained unchanged, and
+this comparison does not modify SUMO lane speeds. It does not infer vehicle
+counts or generate SUMO routes/demand.
 
 ## Warehouse and data
 

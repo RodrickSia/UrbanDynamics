@@ -57,13 +57,19 @@ def run(path: str | Path | None = None, settings: TrafficHistoryConfig = config)
                         source_max_velocity, source_start_node, source_end_node,
                         source_length_m, street_id, street_name, street_type,
                         start_lon, start_lat, end_lon, end_lat,
-                        sumo_edge_id, match_method, match_distance_m
+                        sumo_edge_id, match_method, match_distance_m,
+                        sumo_mean_lane_speed_mps, sumo_mean_lane_speed_kmh,
+                        source_vs_sumo_speed_delta_kmh
                     )
                     SELECT s.source_row_id, s.source_segment_id, s.observed_at, s.period_minutes,
                            s.los, s.source_max_velocity, s.source_start_node, s.source_end_node,
                            s.source_length_m, s.street_id, s.street_name, s.street_type,
                            s.start_lon, s.start_lat, s.end_lon, s.end_lat,
-                           matched.edge_id, matched.method, matched.distance_m
+                           matched.edge_id, matched.method, matched.distance_m,
+                           lane_speeds.mean_speed_mps, lane_speeds.mean_speed_mps * 3.6,
+                           CASE WHEN s.source_max_velocity IS NULL OR lane_speeds.mean_speed_mps IS NULL
+                                THEN NULL
+                                ELSE s.source_max_velocity - lane_speeds.mean_speed_mps * 3.6 END
                     FROM traffic_history_stage s
                     LEFT JOIN LATERAL (
                         SELECT candidate.edge_id, candidate.method, candidate.distance_m
@@ -97,6 +103,11 @@ def run(path: str | Path | None = None, settings: TrafficHistoryConfig = config)
                         ORDER BY candidate.rank, candidate.direction_cost, candidate.distance_m, candidate.edge_id
                         LIMIT 1
                     ) matched ON TRUE
+                    LEFT JOIN transport.sumo_edge matched_edge ON matched_edge.edge_id = matched.edge_id
+                    LEFT JOIN LATERAL (
+                        SELECT AVG((lane->>'speed_mps')::DOUBLE PRECISION) AS mean_speed_mps
+                        FROM jsonb_array_elements(matched_edge.lanes) AS lane_data(lane)
+                    ) lane_speeds ON TRUE
                 """).format(target))
                 cursor.execute(sql.SQL("""
                     SELECT COUNT(*), COUNT(*) FILTER (WHERE sumo_edge_id IS NOT NULL),

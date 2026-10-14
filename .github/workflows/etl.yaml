@@ -137,7 +137,7 @@ jobs:
             fi
           fi
           if [ "$ETL_PIPELINE" = traffic_history ] && { [ "$ETL_STAGE" = load ] || [ "$ETL_STAGE" = all ]; }; then
-            traffic_migration_query="to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql')"
+            traffic_migration_query="to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '09-traffic-speed-comparison.sql')"
             if ! docker compose exec -T postgis sh -c \
               'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
               sh "$traffic_migration_query" | grep -Fxq t; then
