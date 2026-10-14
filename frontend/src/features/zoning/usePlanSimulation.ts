@@ -16,9 +16,9 @@ async function request<T>(path: string, body?: unknown, signal?: AbortSignal): P
 }
 const active = (job?: SimulationJob | null) => !!job && ['queued', 'running'].includes(job.status);
 
-export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: SimulationSettings) {
-  const key = JSON.stringify([plan.id, plan.revision, scenario.id, settings]);
-  const storageKey = `plan-simulation:${plan.id}:${scenario.id}`;
+export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: SimulationSettings, parcelId: string | null, enabled = true) {
+  const key = JSON.stringify([plan.id, plan.revision, scenario.id, parcelId, enabled, settings]);
+  const storageKey = `plan-simulation:${plan.id}:${scenario.id}:${parcelId ?? 'scenario'}`;
   const currentKey = useRef<string | null>(key);
   const [state, setState] = useState<{ key: string; study?: SimulationStudy; job?: SimulationJob; result?: SimulationResult }>();
   const [requesting, setRequesting] = useState(false), [error, setError] = useState('');
@@ -32,6 +32,7 @@ export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: Simu
     try { localStorage.setItem(storageKey, JSON.stringify({ key, id: job.id })); } catch { /* Storage may be unavailable. */ }
   };
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let id = visible?.job?.id;
@@ -59,14 +60,14 @@ export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: Simu
     };
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [key, storageKey, visible?.job?.id, refresh]);
+  }, [key, storageKey, visible?.job?.id, refresh, enabled]);
 
   const run = async (mode: 'screening' | 'native') => {
-    if (requesting || active(visible?.job)) return;
+    if (!enabled || requesting || active(visible?.job)) return;
     setRequesting(true); setError('');
     try {
       const study = await zoningRequest<SimulationStudy>(`/${plan.id}/simulation/studies`, {
-        revision: plan.revision, scenario_id: scenario.id, ...settings,
+        revision: plan.revision, scenario_id: scenario.id, parcel_id: parcelId, ...settings,
       });
       // Changing scenario during preflight must not enqueue an unseen run.
       if (currentKey.current !== key) return;
@@ -87,5 +88,5 @@ export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: Simu
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Simulation unavailable'); }
     finally { setRequesting(false); }
   };
-  return { ...visible, error, requesting, running: active(visible?.job), run, action };
+  return { ...visible, error: enabled ? error : '', requesting, running: active(visible?.job), run, action };
 }

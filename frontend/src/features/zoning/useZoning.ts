@@ -34,7 +34,8 @@ export function useZoning(parcelAvailable = false) {
   const chosenType = plan?.types.find(t => t.id === typeId) ?? plan?.types[0];
   const active = panel !== null;
   const analyzing = active && (panel === 'indicators' || (!!plan && section === 'dashboard'));
-  const analysisArea = analysisSelection?.planId === (plan?.id ?? null) ? analysisSelection.geometry : plan?.study_area ?? null;
+  const analysisArea = panel === 'plans' && section === 'dashboard' ? plan?.study_area ?? null
+    : analysisSelection?.planId === (plan?.id ?? null) ? analysisSelection.geometry : plan?.study_area ?? null;
   const useStudyArea = () => { setAnalysisSelection(null); cancel(); };
   useEffect(() => {
     if (plan && scenario) {

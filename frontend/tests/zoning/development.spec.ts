@@ -13,8 +13,9 @@ async function buildingHeights(page: Page) {
 async function prepare(page: Page, request: APIRequestContext) {
   const fixtureStyle = { version: 8, sources: { baseline: { type: 'geojson', data: { type: 'FeatureCollection', features: [
     { type: 'Feature', id: 77, properties: {}, geometry: { type: 'Polygon', coordinates: [[[106.761,10.821],[106.7614,10.821],[106.7614,10.8214],[106.761,10.8214],[106.761,10.821]]] } },
+    { type: 'Feature', id: 78, properties: {}, geometry: { type: 'Polygon', coordinates: [[[106.764,10.821],[106.7644,10.821],[106.7644,10.8214],[106.764,10.8214],[106.764,10.821]]] } },
   ] } } }, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#dce5df' } },
-    { id: 'baseline-buildings', type: 'fill-extrusion', source: 'baseline', paint: { 'fill-extrusion-color': '#a9b6ae', 'fill-extrusion-height': 6 } }] };
+    { id: 'urban-buildings-3d', type: 'fill-extrusion', source: 'baseline', paint: { 'fill-extrusion-color': '#a9b6ae', 'fill-extrusion-height': 6 } }] };
   await page.route('https://tiles.goong.io/**', route => route.fulfill({ json: fixtureStyle }));
   await page.route('https://tiles.mapterhorn.com/**', route => route.abort());
   await page.route('**/api/v1/layers', route => route.fulfill({ json: { layers: [{ id: 'parcels', available: true }] } }));
@@ -31,7 +32,7 @@ async function prepare(page: Page, request: APIRequestContext) {
   return { plan, name, fixtureStyle };
 }
 
-test('real API: parcel picking, draft, save, clone, edit, lock, masks, style restore and reload', async ({ page, request }) => {
+test('real API: parcel picking, draft, save, clone, edit, lock, masks, style restore and dashboard', async ({ page, request }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   const { plan, name, fixtureStyle } = await prepare(page, request);
@@ -41,7 +42,7 @@ test('real API: parcel picking, draft, save, clone, edit, lock, masks, style res
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
   await clickMap(page, [106.7607,10.8207]);
-  await expect(page.getByText('Parcel 3885881', { exact: true })).toBeVisible();
+  await expect(page.locator('.development-parcel').getByText('Parcel 3885881', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Draw building', exact: true }).click();
   for (const p of [[106.7607,10.8207],[106.76095,10.8207],[106.76095,10.82095],[106.7607,10.82095]]) await clickMap(page, p);
   await page.getByLabel('Building name').fill('House A');
@@ -76,12 +77,12 @@ test('real API: parcel picking, draft, save, clone, edit, lock, masks, style res
   await page.locator('.development-list button').first().click();
   await page.getByRole('button', { name: 'Demolish parcel', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.dataMap.getPaintProperty('baseline-buildings', 'fill-extrusion-opacity'))).toBe(0);
-  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-baseline-buildings').length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.dataMap.getPaintProperty('urban-buildings-3d', 'fill-extrusion-opacity'))).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-urban-buildings-3d').length)).toBe(0);
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect.poll(() => buildingHeights(page)).toContain(6.4);
   await page.getByRole('region', { name: 'Development editor' }).getByRole('button', { name: '3D', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-baseline-buildings').length)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-urban-buildings-3d').length)).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
   await expect.poll(() => buildingHeights(page)).toEqual([]);
   await page.getByRole('button', { name: 'Scenario B', exact: true }).click();
@@ -94,9 +95,41 @@ test('real API: parcel picking, draft, save, clone, edit, lock, masks, style res
   await page.waitForFunction(() => !!window.dataMap.getLayer('development-buildings') && window.dataMap.isStyleLoaded());
   await expect.poll(() => buildingHeights(page)).toContain(12.8);
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.getByRole('button',{name:'Draw area',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Study area',exact:true})).toHaveCount(0);
+  await page.getByText('Plan comparison & validation',{exact:true}).click();
   await expect(page.getByRole('region', { name: 'Development comparison' })).toContainText('Proposed GFA');
-  await page.screenshot({ path: '../.runtime/development/comparison.png' });
-  await page.reload();
+  expect(errors).toEqual([]);
+});
+
+test('persisted locked proposals reload, resize and generate a new building type', async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const prepared = await prepare(page, request);
+  const name = prepared.name;
+  let plan = prepared.plan;
+  const command = async (action: string, payload: object, scenarioId: string) => {
+    const response = await request.post(`/api/v1/zoning/plans/${plan.id}/commands`, { data: {
+      revision: plan.revision, scenario_id: scenarioId, action, payload,
+    } });
+    expect(response.ok()).toBe(true);
+    plan = await response.json();
+  };
+  const input = { parcel_id: '3885881', name: 'House A', geometry: { type: 'Polygon', coordinates: [
+    [[106.7607,10.8207],[106.76095,10.8207],[106.76095,10.82095],[106.7607,10.82095],[106.7607,10.8207]],
+  ] }, floors: 2, floor_height: 3.2, space_use_id: 'residential' };
+  await command('save_building', input, plan.scenarios[1].id);
+  await command('add_scenario', { name: 'Scenario B' }, plan.scenarios[1].id);
+  await command('save_building', { ...input, id: plan.scenarios[2].buildings[0].id, floors: 4 }, plan.scenarios[2].id);
+  await command('lock_scenario', { locked: true }, plan.scenarios[2].id);
+  await page.goto('/tests/browser/data-layers.html', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.getByRole('button', { name: 'Scenario B', exact: true }).click();
+  await page.getByRole('button', { name: 'Development', exact: true }).click();
+  await page.locator('.development-list button').first().click();
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeDisabled();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Scenario B', exact: true }).click();
@@ -127,12 +160,69 @@ test('real API: parcel picking, draft, save, clone, edit, lock, masks, style res
   await page.evaluate(() => window.dataMap.jumpTo({ center: [106.76125,10.82125], zoom: 17, pitch: 0 }));
   await page.waitForFunction(() => window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
   await clickMap(page, [106.7607,10.8207]);
-  await expect(page.getByText('Parcel 3885881', { exact: true })).toBeVisible();
+  await expect(page.locator('.development-parcel').getByText('Parcel 3885881', { exact: true })).toBeVisible();
   await page.getByText('Apply building type', { exact: true }).click();
   await page.getByRole('button', { name: 'Preview type', exact: true }).click();
   await expect(page.getByLabel('Building name')).toHaveValue('Low-rise proposal');
   await page.getByRole('button', { name: 'Save proposal', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Low-rise proposal', exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('existing metrics, zoning precedence, selected-parcel simulation and cached 2D/3D clipping', async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const prepared = await prepare(page, request);
+  let plan = prepared.plan;
+  const command = async (action: string, payload: object) => {
+    const response = await request.post(`/api/v1/zoning/plans/${plan.id}/commands`, { data: {
+      revision: plan.revision, scenario_id: plan.scenarios[1].id, action, payload,
+    } });
+    expect(response.ok()).toBe(true);
+    plan = await response.json();
+  };
+  await command('add_type', { type: { code: 'TMD', name: 'Commercial proposal', color: '#C18EAD' } });
+  await command('draw', { geometry: parcel, type_id: plan.types.at(-1).id, policy: 'replace' });
+  await page.goto('/tests/browser/data-layers.html', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: plan.name }).click();
+  await page.getByRole('button', { name: 'Development', exact: true }).click();
+  const editor = page.getByRole('region', { name: 'Development editor' });
+  const simulation = page.getByRole('region', { name: 'Development simulation' });
+  await expect(simulation.getByRole('combobox', { name: 'Scope', exact: true })).toHaveValue('parcel');
+  await expect(simulation.getByRole('button', { name: 'Run simulation' })).toBeDisabled();
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
+  await clickMap(page, [106.7607,10.8207]);
+  await expect(editor.locator('.development-parcel')).toContainText('TMD · Commercial proposal');
+  await expect(editor.locator('.development-parcel')).toContainText('Existing: ODT');
+  await expect(editor.getByRole('row', { name: /^Height / })).toContainText('12.8 m');
+  await expect(editor.locator('.zoning-metrics strong').first()).not.toHaveText('0 m²');
+  const freezeRequest = page.waitForRequest(request => request.url().endsWith('/simulation/studies') && request.method() === 'POST');
+  await simulation.getByRole('button', { name: 'Run simulation' }).click();
+  expect((await freezeRequest).postDataJSON().parcel_id).toBe('3885881');
+  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toBeVisible({ timeout: 45000 });
+  await simulation.getByText('Change vs Existing', { exact: true }).click();
+  const comparison = simulation.locator('details').filter({ has: page.getByText('Change vs Existing', { exact: true }) });
+  await expect(comparison.getByRole('row', { name: /^Water/ })).not.toContainText('Unknown');
+  await editor.getByRole('button', { name: '3D', exact: true }).click();
+  await page.waitForFunction(() => window.dataMap.getPitch() > 40 && !window.dataMap.isMoving());
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-urban-buildings-3d').map(f => f.id))).toContain(77);
+  expect(await page.evaluate(() => window.dataMap.querySourceFeatures('plan-scope-urban-buildings-3d').map(f => f.id))).not.toContain(78);
+  // The clipped source must remain mounted across mode toggles and provider paint changes.
+  await page.evaluate(() => { Object.assign(window, { cachedPlanSource: window.dataMap.getSource('plan-scope-urban-buildings-3d') }); });
+  for (const mode of ['2D', '3D', '2D']) {
+    await editor.getByRole('button', { name: mode, exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.dataMap.getLayoutProperty('plan-scope-urban-buildings-3d', 'visibility'))).toBe(mode === '2D' ? 'none' : 'visible');
+    expect(await page.evaluate(() => window.dataMap.getSource('plan-scope-urban-buildings-3d') === (window as unknown as {cachedPlanSource: unknown}).cachedPlanSource)).toBe(true);
+    expect(await page.evaluate(() => window.dataMap.getPaintProperty('urban-buildings-3d', 'fill-extrusion-opacity'))).toBe(0);
+  }
+  await page.getByRole('button', { name: 'Existing', exact: true }).click();
+  await page.waitForFunction(() => !window.dataMap.isMoving());
+  await clickMap(page, [106.7607,10.8207]);
+  await expect(editor.getByText('Proposed GFA', { exact: true })).toHaveCount(0);
+  await expect(editor.getByRole('row', { name: /^Height / })).toContainText('12.8 m');
+  await expect(editor.locator('.development-parcel')).not.toContainText('TMD');
+  await page.screenshot({ path: '../.runtime/development/existing-metrics.png' });
   expect(errors).toEqual([]);
 });
 
@@ -180,7 +270,7 @@ test('mixed floor uses: preview, metrics, 2D picking, save, reload and floor rem
   await clickMap(page, [106.76125,10.82125]);
   await expect(page.locator('.development-building')).toBeVisible();
   // Persisted mixed floors survive reload and remain editable in 2D.
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();

@@ -14,8 +14,9 @@ export interface SimulationJob {
 }
 export interface SimulationResult {
   id: string; mode: string; model_version: string;
-  options: { id: string; state: {
+  options: { id: string; comparison: {metric: string; before: number | null; after: number | null; delta: number | null; unit: string; comparability: string}[]; state: {
     metrics: Record<string, number | null>;
+    vietnam_planning_requirements?: { source_url: string; density_checks: {project_id: string; status: string; maximum_percent: number | null}[] };
     traffic?: { runs: { hour_local: number; completed_vehicles: number; unfinished_vehicles: number;
       undeparted_vehicles: number; mean_completed_delay_seconds: number | null }[] };
   } }[];

@@ -53,13 +53,13 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
             <button className="quiet-icon-button" aria-label="Close plan" disabled={w.busy} onClick={() => w.back()}><X size={18}/></button></header>
           <nav className="zoning-detail-tabs" aria-label="Plan sections">{tabs.map(item => <button key={item.id}
             title={item.label} aria-label={item.label} aria-current={displayedTab === item.id ? 'page' : undefined}
-            onClick={() => { if (w.selected.length) w.pick(null, false); w.setSection(item.id); }}><item.icon size={19} aria-hidden="true"/></button>)}</nav>
+            onClick={() => { if (w.selected.length) w.pick(null, false); w.setSection(item.id, () => w.setPanel('plans')); }}><item.icon size={19} aria-hidden="true"/></button>)}</nav>
           {w.error && <div className="zoning-error" role="alert"><p>{w.error}</p><button disabled={w.busy} onClick={() => w.leave(() => void w.openPlan(w.plan!.id))}>Reload plan</button></div>}
           <div key={displayedTab} className="zoning-tab-body">
             {displayedTab === 'info' ? <PlanInfoPanel workspace={w}/>
               : displayedTab === 'zoning' ? <PlanZoningPanel workspace={w}/>
               : displayedTab === 'development' ? <DevelopmentPanel workspace={w} onView={onView}/>
-              : <IndicatorsPanel workspace={w}/>}
+              : <IndicatorsPanel workspace={w} dashboard={w.panel !== 'indicators'}/>}
           </div>
           <p role="status" className="zoning-save-status">{w.busy ? 'Working…' : w.development.dirty ? 'Unsaved proposal' : `Saved · revision ${w.plan.revision}`}</p>
         </aside>

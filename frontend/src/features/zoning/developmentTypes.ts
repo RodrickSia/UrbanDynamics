@@ -32,6 +32,9 @@ export interface DevelopmentReport {
   metrics: DevelopmentMetrics; checks: DevelopmentCheck[]; rule_status: string;
 }
 export interface ParcelDevelopment extends DevelopmentReport {
+  baseline: { status: string; source?: string; metrics: (Pick<DevelopmentMetrics, 'gfa_m2'|'far'|'coverage_pct'|'footprint_m2'> & { max_height: number; max_floors: number }) | null };
+  zoning: { zone_id: string; type_id: string; code: string; name: string; color: string; percent: number }[];
+  scenario_kind: 'reference' | 'proposal';
   parcel: DevelopmentParcel;
   catalog: { version: number; space_uses: { id: string; name: string; color: string; default_floor_height: number }[];
     building_types: { id: string; version: number; name: string; floors: number; floor_height: number; space_use_id: string }[] };

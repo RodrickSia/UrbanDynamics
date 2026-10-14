@@ -29,7 +29,11 @@ export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWo
     {d.loading && <p role="status">Loading parcel…</p>}
     {d.error && <div role="alert"><p>{d.error}</p><button onClick={d.retry}>Retry parcel</button></div>}
     {d.parcel && <>
-      <div className="development-parcel"><strong>Parcel {d.parcel.id}</strong><span>{d.parcel.land_use ?? 'Unknown use'} · {areaText(d.parcel.area_m2)}</span></div>
+      <div className="development-parcel"><strong>Parcel {d.parcel.id}</strong>
+        {d.data?.zoning?.length ? <><span>{d.data.zoning.map(zone => `${zone.code} · ${zone.name}`).join(' / ')}</span>
+          <small title="Underlying cadastral use">Existing: {d.parcel.land_use ?? 'Unknown'} · {areaText(d.parcel.area_m2)}</small>
+          {d.data.zoning.map(zone => <span key={zone.zone_id}><i className="zoning-swatch" style={{backgroundColor:zone.color}}/>{zone.percent.toFixed(1)}%</span>)}</>
+          : <span>{d.parcel.land_use ?? 'Unknown use'} · {areaText(d.parcel.area_m2)}</span>}</div>
       {!d.draft && !w.readOnly && <>
         <div className="development-actions"><button className="zoning-primary" disabled={w.busy} onClick={() => { d.begin(); onView?.('2d'); }}><Plus size={16}/> Draw building</button>
           <button disabled={w.busy} onClick={() => setConfirm(masked ? 'restore' : 'demolish')}>{masked ? 'Restore baseline' : 'Demolish parcel'}</button></div>
@@ -50,13 +54,13 @@ export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWo
           <button aria-label="Delete building" title="Delete building" disabled={w.readOnly || w.busy} onClick={() => setConfirm('delete')}><Trash2 size={16}/></button></div>
         <BuildingFloorSummary building={selected}/></div>}
       <BuildingDraftForm workspace={w} onView={onView}/>
-      {report && <DevelopmentValues report={report}/>}
+      {report && <DevelopmentValues report={report} baseline={d.data?.baseline} existing={w.scenario?.kind === 'reference'}/>}
       <p className="zoning-muted">Concept massing · approximate terrain anchor. Baseline heights unverified.</p>
       {masked && <p className="zoning-muted">Demolition applies to this scenario. Raster imagery stays unchanged.</p>}
     </>}
     {!!w.scenario?.buildings?.length && <><h3>Proposed buildings</h3><ul className="development-list">{w.scenario.buildings.map(b => <li key={b.id}><button disabled={d.dirty || w.busy} aria-pressed={b.id === d.selectedBuilding} onClick={() => { d.pickBuilding(b.id); w.zoomTo(b.geometry); }}>{b.name}<small>{b.floors} floors · {b.height_m.toFixed(1)} m</small></button></li>)}</ul></>}
-    {w.plan && w.scenario?.kind === 'proposal' && !!w.scenario.buildings?.length &&
-      <DevelopmentSimulation key={`${w.plan.id}/${w.scenario.id}`} plan={w.plan} scenario={w.scenario} disabled={w.busy || d.dirty}/>}
+    {w.plan && w.scenario?.kind === 'proposal' &&
+      <DevelopmentSimulation key={`${w.plan.id}/${w.scenario.id}`} plan={w.plan} scenario={w.scenario} parcelId={d.parcelId || null} disabled={w.busy || d.dirty}/>}
     {confirmation && <ActionDialog title={confirmation === 'delete' ? 'Delete proposed building?' : confirmation === 'demolish' ? 'Demolish this parcel?' : 'Restore baseline?'}
       message={confirmation === 'delete' ? 'Remove this proposal from the active scenario.' : 'Only baseline visibility in this scenario changes. Source geometry is retained.'}
       busy={w.busy} error={w.error} onClose={() => { setConfirm(null); d.setDeleteRequested(false); }} onConfirm={async () => !!await w.execute(confirmation === 'delete' ? 'delete_building' : confirmation === 'demolish' ? 'demolish_parcel' : 'restore_parcel',

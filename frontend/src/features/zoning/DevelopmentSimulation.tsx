@@ -22,7 +22,7 @@ const metrics = [
 ] as const;
 const format = (value: number | null | undefined) => value == null ? 'Unknown' : value.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-export function DevelopmentSimulation({ plan, scenario, disabled }: { plan: Plan; scenario: Scenario; disabled: boolean }) {
+export function DevelopmentSimulation({ plan, scenario, parcelId, disabled }: { plan: Plan; scenario: Scenario; parcelId: string | null; disabled: boolean }) {
   const storageKey = `plan-simulation-settings:${plan.id}:${scenario.id}`;
   const [settings, setSettings] = useState<SimulationSettings>(() => {
     try {
@@ -32,18 +32,23 @@ export function DevelopmentSimulation({ plan, scenario, disabled }: { plan: Plan
     return { ...simulationDefaults };
   });
   const [mode, setMode] = useState<'screening' | 'native'>('screening');
-  const simulation = usePlanSimulation(plan, scenario, settings);
+  const [scope, setScope] = useState<'parcel' | 'scenario'>('parcel');
+  const simulation = usePlanSimulation(plan, scenario, settings, scope === 'parcel' ? parcelId : null, scope === 'scenario' || !!parcelId);
   const { job, result, error, requesting, running } = simulation;
-  const state = result?.options.find(option => option.id === 'proposal')?.state;
+  const option = result?.options.find(option => option.id === 'proposal');
+  const state = option?.state;
   const change = (key: keyof SimulationSettings, value: number) => {
     const next = { ...settings, [key]: value }; setSettings(next);
     try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Optional local preferences. */ }
   };
   return <section className="development-simulation" aria-label="Development simulation">
     <div className="zoning-row"><h3><Activity size={16}/> Simulation</h3><span className="zoning-badge">What-if</span></div>
-    <p className="zoning-muted">Saved buildings · {scenario.name}</p>
+    <p className="zoning-muted">{scope === 'parcel' && parcelId ? `Parcel ${parcelId}` : scenario.name}</p>
     <form onSubmit={event => { event.preventDefault(); void simulation.run(mode); }}>
       <fieldset disabled={disabled || requesting || running}>
+        <label>Scope<select value={scope} onChange={event => setScope(event.target.value as typeof scope)}>
+          <option value="parcel">Selected parcel</option><option value="scenario">Whole scenario</option>
+        </select></label>
         <label>Engine<select value={mode} onChange={event => setMode(event.target.value as typeof mode)}>
           <option value="screening">Screening</option><option value="native">SUMO + SWMM</option>
         </select></label>
@@ -52,8 +57,9 @@ export function DevelopmentSimulation({ plan, scenario, disabled }: { plan: Plan
             step="any" required value={Number.isFinite(settings[key]) ? settings[key] : ''} onChange={event => change(key, event.target.valueAsNumber)}/></label>)}
           <p className="zoning-muted">Occupancy is estimated from floor use. Commercial uses Other coefficients. Physical floors still generate demand when excluded from GFA.</p>
         </details>
-        <p className="zoning-muted">{mode === 'screening' ? 'Estimated loads, runoff and shadows.' : 'Synthetic roads and drainage · longer calculation.'} Existing occupancy and infrastructure capacity are unknown.</p>
-        <button className="zoning-primary" type="submit"><Play size={15}/>{requesting ? 'Preparing…' : 'Run simulation'}</button>
+        <p className="zoning-muted">{mode === 'screening' ? 'Estimated loads, runoff and shadows.' : 'Synthetic roads and drainage · longer calculation.'} Occupancy is assumed; infrastructure capacity is unknown.</p>
+        <button className="zoning-primary" type="submit" disabled={scope === 'parcel' && !parcelId}><Play size={15}/>{requesting ? 'Preparing…' : 'Run simulation'}</button>
+        {scope === 'parcel' && !parcelId && <small>Select a parcel on the map.</small>}
       </fieldset>
     </form>
     {disabled && <p className="zoning-muted">Save or discard the draft before running.</p>}
@@ -69,11 +75,25 @@ export function DevelopmentSimulation({ plan, scenario, disabled }: { plan: Plan
       <h4>Proposed demand</h4>
       <div className="zoning-table-scroll"><table><caption className="zoning-muted">{result.mode} · assumed occupancy and surfaces</caption><tbody>
         {metrics.filter(([key]) => key in state.metrics).map(([key, label, unit]) => <tr key={key}><th scope="row">{label}</th><td>{format(state.metrics[key])} <small>{unit}</small></td></tr>)}
-        <tr><th scope="row">Change vs Existing</th><td>Unknown</td></tr><tr><th scope="row">Available capacity</th><td>Unknown</td></tr>
+        <tr><th scope="row">Available capacity</th><td>Unknown</td></tr>
       </tbody></table></div>
+      <details><summary>Change vs Existing</summary><div className="zoning-table-scroll"><table>
+        <thead><tr><th>Metric</th><th>Existing</th><th>Change</th></tr></thead><tbody>
+          {option?.comparison.filter(row => metrics.some(([key]) => key === row.metric)).map(row => <tr key={row.metric}>
+            <th>{metrics.find(([key]) => key === row.metric)?.[1]}<small>{row.unit}</small></th>
+            <td>{format(row.comparability === 'insufficient_data' ? null : row.before)}</td><td>{format(row.delta)}</td>
+          </tr>)}
+        </tbody></table></div></details>
       {state.traffic && <details><summary>Model traffic</summary><div className="zoning-table-scroll"><table><thead><tr><th>Hour</th><th>Done</th><th>Unfinished</th><th>Not departed</th></tr></thead><tbody>
         {state.traffic.runs.map((run, index) => <tr key={index}><th>{run.hour_local}:00</th><td>{run.completed_vehicles}</td><td>{run.unfinished_vehicles}</td><td>{run.undeparted_vehicles}</td></tr>)}
       </tbody></table></div></details>}
+      {state.vietnam_planning_requirements && <details><summary>Planning references</summary>
+        <p className="zoning-muted">Reference screening · site-specific approval unverified</p>
+        <ul>{state.vietnam_planning_requirements.density_checks.map(check => <li key={check.project_id}>
+          {check.project_id}: {check.status.replaceAll('_',' ')}{check.maximum_percent != null ? ` · ${format(check.maximum_percent)}%` : ''}
+        </li>)}</ul>
+        <a href={state.vietnam_planning_requirements.source_url} target="_blank" rel="noreferrer">QCVN reference</a>
+      </details>}
       <a className="development-result-link" href={`${API_BASE_URL}/api/v1/planning/runs/${result.id}`} target="_blank" rel="noreferrer"><Download size={15}/>Result & sources</a>
     </>}
   </section>;

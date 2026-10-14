@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Check, Pentagon, RotateCcw, X } from 'lucide-react';
+import { Check, Pentagon, RotateCcw, X, Layers, SlidersHorizontal } from 'lucide-react';
 import { API_BASE_URL } from '../../services/api';
 import { AreaIndicatorResults } from './AreaIndicatorResults';
 import { indicatorDefaults, indicatorFields, type AreaIndicators, type IndicatorAssumptions } from './areaIndicatorTypes';
 import { ZoningReport } from './ZoningReport';
 import type { ZoningWorkspace } from './useZoning';
 
-export function IndicatorsPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
+export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace: ZoningWorkspace; dashboard?: boolean }) {
   const [assumptions, setAssumptions] = useState({ ...indicatorDefaults });
   const [draft, setDraft] = useState({ ...indicatorDefaults });
   const [retry, setRetry] = useState(0);
@@ -38,19 +38,21 @@ export function IndicatorsPanel({ workspace: w }: { workspace: ZoningWorkspace }
   const error = result?.key === key ? result.error : undefined;
   const change = (field: keyof IndicatorAssumptions, value: number) => setDraft(previous => ({ ...previous, [field]: value }));
   return <section className="area-indicators" aria-label="Selected area indicators">
-    <div className="indicator-area-actions">
+    {!dashboard && <div className="indicator-area-actions">
       <button disabled={w.busy || drawing} onClick={() => w.begin('analysis')}><Pentagon size={16}/>Draw area</button>
       {w.plan && <button disabled={w.busy || drawing} onClick={w.useStudyArea}><RotateCcw size={15}/>Study area</button>}
-    </div>
+    </div>}
     {drawing ? <div className="indicator-draw-state"><p>Click to draw · Enter to finish · Ctrl pauses snapping</p><small>{w.sketch.points.length} points</small>
       <div className="zoning-row"><button aria-label="Cancel analysis area" onClick={w.cancel}><X size={16}/>Cancel</button>
         <button className="zoning-primary" disabled={w.sketch.points.length < 3} onClick={() => void w.finish()}><Check size={16}/>Analyze area</button></div>
     </div> : !w.analysisArea && <p className="zoning-muted">Draw a region or choose a plan to start.</p>}
     {!w.plan && <label>Plan<select value="" disabled={w.loading || w.busy} onChange={event => { if (event.target.value) void w.openPlan(event.target.value); }}>
       <option value="">Select a plan (optional)</option>{w.plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></label>}
-    {w.plan && <label className="zoning-check"><input type="checkbox" checked={w.includeScenario}
-      disabled={drawing || w.busy} onChange={event => w.setIncludeScenario(event.target.checked)}/>Include plan scenario</label>}
-    <details className="indicator-assumptions"><summary>Assumptions</summary><form onSubmit={event => { event.preventDefault(); setAssumptions({ ...draft }); }}>
+    {w.plan && (dashboard ? <button className="quiet-icon-button" title="Include plan scenario" aria-label="Include plan scenario"
+      aria-pressed={w.includeScenario} disabled={w.busy} onClick={() => w.setIncludeScenario(!w.includeScenario)}><Layers size={18}/></button>
+      : <label className="zoning-check"><input type="checkbox" checked={w.includeScenario}
+      disabled={drawing || w.busy} onChange={event => w.setIncludeScenario(event.target.checked)}/>Include plan scenario</label>)}
+    <details className="indicator-assumptions"><summary aria-label="Assumptions" title="Assumptions">{dashboard ? <SlidersHorizontal size={18}/> : 'Assumptions'}</summary><form onSubmit={event => { event.preventDefault(); setAssumptions({ ...draft }); }}>
       <p className="zoning-muted">Illustrative defaults · adjust to local data</p>
       {indicatorFields.map(([field,label,,min,max]) => <label key={field}>{label}<input type="number" required min={min} max={max}
         step={field === 'transit_radius_m' ? 1 : 'any'} value={Number.isFinite(draft[field]) ? draft[field] : ''} onChange={event => change(field,event.target.valueAsNumber)}/></label>)}
