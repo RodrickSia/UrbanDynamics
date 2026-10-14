@@ -22,6 +22,7 @@ on:
           - model_generation
           - osm_sumo_hcmc
           - traffic_history
+          - road_data_tomtom
       stage:
         description: ETL stage to run
         type: choice
@@ -145,12 +146,22 @@ jobs:
               exit 1
             fi
           fi
+          if [ "$ETL_PIPELINE" = road_data_tomtom ] && { [ "$ETL_STAGE" = load ] || [ "$ETL_STAGE" = all ]; }; then
+            tomtom_migration_query="to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.tomtom_traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '10-tomtom-traffic-observation.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$tomtom_migration_query" | grep -Fxq t; then
+              echo "::error::The SUMO or TomTom traffic migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          fi
           if [ "$ETL_PIPELINE" != parcels_hcmc ] && [ "$ETL_PIPELINE" != buildings_footprint ] && \
              [ "$ETL_PIPELINE" != buildings_footprint_gba ] && [ "$ETL_PIPELINE" != model_generation ] && [ "$ETL_PIPELINE" != all ] && \
              [ "$ETL_PIPELINE" != osm_sumo_hcmc ] && \
              [ "$ETL_PIPELINE" != traffic_history ] && \
+             [ "$ETL_PIPELINE" != road_data_tomtom ] && \
              { [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; }; then
-            echo "::error::The transform and load stages are supported only for staged parcel, building-footprint, model-generation, OSM/SUMO, and traffic-history pipelines." >&2
+            echo "::error::The transform and load stages are supported only for staged parcel, building-footprint, model-generation, OSM/SUMO, and traffic pipelines." >&2
             exit 1
           fi
 

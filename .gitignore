@@ -35,6 +35,10 @@ etl/data/buildings_footprint/*
 etl/data/traffic_history/*
 !etl/data/traffic_history/.gitkeep
 !etl/data/traffic_history/traffic.csv
+# Keep the TomTom road-flow input directory in git; fetched snapshots stay local.
+!etl/data/road_data_tomtom/
+etl/data/road_data_tomtom/*
+!etl/data/road_data_tomtom/.gitkeep
 test-results/
 
 # Frontend dependencies and build output

@@ -19,6 +19,7 @@ PIPELINES = (
     "model_generation",
     "osm_sumo_hcmc",
     "traffic_history",
+    "road_data_tomtom",
 )
 STAGES = ("all", "extract", "transform", "load")
 
@@ -38,6 +39,22 @@ def _run(pipeline_name: str, stage: str, options) -> None:
     if pipeline_name == "traffic_history":
         from src.pipelines.traffic_history import extract, load, transform
         from src.pipelines.traffic_history.config import config
+
+        if stage in ("all", "extract"):
+            source = extract.run()
+        else:
+            source = config.source_file
+        if stage in ("all", "transform"):
+            transformed = transform.run(source)
+        else:
+            transformed = config.transformed_file
+        if stage in ("all", "load"):
+            load.run(transformed)
+        return
+
+    if pipeline_name == "road_data_tomtom":
+        from src.pipelines.road_data_tomtom import extract, load, transform
+        from src.pipelines.road_data_tomtom.config import config
 
         if stage in ("all", "extract"):
             source = extract.run()

@@ -31,10 +31,12 @@ jobs:
             --profile etl-model-generation \
             --profile etl-osm-sumo-hcmc \
             --profile etl-traffic-history \
+            --profile traffic_feat \
             build backend frontend etl-population-hcmc \
             etl-flood-history etl-flood-satellite etl-flood-risk etl-land-price \
             etl-parcels-hcmc etl-buildings-footprint etl-buildings-footprint-gba \
-            etl-model-generation etl-osm-sumo-hcmc etl-traffic-history
+            etl-model-generation etl-osm-sumo-hcmc etl-traffic-history \
+            etl-road-data-tomtom
 
   database:
     runs-on: ubuntu-latest
