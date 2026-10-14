@@ -18,14 +18,15 @@ const PARCEL_FILL = 'zoning-plan-parcels-fill';
 const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const DRAW_COLOR = '#FF6D00';
+const AREA_COLOR = '#2877dc';
 function feature(geometry: Geometry, properties: Record<string, unknown>): Feature { return { type: 'Feature', geometry, properties }; }
 
 function data(bridge: ZoningBridge): FeatureCollection {
   if (!bridge.active) return EMPTY;
   const features: Feature[] = [];
-  if (bridge.plan) features.push(feature(bridge.plan.study_area, { kind: 'study', color: '#005b65', alpha: 0, width: 3 }));
+  if (bridge.plan) features.push(feature(bridge.plan.study_area, { kind: 'study', color: AREA_COLOR, alpha: 0, width: 3 }));
   if (bridge.analysis?.active && bridge.analysis.geometry) features.push(feature(bridge.analysis.geometry,
-    { kind: 'analysis', color: '#2877dc', alpha: .06, width: 3 }));
+    { kind: 'analysis', color: AREA_COLOR, alpha: .06, width: 3 }));
   if (bridge.visible) for (const zone of bridge.scenario?.zones ?? []) {
     const type = bridge.plan?.types.find(t => t.id === zone.type_id);
     features.push(feature(zone.geometry, { kind: 'zone', id: zone.id, label: type?.code ?? 'Unknown',
