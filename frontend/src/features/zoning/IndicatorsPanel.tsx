@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Check, Pentagon, RotateCcw, X, Layers, SlidersHorizontal } from 'lucide-react';
+import { Check, Pentagon, RotateCcw, X, Layers, SlidersHorizontal, ChartColumnIncreasing } from 'lucide-react';
 import { API_BASE_URL } from '../../services/api';
 import { AreaIndicatorResults } from './AreaIndicatorResults';
 import { indicatorDefaults, indicatorFields, type AreaIndicators, type IndicatorAssumptions } from './areaIndicatorTypes';
 import { ZoningReport } from './ZoningReport';
 import type { ZoningWorkspace } from './useZoning';
+import { chartMetrics, chartRows, chartValue, type ChartMetric } from './indicatorChart';
 
-export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace: ZoningWorkspace; dashboard?: boolean }) {
+export function IndicatorsPanel({ workspace: w, dashboard = false, onView }: { workspace: ZoningWorkspace; dashboard?: boolean; onView?: (mode: '2d' | '3d') => void }) {
   const [assumptions, setAssumptions] = useState({ ...indicatorDefaults });
   const [draft, setDraft] = useState({ ...indicatorDefaults });
   const [retry, setRetry] = useState(0);
   const [showPlanReport, setShowPlanReport] = useState(false);
+  const [metric, setMetric] = useState<ChartMetric>('population');
+  const [showChart, setShowChart] = useState(true);
   const [result, setResult] = useState<{ key: string; data?: AreaIndicators; error?: string }>();
   const drawing = w.sketch.tool === 'analysis';
   const key = JSON.stringify({ geometry: w.analysisArea,
@@ -36,6 +39,13 @@ export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace
   }, [key, drawing, retry]);
   const data = result?.key === key ? result.data : undefined;
   const error = result?.key === key ? result.error : undefined;
+  const { setIndicatorChart, indicatorScope } = w;
+  useEffect(() => {
+    setIndicatorChart(data && !drawing && showChart ? {
+      scope: indicatorScope, geometry: data.geometry, metric, rows: chartRows(data, metric),
+    } : null);
+    return () => setIndicatorChart(null);
+  }, [data, drawing, showChart, metric, setIndicatorChart, indicatorScope]);
   const change = (field: keyof IndicatorAssumptions, value: number) => setDraft(previous => ({ ...previous, [field]: value }));
   return <section className="area-indicators" aria-label="Selected area indicators">
     {!dashboard && <div className="indicator-area-actions">
@@ -59,6 +69,15 @@ export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace
       <button className="zoning-primary" type="submit">Apply assumptions</button>
     </form></details>
     {!drawing && w.analysisArea && <>
+      {data && <section className="indicator-chart-controls" aria-label="Map chart">
+        <div className="development-actions"><button aria-label="Show 3D chart" title="Show 3D chart" onClick={() => { setShowChart(true); onView?.('3d'); }}><ChartColumnIncreasing size={17}/>3D chart</button>
+          <button aria-label="Toggle map chart" aria-pressed={showChart} onClick={() => setShowChart(value => !value)}><Layers size={17}/></button></div>
+        <label>Chart metric<select value={metric} onChange={event => setMetric(event.target.value as ChartMetric)}>
+          {chartMetrics.map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></label>
+        {showChart && <>{!chartRows(data, metric).length && <p className="zoning-muted">No data</p>}<ul className="indicator-chart-legend">{chartRows(data, metric).map((row, index) => <li key={index}>
+          <span className="zoning-swatch" style={{ backgroundColor: row.value !== null && row.value < 0 ? '#b54e44' : row.color }}/><span>{row.label}</span><strong>{chartValue(row)}</strong></li>)}</ul>
+          <small className="zoning-muted">Area totals · relative column heights{metric === 'jobs_balance' ? ' · − = deficit' : ''}</small></>}
+      </section>}
       {error ? <div role="alert" className="zoning-error"><p>{error}</p><button onClick={() => setRetry(value => value+1)}>Retry</button></div>
         : data ? <AreaIndicatorResults data={data}/> : <div className="indicator-loading" role="status" aria-busy="true">Calculating selected area…</div>}
     </>}

@@ -44,7 +44,7 @@ export default function App() {
         <UrbanMap
           zoning={{ active: zoning.active, plan: zoning.plan,
             scenario: zoning.analyzing && !zoning.includeScenario ? zoning.plan?.scenarios[0] ?? null : zoning.scenario,
-            analysis: { active: zoning.analyzing, geometry: zoning.analysisArea },
+            analysis: { active: zoning.analyzing, geometry: zoning.analysisArea, chart: zoning.indicatorChart },
             selected: zoning.selected, sketch: zoning.sketch, preview: zoning.preview,
             opacity: zoning.opacity, visible: zoning.visible, showParcels: zoning.showParcels,
             parcelAvailable: zoning.parcelAvailable, busy: zoning.busy,

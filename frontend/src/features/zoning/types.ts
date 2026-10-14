@@ -59,7 +59,7 @@ export interface ZoningBridge {
   sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; showParcels: boolean;
   parcelAvailable: boolean; busy: boolean;
   development?: DevelopmentBridge;
-  analysis?: { active: boolean; geometry: PolygonGeometry | null };
+  analysis?: { active: boolean; geometry: PolygonGeometry | null; chart?: import('./indicatorChart').IndicatorChart | null };
   onPick: (id: string | null, multiple: boolean) => void;
   onSketch: (sketch: Sketch) => void;
   onFinish: () => void; onCancel: () => void;

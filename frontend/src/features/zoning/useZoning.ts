@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { deleteZoningPlan, zoningRequest } from './api';
 import { sketchGeometry } from './geometry';
 import { useDevelopment } from './useDevelopment';
+import type { IndicatorChart } from './indicatorChart';
 import type { Command, Plan, PlanSummary, PolygonGeometry, Preview, Sketch, Tool } from './types';
 
 const EMPTY_SKETCH: Sketch = { tool: null, points: [], geometry: null };
@@ -26,6 +27,7 @@ export function useZoning(parcelAvailable = false) {
   const [section, setSectionState] = useState<'info' | 'zoning' | 'development' | 'dashboard'>('zoning');
   const [analysisSelection, setAnalysisSelection] = useState<{ planId: string | null; geometry: PolygonGeometry } | null>(null);
   const [includeScenario, setIncludeScenario] = useState(true);
+  const [indicatorChart, setIndicatorChart] = useState<IndicatorChart | null>(null);
   const [leaving, setLeaving] = useState(false);
   const leaveAction = useRef<(() => void) | null>(null);
   const pending = useRef(false);
@@ -37,6 +39,7 @@ export function useZoning(parcelAvailable = false) {
   const analysisArea = panel === 'plans' && section === 'dashboard' ? plan?.study_area ?? null
     : analysisSelection?.planId === (plan?.id ?? null) ? analysisSelection.geometry : plan?.study_area ?? null;
   const useStudyArea = () => { setAnalysisSelection(null); cancel(); };
+  const indicatorScope = JSON.stringify([plan?.id, plan?.revision, scenario?.id, includeScenario, analysisArea]);
   useEffect(() => {
     if (plan && scenario) {
       try { localStorage.setItem(`urban-plan-scenario-${plan.id}`, scenario.id); } catch { /* Browser storage is optional. */ }
@@ -162,6 +165,7 @@ export function useZoning(parcelAvailable = false) {
   const close = (after?: () => void) => leave(() => { setPanel(null); cancel(); after?.(); });
   return { panel, setPanel, active, close, plan, plans, scenario, chosenType, typeId, setTypeId, selected, pick,
     analyzing, analysisArea, includeScenario, setIncludeScenario, useStudyArea,
+    indicatorScope, setIndicatorChart, indicatorChart: analyzing && indicatorChart?.scope === indicatorScope ? indicatorChart : null,
     sketch, setSketch, begin, cancel: development.dirty ? development.cancel : cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
     section, setSection, development, leaving, resolveLeave, leave,
     visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy: busy || development.working, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,

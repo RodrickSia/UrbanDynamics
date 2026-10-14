@@ -119,7 +119,7 @@
 .zoning-tool-rail { display: grid; gap: .15rem; }
 .zoning-ui .zoning-tool-rail button { width: 2.7rem; height: 2.7rem; min-height: 0; padding: 0; border: 0; background: transparent; }
 .zoning-ui .zoning-tool-rail button:hover:not(:disabled), .zoning-ui .zoning-tool-rail button[aria-pressed='true'] { background: var(--accent-muted); }
-.zoning-tools.is-editing { top: auto; bottom: 1rem; width: min(26rem, calc(100vw - var(--zoning-detail-width) - 2rem)); max-height: 65dvh; overflow: auto; transform: none; padding: .8rem 1rem; }
+.zoning-tools.is-editing { top: auto; bottom: 1rem; left: 1rem; right: auto; width: min(26rem, calc(100vw - var(--zoning-detail-width) - 2rem)); max-height: 65dvh; overflow: auto; transform: none; padding: .8rem 1rem; }
 .zoning-tools .zoning-row > strong { flex: 1; }
 .zoning-tools p { margin: .6rem 0; font-size: .78rem; }
 .zoning-preview { border-left: 3px solid var(--accent); padding-left: .75rem; margin-top: .75rem; }
@@ -141,6 +141,11 @@
 .zoning-rule-state-conditional { color: var(--accent-strong); }
 .zoning-dialog { border: 1px solid var(--border-strong); border-radius: var(--radius-panel); width: min(29rem, calc(100vw - 2rem)); max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 1.25rem; }
 .zoning-dialog::backdrop { background: rgba(21,41,45,.25); backdrop-filter: blur(3px); }
+.indicator-chart-controls { padding: .75rem 0; border-bottom: 1px solid var(--border); }
+.indicator-chart-legend { list-style: none; padding: 0; margin: .5rem 0; max-height: 12rem; overflow: auto; scrollbar-width: thin; }
+.indicator-chart-legend li { display: flex; align-items: center; gap: .4rem; padding: .35rem 0; font-size: .78rem; }
+.indicator-chart-legend li > span:nth-child(2) { flex: 1; min-width: 0; }
+.indicator-chart-legend strong { white-space: nowrap; }
 .zoning-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 .75rem; }
 .zoning-code-field { margin: .85rem 0; min-width: 0; }
 .zoning-code-field > label { margin: 0 0 .4rem; }
@@ -187,7 +192,7 @@
   .zoning-scenario-tabs button { padding: .5rem .6rem; }
   .zoning-tools { top: auto; right: 1.3rem; bottom: .75rem; transform: none; z-index: 47; }
   .zoning-tool-rail { grid-template-columns: repeat(3, 1fr); }
-  .zoning-tools.is-editing { right: .75rem; width: calc(100vw - 4rem); max-height: 38dvh; }
+  .zoning-tools.is-editing { left: .75rem; right: auto; width: calc(100vw - 4rem); max-height: 38dvh; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .zoning-nav { transition: top .32s cubic-bezier(.22, 1, .36, 1); }

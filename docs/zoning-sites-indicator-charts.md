@@ -1,0 +1,15 @@
+# Zoning development sites and map charts
+
+Development map picking now prioritizes a visible saved zone over its underlying cadastral parcels. A proposed building remains directly selectable for editing. A zone is one buildable site, identified as `zone:<uuid>`; its geometry and type are resolved from the active scenario on the server for reports, previews, saves and simulation submission. Numeric parcel IDs retain their existing behavior. No cadastral geometry is changed.
+
+Generated baseline buildings for zone sites are queried by spatial intersection, so all intersecting parcels contribute. Loaded Goong context uses the same existing bounded supplement. Scenario duplication remaps zone site IDs; boundary edits or deletion that would orphan development are rejected until that development is removed. Minimum setbacks are measured to the selected site's boundary, not internal cadastral boundaries. Simulation retains its existing connected-polygon and workload limits.
+
+The Draw zoning panel is bottom-left. The redundant Hide baseline checkbox below Floor uses is removed; explicit demolition and restore actions remain available in Development.
+
+Indicators and Dashboard share an aggregate map chart. Select a metric, then use **3D chart** to tilt the map. Existing/proposed columns share a scale within the chosen metric; percent columns use 0–100%. Heights are illustrative, not physical building heights or a spatial distribution of demand. Hover shows exact value and unit; the keyboard-accessible legend provides the same values. Negative jobs balance keeps its sign and uses magnitude for column height. Missing values stay unknown and have no column; zero remains zero.
+
+Chart footprints are anchored inside the selected geometry, respecting holes. Current source buildings and proposed building floors are clipped to the analysis area, with restoration on closing the workspace. Charts clear when geometry, scenario, assumptions or request results change; stale responses are cancelled. Charts are not included in building clipping or baseline metrics.
+
+Validation: frontend unit tests cover unknown/negative values, shared scales, holed geometry and proposal clipping. API tests cover a zone site without parcel data, containment, scenario remapping and a completed Screening simulation. A browser flow checks zone-over-parcel picking, saving a footprint beyond the cadastral parcel, checkbox removal, bottom-left Draw placement, 3D columns, clipped source/proposed buildings, scenario toggle, unknown values and cleanup. Local test sources are fixtures. Production data and deployment are unchanged.
+
+Results: frontend build/lint and 133 unit tests pass. Backend suite passes 362 tests with 11 database-dependent tests skipped; the additional spatial-baseline regression passes in its seven-test module. All six Development browser flows pass across the suite and targeted rerun. The rerun also covers a stale rendered zone during a fast scenario switch: picking now checks membership in the current scenario before selecting that zone. Desktop screenshots were inspected, with overflow checks at 768px and 320px.

@@ -32,6 +32,82 @@ async function prepare(page: Page, request: APIRequestContext) {
   return { plan, name, fixtureStyle };
 }
 
+test('zone site takes priority over parcels; drawing panel sits left and indicator chart scopes buildings', async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const prepared = await prepare(page, request);
+  let plan = prepared.plan;
+  const command = async (action: string, payload: object) => {
+    const response = await request.post(`/api/v1/zoning/plans/${plan.id}/commands`, { data: {
+      revision: plan.revision, scenario_id: plan.scenarios[1].id, action, payload,
+    } });
+    expect(response.ok(), await response.text()).toBe(true);
+    plan = await response.json();
+  };
+  await command('add_type', { type: { code: 'ODT', name: 'Residential', color: '#D79B8C' } });
+  await command('draw', { geometry: plan.study_area, type_id: plan.types[0].id, policy: 'preserve' });
+  await page.goto('/tests/browser/data-layers.html');
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: prepared.name }).click();
+  await page.getByRole('button', { name: 'Draw zone', exact: true }).click();
+  const bounds = await page.getByLabel('Zoning tools').boundingBox();
+  expect(bounds!.x).toBeLessThan(25);
+  expect(bounds!.y + bounds!.height).toBeGreaterThan(950);
+  await page.screenshot({ path: '../.runtime/zone-chart-e2e/draw-left.png' });
+  await page.getByRole('button', { name: 'Cancel geometry edit' }).click();
+  await page.getByRole('button', { name: 'Development', exact: true }).click();
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
+  await clickMap(page, [106.7607,10.8207]);
+  await expect(page.locator('.development-parcel')).toContainText('Zoning · ODT');
+  await page.getByRole('button', { name: 'Draw building', exact: true }).click();
+  await expect(page.getByText('Hide baseline on this parcel')).toHaveCount(0);
+  // This footprint extends beyond the cadastral parcel, but stays in the zoning site.
+  await page.keyboard.down('Control');
+  for (const p of [[106.7615,10.8215],[106.7625,10.8215],[106.7625,10.8225],[106.7615,10.8225]]) await clickMap(page, p);
+  await page.keyboard.up('Control');
+  await page.getByRole('button', { name: 'Save proposal', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved · revision 4' })).toBeVisible();
+  const saved = await (await request.get(`/api/v1/zoning/plans/${plan.id}`)).json();
+  expect(saved.scenarios[1].buildings[0].parcel_id).toBe(`zone:${plan.scenarios[1].zones[0].id}`);
+  await page.route('**/api/v1/indicators/area', route => {
+    const body = route.request().postDataJSON();
+    const metrics = { population: 100, energy_kwh_day: 300, water_m3_day: 12, waste_kg_day: 100,
+      housing_capacity: null, jobs_needed: 50, jobs_capacity: null, jobs_balance: null };
+    return route.fulfill({ json: { geometry: body.geometry, area_m2: 10000, baseline: metrics,
+      proposal: body.include_scenario ? { ...metrics, population: 200 } : null, land_use: [], zoning: [],
+      population_source: { status: 'available', year: 2025, coverage_percent: 100 },
+      transit: { status: 'missing', coverage_percent: null }, assumptions: body.assumptions, notes: [], issues: [] } });
+  });
+  await page.getByRole('button', { name: 'Indicators', exact: true }).click();
+  await page.getByRole('button', { name: 'Draw area', exact: true }).click();
+  await page.keyboard.down('Control');
+  for (const p of [[106.7607,10.8207],[106.7615,10.8207],[106.7615,10.8215],[106.7607,10.8215]]) await clickMap(page, p);
+  await page.keyboard.up('Control');
+  await page.getByRole('button', { name: 'Analyze area' }).click();
+  await page.getByRole('button', { name: 'Show 3D chart', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => ({ chart: !!window.dataMap.getLayer('indicator-chart-bars'),
+    pitched: window.dataMap.getPitch() > 40, moving: window.dataMap.isMoving() })), { timeout: 15000 }).toEqual({ chart: true, pitched: true, moving: false });
+  await expect.poll(() => page.evaluate(() => window.dataMap.getStyle().sources['indicator-chart'].data.features.length)).toBe(2);
+  await expect.poll(() => page.evaluate(() => window.dataMap.getStyle().sources['development-scene'].data.features.filter(f => f.properties.kind === 'building').length)).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.dataMap.getStyle().sources['plan-scope-urban-buildings-3d'].data.features.map(f => f.id))).toEqual([77]);
+  await page.screenshot({ path: '../.runtime/zone-chart-e2e/indicator-chart.png' });
+  for (const width of [768, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByLabel('Include plan scenario').uncheck();
+  await expect.poll(() => page.evaluate(() => window.dataMap.getStyle().sources['indicator-chart']?.data.features.length ?? 0)).toBe(1);
+  await page.getByLabel('Chart metric').selectOption('housing_capacity');
+  await expect(page.getByRole('region', { name: 'Map chart' })).toContainText('No data');
+  await expect.poll(() => page.evaluate(() => window.dataMap.getStyle().sources['indicator-chart'].data.features.length)).toBe(0);
+  await page.getByRole('button', { name: 'Indicators', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => !!window.dataMap.getSource('indicator-chart'))).toBe(false);
+  await expect.poll(() => page.evaluate(() => !!window.dataMap.getSource('plan-scope-urban-buildings-3d'))).toBe(false);
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('urban-buildings-3d', 'fill-extrusion-opacity'))).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
 test('Existing reads streamed Goong buildings and measures scenario setbacks in 2D and 3D', async ({ page, request }) => {
   const { name } = await prepare(page, request);
   const errors: string[] = [];
@@ -235,12 +311,12 @@ test('existing metrics, zoning precedence, selected-parcel simulation and cached
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
   await clickMap(page, [106.7607,10.8207]);
   await expect(editor.locator('.development-parcel')).toContainText('TMD · Commercial proposal');
-  await expect(editor.locator('.development-parcel')).toContainText('Existing: ODT');
+  await expect(editor.locator('.development-parcel')).toContainText('Zoning · TMD');
   await expect(editor.getByRole('row', { name: /^Height / })).toContainText('12.8 m');
   await expect(editor.locator('.zoning-metrics strong').first()).not.toHaveText('0 m²');
-  const freezeRequest = page.waitForRequest(request => request.url().endsWith('/simulation/studies') && request.method() === 'POST');
+  const freezeRequest = page.waitForRequest(request => request.url().endsWith('/simulation/runs') && request.method() === 'POST');
   await simulation.getByRole('button', { name: 'Run simulation' }).click();
-  expect((await freezeRequest).postDataJSON().parcel_id).toBe('3885881');
+  expect((await freezeRequest).postDataJSON().parcel_id).toBe(`zone:${plan.scenarios[1].zones[0].id}`);
   await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toBeVisible({ timeout: 45000 });
   await simulation.getByText('Change vs Existing', { exact: true }).click();
   const comparison = simulation.locator('details').filter({ has: page.getByText('Change vs Existing', { exact: true }) });

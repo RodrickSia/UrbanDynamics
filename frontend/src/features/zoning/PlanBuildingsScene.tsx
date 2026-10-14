@@ -8,7 +8,7 @@ import type { ZoningBridge } from './types';
 export function PlanBuildingsScene({ map, bridge, mode }: {
   map: MapLibreMap | null; bridge: ZoningBridge; mode: '2d' | '3d';
 }) {
-  const study = bridge.active ? bridge.plan?.study_area : undefined;
+  const study = bridge.active ? (bridge.analysis?.active ? bridge.analysis.geometry ?? undefined : bridge.plan?.study_area) : undefined;
   const masks = bridge.scenario?.demolition_masks;
   const enabled = !!study;
   const current = useRef({ study, masks, mode });
@@ -32,7 +32,7 @@ export function PlanBuildingsScene({ map, bridge, mode }: {
       refreshing = true;
       try {
       const targets = new Set([...originals.keys(), ...map.getStyle().layers.filter(layer =>
-        layer.type === 'fill-extrusion' && !layer.id.startsWith('development-') && !layer.id.startsWith('plan-scope-')).map(layer => layer.id)]);
+        layer.type === 'fill-extrusion' && !layer.id.startsWith('development-') && !layer.id.startsWith('indicator-chart-') && !layer.id.startsWith('plan-scope-')).map(layer => layer.id)]);
       for (const id of targets) {
         const sourceId = `plan-scope-${id}`, layer = map.getLayer(id);
         const spec = map.getStyle().layers.find(item => item.id === id);

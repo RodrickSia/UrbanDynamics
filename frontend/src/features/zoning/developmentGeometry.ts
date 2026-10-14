@@ -11,6 +11,9 @@ function inRing(p: Position, ring: Position[]) {
   return inside;
 }
 function inside(p: Position, rings: Position[][]) { return inRing(p, rings[0]) && !rings.slice(1).some(r => inRing(p, r)); }
+export function pointInArea(point: Position, geometry: PolygonGeometry): boolean {
+  return polygons(geometry).some(rings => inside(point, rings));
+}
 function crosses(a: Position, b: Position, c: Position, d: Position) {
   const orient = (p: Position, q: Position, r: Position) => (q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);
   const on = (p: Position, q: Position, r: Position) => r[0] >= Math.min(p[0], q[0]) && r[0] <= Math.max(p[0], q[0]) && r[1] >= Math.min(p[1], q[1]) && r[1] <= Math.max(p[1], q[1]);

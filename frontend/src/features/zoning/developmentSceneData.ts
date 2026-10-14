@@ -1,6 +1,7 @@
 ﻿import type { Feature, FeatureCollection } from 'geojson';
 import type { ZoningBridge } from './types';
 import type { ProposedBuilding } from './developmentTypes';
+import { planBuildings } from './planBuildingGeometry';
 
 function buildingFeatures(building: ProposedBuilding, selected: boolean, preview = false): Feature[] {
   // Coalesce matching adjacent floors so large uniform buildings remain one extrusion.
@@ -31,6 +32,7 @@ export function developmentData(b: ZoningBridge): FeatureCollection {
     properties: { kind: 'parcel', color: '#2877dc' } });
   for (const mask of b.scenario?.demolition_masks ?? []) features.push({ type: 'Feature', geometry: mask.geometry,
     properties: { kind: 'demolition', color: '#bb7934' } });
+  if (b.analysis?.active && b.analysis.geometry) return planBuildings(features, b.analysis.geometry, []);
   return { type: 'FeatureCollection', features };
 }
 

@@ -5,6 +5,14 @@ import { developmentData } from './developmentSceneData';
 
 const square = (x: number, y: number, size = 1): PolygonGeometry => ({ type: 'Polygon', coordinates: [[[x,y],[x+size,y],[x+size,y+size],[x,y+size],[x,y]]] });
 describe('scenario geometry visibility', () => {
+  it('clips proposal buildings to the selected indicator area', () => {
+    const bridge = { active: true, analysis: { active: true, geometry: square(0,0) },
+      scenario: { buildings: [{ id: 'in', geometry: square(.8,.8), height_m: 9, color: '#D79B8C' },
+        { id: 'out', geometry: square(2,2), height_m: 9, color: '#D79B8C' }] } } as unknown as ZoningBridge;
+    const result = developmentData(bridge);
+    expect(result.features.map(f => f.properties?.id)).toEqual(['in']);
+    expect(JSON.stringify(result.features[0].geometry)).not.toContain('1.8');
+  });
   it('masks crossing and contained footprints, but not buildings in holes or outside', () => {
     expect(polygonsIntersect(square(0,0), square(.8,.8))).toBe(true);
     expect(polygonsIntersect(square(0,0,5), square(1,1))).toBe(true);
