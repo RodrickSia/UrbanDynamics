@@ -179,6 +179,42 @@ services:
       postgis:
         condition: service_healthy
 
+  etl-osm-sumo-hcmc:
+    <<: *etl
+    profiles: ["etl-osm-sumo-hcmc", "traffic_feat"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: osm_sumo_hcmc
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-traffic-history:
+    <<: *etl
+    profiles: ["etl-traffic-history", "traffic_feat"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: traffic_history
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
+  etl-road-data-tomtom:
+    <<: *etl
+    profiles: ["etl-road-data-tomtom", "traffic_feat"]
+    environment:
+      <<: *warehouse-env
+      DATA_DIR: /app/data
+      ETL_PIPELINE: road_data_tomtom
+    command: ["run"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+
   khoi-checks:
     build:
       context: .
