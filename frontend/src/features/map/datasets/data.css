@@ -54,6 +54,24 @@
   border: 1px solid rgba(0, 0, 0, 0.15);
   flex: none;
 }
+.sumo-volume-legend {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+}
+.sumo-volume-ramp {
+  height: 0.7rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: linear-gradient(to right, #277da1, #50b5b0, #b8d76b, #f2ae49, #c43d3d);
+}
+.sumo-volume-ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
 .dataset-status {
   display: flex;
   align-items: center;

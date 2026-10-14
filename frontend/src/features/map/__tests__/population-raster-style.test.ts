@@ -10,6 +10,15 @@ const populationSelection: DataSelection = {
   year: 2030,
   dates: {},
 };
+const sumoSelection: DataSelection = {
+  id: 'sumo-simulation',
+  dataset: 'sumo_simulation',
+  url: '/api/v1/traffic/sumo-simulations/runs/test/features',
+  year: 2026,
+  dates: {},
+  sumoRunId: 'test',
+  sumoVolumeMax: 120,
+};
 
 describe('Population raster rendering', () => {
   it('keeps linear resampling and disables tile cross-fade seams', () => {
@@ -34,5 +43,15 @@ describe('Population raster rendering', () => {
       maxzoom: 17,
       bounds: [102, 8, 110, 24],
     });
+  });
+
+  it('colors every SUMO road by the run-specific estimated car volume scale', () => {
+    const style = datasetStyle(sumoSelection);
+    const color = (style.paint as Record<string, unknown> | undefined)?.['line-color'];
+
+    expect(color).toEqual([
+      'interpolate', ['linear'], ['to-number', ['get', 'estimated_cars_30min'], 0],
+      0, '#277da1', 30, '#50b5b0', 60, '#b8d76b', 90, '#f2ae49', 120, '#c43d3d',
+    ]);
   });
 });

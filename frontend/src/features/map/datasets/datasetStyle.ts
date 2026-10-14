@@ -114,20 +114,26 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
         },
       };
     case 'sumo_simulation':
+      {
+        const volumeMax = Math.max(1, selection.sumoVolumeMax ?? 1);
       return {
         ...common,
         type: 'line',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': [
-            'match', ['get', 'simulated_los'],
-            'A', '#168a58', 'B', '#71ad45', 'C', '#d2b83f',
-            'D', '#e58b32', 'E', '#d9583c', 'F', '#8c3047', '#8a9199',
+            'interpolate', ['linear'], ['to-number', ['get', 'estimated_cars_30min'], 0],
+            0, '#277da1',
+            volumeMax * 0.25, '#50b5b0',
+            volumeMax * 0.5, '#b8d76b',
+            volumeMax * 0.75, '#f2ae49',
+            volumeMax, '#c43d3d',
           ],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.1, 13, 2.7, 17, 5],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.75, 9, 1.15, 13, 2.7, 17, 5],
           'line-opacity': 0.9,
         },
       };
+      }
     case 'parcels':
       return parcelFill();
     case 'synthetic_buildings':

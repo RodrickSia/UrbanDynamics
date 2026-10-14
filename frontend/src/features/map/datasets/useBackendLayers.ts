@@ -186,16 +186,19 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
         if (!isDataLayer(layer.id) || !layers[layer.id] || layer.status !== 'available') return [];
         const dataset = DATASETS[layer.id];
         if (dataset === 'sumo_simulation' && (!sumoRunId || sumoRunStatus !== 'completed')) return [];
+        const sumoVolumeMax = Number(sumoRunMetadata?.max_estimated_cars_30min ?? 0);
         return [
           { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette,
             dataset === 'traffic' ? trafficSchedule : undefined, dataset === 'sumo_simulation' ? sumoRunId ?? undefined : undefined), year, dates,
             visible: layer.id !== 'synthetic-buildings' || mode === '3d',
             ...(dataset === 'traffic' ? { trafficPeriod: trafficSchedule } : {}),
-            ...(dataset === 'sumo_simulation' ? { sumoRunId: sumoRunId ?? undefined } : {}),
+            ...(dataset === 'sumo_simulation'
+              ? { sumoRunId: sumoRunId ?? undefined, sumoVolumeMax }
+              : {}),
           },
         ];
       }),
-    [definitions, layers, year, palette, dates, trafficSchedule, sumoRunId, sumoRunStatus, mode],
+    [definitions, layers, year, palette, dates, trafficSchedule, sumoRunId, sumoRunStatus, sumoRunMetadata, mode],
   );
   const runSumo = useCallback(async (period: TrafficPeriod) => {
     const result = await runSumoSimulation(period);

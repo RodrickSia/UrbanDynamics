@@ -32,6 +32,7 @@ export interface DataSelection {
   visible?: boolean;
   trafficPeriod?: TrafficPeriod;
   sumoRunId?: string;
+  sumoVolumeMax?: number;
 }
 // Keep synchronized with backend/app/services/raster_tiles.py; values are people/cell.
 export const PALETTE_STOPS: Record<Palette, ReadonlyArray<readonly [number, string]>> = {

@@ -139,38 +139,52 @@ def _target_demand(weekday: int, period: str) -> tuple[float, int]:
     return trip_period_seconds, int(row[1])
 
 
-def _features(
-    network_path: Path,
-    output_path: Path,
+def _features_from_intervals(
+    network,
+    intervals: list[ET.Element],
     run_id: str,
     weekday: int,
     period: str,
     trip_period: float,
     observation_rows: int,
 ) -> dict:
-    import sumolib
-
-    network = sumolib.net.readNet(str(network_path))
-    edge_data = output_path / "edge-data.xml"
-    root = ET.parse(edge_data).getroot()
-    intervals = root.findall("interval")
     if not intervals:
         raise RuntimeError("SUMO completed without edge-level output")
-    last_interval = intervals[-1]
+    entered_by_edge: dict[str, int] = {}
+    sampled_seconds_by_edge: dict[str, float] = {}
+    speed_seconds_by_edge: dict[str, float] = {}
+    occupancy_seconds_by_edge: dict[str, float] = {}
+    for interval in intervals:
+        for element in interval.findall("edge"):
+            edge_id = element.get("id", "")
+            if not edge_id or edge_id.startswith(":"):
+                continue
+            entered_by_edge[edge_id] = entered_by_edge.get(edge_id, 0) + int(
+                float(element.get("entered", "0"))
+            )
+            sampled = float(element.get("sampledSeconds", "0"))
+            if sampled > 0:
+                sampled_seconds_by_edge[edge_id] = sampled_seconds_by_edge.get(edge_id, 0) + sampled
+                speed_seconds_by_edge[edge_id] = speed_seconds_by_edge.get(edge_id, 0) + (
+                    float(element.get("speed", "0")) * sampled
+                )
+                occupancy_seconds_by_edge[edge_id] = occupancy_seconds_by_edge.get(edge_id, 0) + (
+                    float(element.get("occupancy", "0")) * sampled
+                )
+
     features = []
-    for element in last_interval.findall("edge"):
-        edge_id = element.get("id", "")
-        if not edge_id or edge_id.startswith(":"):
-            continue
-        try:
-            edge = network.getEdge(edge_id)
-        except KeyError:
+    for edge in network.getEdges():
+        edge_id = edge.getID()
+        if edge_id.startswith(":"):
             continue
         coordinates = [network.convertXY2LonLat(x, y) for x, y in edge.getShape()]
         if len(coordinates) < 2:
             continue
         free_speed = float(edge.getSpeed())
-        simulated_speed = float(element.get("speed", "0"))
+        sampled = sampled_seconds_by_edge.get(edge_id, 0)
+        # SUMO reports no measured speed when an edge has no sampled car. Use
+        # free-flow speed for that zero-volume edge rather than painting it as jammed.
+        simulated_speed = speed_seconds_by_edge.get(edge_id, 0) / sampled if sampled else free_speed
         ratio = simulated_speed / free_speed if free_speed > 0 else 0
         grade = (
             "A"
@@ -198,8 +212,10 @@ def _features(
                     "free_flow_speed_kmh": round(free_speed * 3.6, 1),
                     "speed_ratio": round(ratio, 3),
                     "congestion_score": round((1 - min(1, ratio)) * 100, 1),
-                    "vehicles_entered": int(float(element.get("entered", "0"))),
-                    "occupancy_percent": round(float(element.get("occupancy", "0")), 1),
+                    "estimated_cars_30min": entered_by_edge.get(edge_id, 0),
+                    "occupancy_percent": round(
+                        occupancy_seconds_by_edge.get(edge_id, 0) / sampled if sampled else 0, 1
+                    ),
                 },
             }
         )
@@ -215,7 +231,14 @@ def _features(
             "period": period,
             "timezone": "Asia/Ho_Chi_Minh",
             "simulation_interval_seconds": (
-                float(last_interval.get("end", "0")) - float(last_interval.get("begin", "0"))
+                float(intervals[-1].get("end", "0")) - float(intervals[0].get("begin", "0"))
+            ),
+            "vehicle_count_period_seconds": SIMULATION_SECONDS,
+            "vehicle_count_period_label": "simulated 30-minute period",
+            "vehicle_count_type": "passenger cars; motorcycles excluded from the count",
+            "max_estimated_cars_30min": max(
+                (feature["properties"]["estimated_cars_30min"] for feature in features),
+                default=0,
             ),
             "estimated_trip_period_seconds": trip_period,
             "historical_observation_rows_used": observation_rows,
@@ -233,6 +256,30 @@ def _features(
             "features": len(features),
         },
     }
+
+
+def _features(
+    network_path: Path,
+    output_path: Path,
+    run_id: str,
+    weekday: int,
+    period: str,
+    trip_period: float,
+    observation_rows: int,
+) -> dict:
+    import sumolib
+
+    network = sumolib.net.readNet(str(network_path))
+    root = ET.parse(output_path / "edge-data.xml").getroot()
+    return _features_from_intervals(
+        network,
+        root.findall("interval"),
+        run_id,
+        weekday,
+        period,
+        trip_period,
+        observation_rows,
+    )
 
 
 def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict:
@@ -339,9 +386,10 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         id="traffic",
         file="edge-data.xml",
         period="300",
-        begin="900",
+        begin="0",
         end=str(SIMULATION_SECONDS),
-        excludeEmpty="true",
+        excludeEmpty="false",
+        vTypes="car",
     )
     ET.ElementTree(root).write(directory / "additional.xml", encoding="utf-8", xml_declaration=True)
     _run(

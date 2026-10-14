@@ -67,7 +67,10 @@ Compose service, builds/caches a SUMO road network from the HCMC OSM PBF, and
 returns edge-level simulated speeds and LOS for the map. It derives one global
 random-trip rate from historical LOS because the current traffic sources do
 not provide vehicle counts or an observed origin-destination matrix. Treat the
-result as an estimated-demand scenario, not a validated forecast. Apply
+result as an estimated-demand scenario, not a validated forecast. The map
+includes all network road edges and colors them by SUMO-estimated passenger-car
+passages over the simulated 30-minute interval; motorcycle traffic affects the
+simulation but is not included in that car count. Apply
 `11-sumo-congestion-simulation.sql` before using the queue API.
 
 ## Configuration and operation

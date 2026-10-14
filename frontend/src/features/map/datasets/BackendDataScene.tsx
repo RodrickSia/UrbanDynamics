@@ -304,6 +304,7 @@ const FIELDS: Record<string, string> = {
   simulated_speed_kmh: 'SUMO speed (km/h)',
   free_flow_speed_kmh: 'Free-flow speed (km/h)',
   speed_ratio: 'Speed ratio',
+  estimated_cars_30min: 'Estimated car passages (30 min)',
   vehicles_entered: 'Simulated vehicles entered',
   occupancy_percent: 'Simulated occupancy (%)',
   start: 'From',

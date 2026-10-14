@@ -13,6 +13,11 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
   const [sumoPeriod, setSumoPeriod] = useState(data.trafficSchedule.period);
   const [sumoSubmitting, setSumoSubmitting] = useState(false);
   const [sumoSubmitError, setSumoSubmitError] = useState('');
+  const sumoVolumeMax = Math.max(
+    0,
+    Math.floor(Number(data.sumoRunMetadata?.max_estimated_cars_30min ?? 0)),
+  );
+  const sumoVolumeTicks = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round(sumoVolumeMax * fraction)))];
   const StatusIcon =
     report?.status === 'error'
       ? CircleAlert
@@ -244,16 +249,25 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
             </p>
           )}
           {sumoSubmitError && <p className="dataset-status" role="alert">{sumoSubmitError}</p>}
-          <div className="dataset-legend">
-            {[
-              ['A', '#168a58'], ['B', '#71ad45'], ['C', '#d2b83f'],
-              ['D', '#e58b32'], ['E', '#d9583c'], ['F', '#8c3047'],
-            ].map(([grade, color]) => <Legend key={grade} color={color} label={grade} />)}
+          <div className="sumo-volume-legend" role="group" aria-label="Estimated car passages per road over 30 minutes">
+            <small>Estimated car passages · simulated 30 minutes</small>
+            <div className="sumo-volume-ramp" aria-hidden="true" />
+            {data.sumoRunStatus === 'completed' ? (
+              <div className="sumo-volume-ticks">
+                {sumoVolumeTicks.map((tick, index) => (
+                  <span key={`${tick}-${index}`}>{tick.toLocaleString()}</span>
+                ))}
+              </div>
+            ) : (
+              <small>Run a scenario to calculate the road-volume scale.</small>
+            )}
           </div>
           <DatasetNote>
             This is a separate SUMO run. Demand is estimated from historical LOS, not measured
             vehicle counts or an observed origin–destination matrix. Results are modeled scenarios,
-            not live traffic or a validated forecast.
+            not live traffic or a validated forecast. Road colors show estimated passenger-car
+            passages on each road over the simulated 30-minute period; zero-volume roads remain
+            visible at the low end of the scale.
           </DatasetNote>
         </>
       )}

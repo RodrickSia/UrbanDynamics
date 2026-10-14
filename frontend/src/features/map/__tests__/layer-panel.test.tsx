@@ -37,7 +37,7 @@ function mockCatalog() {
               : input.endsWith('/traffic/sumo-simulations/runs') && init?.method === 'POST'
                 ? { run_id: 'a4b0baab-5b88-42e3-932d-72a8103fe870', status: 'queued' }
               : input.includes('/traffic/sumo-simulations/runs/')
-                ? { status: 'completed', metadata: { features: 420 } }
+                ? { status: 'completed', metadata: { features: 420, max_estimated_cars_30min: 120 } }
               : input.endsWith('/traffic/catalog')
                 ? { available: true, network_available: true }
               : {
@@ -100,6 +100,8 @@ it('runs SUMO separately from planning and exposes its simulation layer controls
   expect(screen.getByText('Run SUMO congestion scenario')).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Run separate SUMO simulation' }));
   await waitFor(() => expect(screen.getByText(/SUMO simulation complete/)).toBeInTheDocument());
+  expect(screen.getByRole('group', { name: 'Estimated car passages per road over 30 minutes' })).toBeInTheDocument();
+  expect(screen.getByText('120')).toBeInTheDocument();
 });
 it('reveals compact controls only for active layers and supports keyboard toggling', async () => {
   mockCatalog();
