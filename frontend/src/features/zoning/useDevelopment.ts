@@ -3,6 +3,7 @@ import { zoningRequest } from './api';
 import { buildingInput, type BuildingInput, type DevelopmentPreview, type ParcelDevelopment, type ProposedBuilding } from './developmentTypes';
 import { sketchGeometry } from './geometry';
 import type { Plan, Scenario, Sketch } from './types';
+import type { FeatureCollection } from 'geojson';
 
 const EMPTY: Sketch = { tool: null, geometry: null, points: [] };
 export function useDevelopment(plan: Plan | null, scenario: Scenario | null, sketch: Sketch,
@@ -12,6 +13,7 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
   const [selection, setSelection] = useState({ scope: '', parcelId: '', buildingId: '' });
   const [response, setResponse] = useState<{ key: string; value?: ParcelDevelopment; error?: string } | null>(null);
   const [retry, setRetry] = useState(0);
+  const [mapped, setMapped] = useState<{ scope: string; parcelId: string; buildings: FeatureCollection }>();
   const [draftState, setDraftState] = useState<{ scope: string; value: BuildingInput } | null>(null);
   const [previewState, setPreviewState] = useState<{ key: string; value: DevelopmentPreview } | null>(null);
   const [working, setWorking] = useState(false);
@@ -20,7 +22,9 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
   const pending = useRef(false);
   const parcelId = selection.scope === scope ? selection.parcelId : '';
   const selectedBuilding = selection.scope === scope ? selection.buildingId : '';
-  const requestKey = `${scope}/${plan?.revision}/${parcelId}/${retry}`;
+  const mapBuildings = mapped?.scope === scope && mapped.parcelId === parcelId ? mapped.buildings : undefined;
+  const mapKey = JSON.stringify(mapBuildings ?? null);
+  const requestKey = `${scope}/${plan?.revision}/${parcelId}/${retry}/${mapKey}`;
   const draft = draftState?.scope === scope ? draftState.value : null;
   const geometry = sketchGeometry(sketch);
   const input = draft && geometry && geometry.type !== 'LineString' ? { ...draft, geometry } : null;
@@ -28,16 +32,18 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
   const preview = previewState?.key === `${requestKey}/${inputKey}` ? previewState.value : null;
   const data = response?.key === requestKey ? response.value : undefined;
   const error = response?.key === requestKey ? response.error : undefined;
-  const parcel = data?.parcel ?? (parcelId ? plan?.parcels?.[parcelId] : null) ?? null;
+  // Retain the canonical parcel while supplementing its report with loaded map tiles.
+  const parcel = data?.parcel ?? (response?.value?.parcel.id === parcelId && response.key.startsWith(`${scope}/`) ? response.value.parcel : null)
+    ?? (parcelId ? plan?.parcels?.[parcelId] : null) ?? null;
   const readOnly = !scenario || scenario.locked || scenario.kind === 'reference';
   useEffect(() => {
     if (!plan || !scenario || !parcelId) return;
     const controller = new AbortController();
-    void zoningRequest<ParcelDevelopment>(`/${plan.id}/development/parcels/${parcelId}?scenario_id=${scenario.id}`, undefined, controller.signal)
+    void zoningRequest<ParcelDevelopment>(`/${plan.id}/development/parcels/${parcelId}${mapBuildings ? '/baseline' : ''}?scenario_id=${scenario.id}`, mapBuildings, controller.signal)
       .then(value => { if (!controller.signal.aborted) setResponse({ key: requestKey, value }); })
       .catch(cause => { if (!controller.signal.aborted) setResponse({ key: requestKey, error: cause.message }); });
     return () => controller.abort();
-  }, [plan, scenario, parcelId, requestKey]);
+  }, [plan, scenario, parcelId, requestKey, mapBuildings]);
   useEffect(() => {
     if (!draft) return;
     const prevent = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -110,6 +116,10 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
     return true;
   };
   return { parcel, parcelId, selectedBuilding, data, error, loading: !!parcelId && !data && !error,
+    mapBuildings, onBaseline: (id: string, buildings: FeatureCollection) => {
+      if (id === parcelId) setMapped(previous => previous?.scope === scope && previous.parcelId === id
+        && JSON.stringify(previous.buildings) === JSON.stringify(buildings) ? previous : { scope, parcelId: id, buildings });
+    },
     retry: () => setRetry(n => n + 1), draft, input, preview, working, dirty: !!draft,
     deleteRequested, setDeleteRequested,
     pickParcel, pickBuilding, clearSelection, begin, update, cancel, previewBuilding, generate, save };

@@ -1,4 +1,5 @@
 import type { PolygonGeometry } from './types';
+import type { FeatureCollection } from 'geojson';
 
 export interface DevelopmentParcel {
   id: string; geometry: PolygonGeometry; area_m2: number; land_use: string | null;
@@ -32,7 +33,8 @@ export interface DevelopmentReport {
   metrics: DevelopmentMetrics; checks: DevelopmentCheck[]; rule_status: string;
 }
 export interface ParcelDevelopment extends DevelopmentReport {
-  baseline: { status: string; source?: string; metrics: (Pick<DevelopmentMetrics, 'gfa_m2'|'far'|'coverage_pct'|'footprint_m2'> & { max_height: number; max_floors: number }) | null };
+  baseline: { status: string; source?: string; metrics: (Pick<DevelopmentMetrics, 'gfa_m2'|'far'|'coverage_pct'|'footprint_m2'> & { max_height: number; max_floors: number; setbacks?: number | null }) | null };
+  scenario_setback_m?: number | null;
   zoning: { zone_id: string; type_id: string; code: string; name: string; color: string; percent: number }[];
   scenario_kind: 'reference' | 'proposal';
   parcel: DevelopmentParcel;
@@ -44,6 +46,7 @@ export interface DevelopmentBridge {
   active: boolean; parcel: DevelopmentParcel | null; selectedBuilding: string | null;
   preview: ProposedBuilding | null; onPickParcel: (id: string) => void;
   onPickBuilding: (id: string) => void;
+  onBaseline?: (parcelId: string, buildings: FeatureCollection) => void;
   onDelete: () => void; onUndo: (redo: boolean) => void;
 }
 

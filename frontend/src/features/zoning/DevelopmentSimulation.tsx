@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../../services/api';
 import { usePlanSimulation } from './usePlanSimulation';
 import { simulationDefaults, type SimulationSettings } from './simulationTypes';
 import type { Plan, Scenario } from './types';
+import type { FeatureCollection } from 'geojson';
 
 const fields = [
   ['residential_m2_per_person', 'Residential m² / person', 5, 500],
@@ -22,7 +23,7 @@ const metrics = [
 ] as const;
 const format = (value: number | null | undefined) => value == null ? 'Unknown' : value.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
-export function DevelopmentSimulation({ plan, scenario, parcelId, disabled }: { plan: Plan; scenario: Scenario; parcelId: string | null; disabled: boolean }) {
+export function DevelopmentSimulation({ plan, scenario, parcelId, disabled, mapBuildings }: { plan: Plan; scenario: Scenario; parcelId: string | null; disabled: boolean; mapBuildings?: FeatureCollection }) {
   const storageKey = `plan-simulation-settings:${plan.id}:${scenario.id}`;
   const [settings, setSettings] = useState<SimulationSettings>(() => {
     try {
@@ -33,7 +34,7 @@ export function DevelopmentSimulation({ plan, scenario, parcelId, disabled }: { 
   });
   const [mode, setMode] = useState<'screening' | 'native'>('screening');
   const [scope, setScope] = useState<'parcel' | 'scenario'>('parcel');
-  const simulation = usePlanSimulation(plan, scenario, settings, scope === 'parcel' ? parcelId : null, scope === 'scenario' || !!parcelId);
+  const simulation = usePlanSimulation(plan, scenario, settings, scope === 'parcel' ? parcelId : null, scope === 'scenario' || !!parcelId, scope === 'parcel' ? mapBuildings : undefined);
   const { job, result, error, requesting, running } = simulation;
   const option = result?.options.find(option => option.id === 'proposal');
   const state = option?.state;

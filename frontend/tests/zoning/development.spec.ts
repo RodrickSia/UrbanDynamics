@@ -32,6 +32,47 @@ async function prepare(page: Page, request: APIRequestContext) {
   return { plan, name, fixtureStyle };
 }
 
+test('Existing reads streamed Goong buildings and measures scenario setbacks in 2D and 3D', async ({ page, request }) => {
+  const { name } = await prepare(page, request);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const buildings = new GeoJSONVT({ type: 'Feature', id: 101, properties: { height: 24, levels: 6 },
+    geometry: { type: 'Polygon', coordinates: [[[106.7606,10.8206],[106.7609,10.8206],[106.7609,10.8209],[106.7606,10.8209],[106.7606,10.8206]]] } }, { maxZoom: 18 });
+  await page.unroute('https://tiles.goong.io/**');
+  await page.route('https://tiles.goong.io/**', route => route.fulfill({ json: {
+    version: 8, sources: { composite: { type: 'vector', tiles: ['http://127.0.0.1:5178/__baseline/{z}/{x}/{y}.pbf'], maxzoom: 18 } },
+    layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#dce5df' } },
+      { id: 'building-footprints', type: 'fill', source: 'composite', 'source-layer': 'VN_Building', paint: { 'fill-opacity': 0 } }],
+  } }));
+  await page.route('**/__baseline/**', route => {
+    const match = route.request().url().match(/__baseline\/(\d+)\/(\d+)\/(\d+)\.pbf/)!;
+    const tile = buildings.getTile(+match[1], +match[2], +match[3]);
+    return tile ? route.fulfill({ contentType: 'application/vnd.mapbox-vector-tile', body: Buffer.from(fromGeojsonVt({ VN_Building: tile })) }) : route.fulfill({ status: 204 });
+  });
+  await page.goto('/tests/browser/data-layers.html');
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.getByRole('button', { name: 'Development', exact: true }).click();
+  await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
+  await clickMap(page, [106.7607,10.8207]);
+  const panel = page.getByRole('region', { name: 'Development editor' });
+  await expect(panel.getByText('Mapped buildings · Goong loaded tiles · estimated floors/heights')).toBeVisible();
+  await expect(panel.getByRole('row', { name: /^Height / })).toContainText('24 m');
+  await expect(panel.getByRole('row', { name: /^Floors / })).toContainText('6 floors');
+  const setback = panel.getByRole('row', { name: /^Min. setback / });
+  await expect(setback).not.toContainText('No data');
+  await page.getByRole('button', { name: 'Existing', exact: true }).click();
+  await page.waitForFunction(() => window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
+  await clickMap(page, [106.7607,10.8207]);
+  await expect(panel.getByRole('row', { name: /^Height / })).toContainText('24 m');
+  await expect(setback).not.toContainText('No data');
+  await panel.getByRole('button', { name: '3D', exact: true }).click();
+  await panel.getByRole('button', { name: '2D', exact: true }).click();
+  await expect(panel.getByRole('row', { name: /^Height / })).toContainText('24 m');
+  await panel.screenshot({ path: '../.runtime/development-gap-e2e/existing-baseline.png' });
+  expect(errors).toEqual([]);
+});
+
 test('real API: parcel picking, draft, save, clone, edit, lock, masks, style restore and dashboard', async ({ page, request }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

@@ -1,6 +1,7 @@
 """Durable study revisions, runs and jobs in PostgreSQL or local SQLite."""
 from contextlib import contextmanager
 import json
+import logging
 import os
 from pathlib import Path
 import sqlite3
@@ -10,6 +11,8 @@ import psycopg
 
 from src.shared.database import warehouse_configured, connect_to_warehouse
 from ..integrated.context import digest
+
+logger = logging.getLogger(__name__)
 
 
 class StoreError(RuntimeError):
@@ -21,6 +24,7 @@ class Conflict(ValueError):
 
 
 SCHEMA = (
+    "CREATE TABLE IF NOT EXISTS planning_submissions (scope TEXT NOT NULL, request_key TEXT NOT NULL, input_hash TEXT NOT NULL, study_id TEXT NOT NULL, job_id TEXT NOT NULL, PRIMARY KEY(scope,request_key))",
     "CREATE TABLE IF NOT EXISTS planning_benchmarks (id TEXT PRIMARY KEY, signature TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL, payload TEXT NOT NULL)",
     "CREATE INDEX IF NOT EXISTS planning_benchmarks_signature_idx ON planning_benchmarks(signature,created_at)",
     "CREATE TABLE IF NOT EXISTS planning_documents (id TEXT PRIMARY KEY, kind TEXT NOT NULL, study_id TEXT, created_at DOUBLE PRECISION NOT NULL, payload TEXT NOT NULL)",
@@ -64,6 +68,7 @@ def transaction():
     except (sqlite3.Error, psycopg.Error, OSError) as error:
         if connection:
             connection.rollback()
+        logger.exception('Planning storage transaction failed (%s)', 'postgres' if postgres else 'sqlite')
         raise StoreError("Planning storage unavailable") from error
     except Exception:
         if connection:
@@ -95,6 +100,33 @@ def load_document(identifier, kind):
     with transaction() as session:
         row = session.execute("SELECT payload FROM planning_documents WHERE id=? AND kind=?", (str(identifier), kind)).fetchone()
         return json.loads(row[0]) if row else None
+
+
+def start_study(inputs, context_hash, scope, mode, request_key):
+    """Commit the frozen input and queued job together; retries reuse the same job."""
+    signature = digest({'inputs': inputs, 'context_hash': context_hash, 'mode': mode})
+    with transaction() as session:
+        previous = session.execute(
+            'SELECT input_hash,study_id,job_id FROM planning_submissions WHERE scope=? AND request_key=?',
+            (scope, request_key)).fetchone()
+        if previous:
+            if previous[0] != signature:
+                raise Conflict('Run request key was already used with different inputs')
+            row = session.execute("SELECT payload FROM planning_documents WHERE id=? AND kind='study'", (previous[1],)).fetchone()
+            if row is None:
+                raise StoreError('Stored simulation input is unavailable')
+            study, job_id = json.loads(row[0]), previous[2]
+        else:
+            study = _save(session, 'study', {'inputs': inputs, 'context_hash': context_hash, 'parent_revision_id': None})
+            job_id = str(uuid4())
+            session.execute("INSERT INTO planning_jobs(id,study_id,mode,idempotency_key,input_hash,status,created_at) VALUES(?,?,?,?,?,'queued',?)",
+                            (job_id, study['id'], mode, request_key, digest({'study': context_hash, 'mode': mode}), time.time()))
+            session.execute('INSERT INTO planning_submissions(scope,request_key,input_hash,study_id,job_id) VALUES(?,?,?,?,?)',
+                            (scope, request_key, signature, study['id'], job_id))
+    job = get_job(job_id)
+    if job is None:
+        raise StoreError('Queued simulation is not visible in storage')
+    return study, job
 
 
 def enqueue(study_id, mode, idempotency_key):

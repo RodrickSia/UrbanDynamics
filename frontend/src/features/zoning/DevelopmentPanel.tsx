@@ -54,13 +54,13 @@ export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWo
           <button aria-label="Delete building" title="Delete building" disabled={w.readOnly || w.busy} onClick={() => setConfirm('delete')}><Trash2 size={16}/></button></div>
         <BuildingFloorSummary building={selected}/></div>}
       <BuildingDraftForm workspace={w} onView={onView}/>
-      {report && <DevelopmentValues report={report} baseline={d.data?.baseline} existing={w.scenario?.kind === 'reference'}/>}
+      {report && <DevelopmentValues report={report} baseline={d.data?.baseline} existing={w.scenario?.kind === 'reference'} scenarioSetback={d.preview ? undefined : d.data?.scenario_setback_m}/>}
       <p className="zoning-muted">Concept massing · approximate terrain anchor. Baseline heights unverified.</p>
       {masked && <p className="zoning-muted">Demolition applies to this scenario. Raster imagery stays unchanged.</p>}
     </>}
     {!!w.scenario?.buildings?.length && <><h3>Proposed buildings</h3><ul className="development-list">{w.scenario.buildings.map(b => <li key={b.id}><button disabled={d.dirty || w.busy} aria-pressed={b.id === d.selectedBuilding} onClick={() => { d.pickBuilding(b.id); w.zoomTo(b.geometry); }}>{b.name}<small>{b.floors} floors · {b.height_m.toFixed(1)} m</small></button></li>)}</ul></>}
     {w.plan && w.scenario?.kind === 'proposal' &&
-      <DevelopmentSimulation key={`${w.plan.id}/${w.scenario.id}`} plan={w.plan} scenario={w.scenario} parcelId={d.parcelId || null} disabled={w.busy || d.dirty}/>}
+      <DevelopmentSimulation key={`${w.plan.id}/${w.scenario.id}`} plan={w.plan} scenario={w.scenario} parcelId={d.parcelId || null} disabled={w.busy || d.dirty} mapBuildings={d.mapBuildings}/>}
     {confirmation && <ActionDialog title={confirmation === 'delete' ? 'Delete proposed building?' : confirmation === 'demolish' ? 'Demolish this parcel?' : 'Restore baseline?'}
       message={confirmation === 'delete' ? 'Remove this proposal from the active scenario.' : 'Only baseline visibility in this scenario changes. Source geometry is retained.'}
       busy={w.busy} error={w.error} onClose={() => { setConfirm(null); d.setDeleteRequested(false); }} onConfirm={async () => !!await w.execute(confirmation === 'delete' ? 'delete_building' : confirmation === 'demolish' ? 'demolish_parcel' : 'restore_parcel',

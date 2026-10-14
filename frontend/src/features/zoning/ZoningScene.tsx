@@ -7,6 +7,7 @@ import { editVertex, rings, sketchGeometry } from './geometry';
 import { nearestSnap, snapSource, type SnapGeometry } from './snapping';
 import type { PolygonGeometry, ZoningBridge } from './types';
 import { BUILDING_LAYER, BUILDING_EXCLUDED_LAYER, BUILDING_FOOTPRINT_LAYER } from './DevelopmentScene';
+import { useMappedBaseline } from './useMappedBaseline';
 
 const SOURCE = 'zoning-editor';
 const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
@@ -49,6 +50,7 @@ function data(bridge: ZoningBridge): FeatureCollection {
 }
 
 export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: ZoningBridge }) {
+  useMappedBaseline(map, bridge);
   const current = useRef(bridge);
   const parcelTiles = bridge.plan
     ? `${API_BASE_URL}/api/v1/zoning/plans/${encodeURIComponent(bridge.plan.id)}/parcels/tiles/{z}/{x}/{y}.pbf?revision=${bridge.plan.revision}&schema=2`

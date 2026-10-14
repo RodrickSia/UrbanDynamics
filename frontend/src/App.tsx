@@ -53,6 +53,7 @@ export default function App() {
             development: { active: !zoning.analyzing && zoning.section === 'development', parcel: zoning.development.parcel,
               selectedBuilding: zoning.development.selectedBuilding, preview: zoning.development.preview?.building ?? null,
               onPickParcel: zoning.development.pickParcel, onPickBuilding: zoning.development.pickBuilding,
+              onBaseline: zoning.development.onBaseline,
               onDelete: () => { if (!zoning.readOnly && !zoning.busy && !zoning.development.dirty && zoning.development.selectedBuilding) zoning.development.setDeleteRequested(true); },
               onUndo: redo => { if (!zoning.readOnly && !zoning.busy && !zoning.development.dirty) void zoning.execute(redo ? 'redo_development' : 'undo_development'); } } }}
           backend={{selections:backend.selections,opacity:workspace.opacityByLayer,revision:backend.revision,report:backend.report}}

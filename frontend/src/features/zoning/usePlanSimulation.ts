@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../../services/api';
 import { zoningRequest } from './api';
 import type { Plan, Scenario } from './types';
 import type { SimulationJob, SimulationResult, SimulationSettings, SimulationStudy } from './simulationTypes';
+import type { FeatureCollection } from 'geojson';
 
 async function request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/api/v1/planning${path}`, {
@@ -16,13 +17,16 @@ async function request<T>(path: string, body?: unknown, signal?: AbortSignal): P
 }
 const active = (job?: SimulationJob | null) => !!job && ['queued', 'running'].includes(job.status);
 
-export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: SimulationSettings, parcelId: string | null, enabled = true) {
+export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: SimulationSettings, parcelId: string | null, enabled = true, mapBuildings?: FeatureCollection) {
+  // Tiles keep streaming while a job runs. Its input is frozen on submission;
+  // passive map updates must not hide the running job or invalidate its result.
   const key = JSON.stringify([plan.id, plan.revision, scenario.id, parcelId, enabled, settings]);
   const storageKey = `plan-simulation:${plan.id}:${scenario.id}:${parcelId ?? 'scenario'}`;
   const currentKey = useRef<string | null>(key);
   const [state, setState] = useState<{ key: string; study?: SimulationStudy; job?: SimulationJob; result?: SimulationResult }>();
   const [requesting, setRequesting] = useState(false), [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const submission = useRef<{ key: string; id: string } | null>(null);
   useEffect(() => {
     currentKey.current = key;
     return () => { currentKey.current = null; };
@@ -66,13 +70,15 @@ export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: Simu
     if (!enabled || requesting || active(visible?.job)) return;
     setRequesting(true); setError('');
     try {
-      const study = await zoningRequest<SimulationStudy>(`/${plan.id}/simulation/studies`, {
+      const submissionKey = `${key}/${mode}`;
+      if (submission.current?.key !== submissionKey) submission.current = { key: submissionKey, id: crypto.randomUUID() };
+      const { study, job } = await zoningRequest<{ study: SimulationStudy; job: SimulationJob }>(`/${plan.id}/simulation/runs`, {
         revision: plan.revision, scenario_id: scenario.id, parcel_id: parcelId, ...settings,
+        mode, idempotency_key: submission.current.id,
+        ...(mapBuildings ? { map_buildings: mapBuildings } : {}),
       });
-      // Changing scenario during preflight must not enqueue an unseen run.
-      if (currentKey.current !== key) return;
-      const job = await request<SimulationJob>(`/studies/${study.id}/runs`, { mode, idempotency_key: crypto.randomUUID() });
       remember(job);
+      submission.current = null;
       if (currentKey.current === key) setState({ key, study, job });
     } catch (reason) {
       if (currentKey.current === key) setError(reason instanceof Error ? reason.message : 'Simulation unavailable');

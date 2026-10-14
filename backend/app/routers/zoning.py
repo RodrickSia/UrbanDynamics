@@ -11,7 +11,8 @@ from shapely.errors import GEOSException
 from app.services.zoning import baseline, development, engine, store
 from app.services.zoning.indicators import report
 from app.services.zoning.models import Command, PlanInput
-from app.services.zoning.simulation import SimulationInput, study_from_plan
+from app.services.zoning.simulation import SimulationInput, SimulationRunInput, study_from_plan
+from app.services.simulation.integrated.models import MapBuildingCollection
 
 router = APIRouter(prefix="/api/v1/zoning/plans", tags=["zoning plans"])
 
@@ -158,13 +159,28 @@ def selected_parcel(plan, parcel_id):
 
 @router.get("/{identifier}/development/parcels/{parcel_id}")
 def development_parcel(identifier: UUID, parcel_id: str, scenario_id: str):
+    return parcel_development_report(identifier, parcel_id, scenario_id)
+
+
+@router.post("/{identifier}/development/parcels/{parcel_id}/baseline")
+def development_map_baseline(identifier: UUID, parcel_id: str, scenario_id: str, body: MapBuildingCollection):
+    return parcel_development_report(identifier, parcel_id, scenario_id, body)
+
+
+def parcel_development_report(identifier, parcel_id, scenario_id, map_buildings=None):
     def read():
         plan = require_plan(identifier)
         scenario = engine.find(plan["scenarios"], scenario_id)
         parcel = selected_parcel(plan, parcel_id)
         buildings = [b for b in scenario.get("buildings", []) if b["parcel_id"] == parcel_id]
+        records = baseline.buildings(parcel, plan['study_area'])
+        if map_buildings is not None:
+            records = baseline.with_map_buildings(parcel, plan['study_area'], records, map_buildings)
+        current = baseline.report(parcel, plan['study_area'], records)
+        retained = [] if any(m['parcel_id'] == parcel_id for m in scenario.get('demolition_masks', [])) else records or []
+        scenario_setback = development.minimum_setback(parcel, [*retained, *buildings])
         return {"parcel": parcel, "catalog": development.CATALOG,
-                "baseline": baseline.report(parcel, plan['study_area'], baseline.buildings(parcel, plan['study_area'])),
+                "baseline": current, "scenario_setback_m": scenario_setback,
                 "zoning": baseline.zoning(plan, scenario, parcel), "scenario_kind": scenario['kind'],
                 **development.validation(plan, scenario, parcel, buildings)}
     return execute(read)
@@ -188,6 +204,15 @@ def plan_land_use(identifier: UUID):
 
 @router.post("/{identifier}/simulation/studies", status_code=201)
 def simulation_study(identifier: UUID, body: SimulationInput):
+    return save_simulation(identifier, body)
+
+
+@router.post("/{identifier}/simulation/runs", status_code=202)
+def simulation_run(identifier: UUID, body: SimulationRunInput):
+    return save_simulation(identifier, body)
+
+
+def save_simulation(identifier, body):
     from app.services.simulation.planning import store as simulations
     from app.services.simulation.planning.context import canonical_input, preflight
 
@@ -200,9 +225,16 @@ def simulation_study(identifier: UUID, body: SimulationInput):
     study = execute(lambda: study_from_plan(plan, body))
     ready = execute(lambda: preflight(study))
     try:
-        saved = simulations.save_study(canonical_input(study), ready["context_hash"])
+        if isinstance(body, SimulationRunInput):
+            saved, job = simulations.start_study(canonical_input(study), ready['context_hash'],
+                f'zoning:{identifier}:{body.scenario_id}', body.mode, body.idempotency_key)
+        else:
+            saved = simulations.save_study(canonical_input(study), ready["context_hash"])
+    except simulations.Conflict as error:
+        raise HTTPException(409, str(error)) from None
     except simulations.StoreError:
         raise HTTPException(503, "Simulation storage unavailable") from None
-    return {"id": saved["id"], "plan_id": str(identifier), "revision": plan["revision"],
+    summary = {"id": saved["id"], "plan_id": str(identifier), "revision": plan["revision"],
             "scenario_id": str(body.scenario_id), "native_work_estimate": ready["native_work_estimate"],
             "model_version": ready["model_version"], "context_hash": ready["context_hash"]}
+    return {'study': summary, 'job': job} if isinstance(body, SimulationRunInput) else summary

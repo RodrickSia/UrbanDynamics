@@ -21,6 +21,26 @@ def freeze(client, plan, **settings):
         "revision": plan["revision"], "scenario_id": plan["scenarios"][1]["id"], **settings})
 
 
+def test_development_starts_a_durable_job_in_one_request(client, plan, parcel_source, monkeypatch, tmp_path):
+    monkeypatch.setenv('PLANNING_SQLITE_PATH', str(tmp_path / 'atomic.sqlite'))
+    monkeypatch.setenv('SIMULATION_WORK_DIR', str(tmp_path / 'solvers'))
+    plan = command(client, plan, 'save_building', building())
+    payload = {'revision': plan['revision'], 'scenario_id': plan['scenarios'][1]['id'],
+               'parcel_id': '3885881', 'mode': 'screening', 'idempotency_key': 'atomic-retry'}
+    path = f"/api/v1/zoning/plans/{plan['id']}/simulation/runs"
+    response = client.post(path, json=payload)
+    assert response.status_code == 202, response.text
+    started = response.json()
+    assert started['study']['id'] == started['job']['study_id']
+    assert client.post(path, json=payload).json()['job']['id'] == started['job']['id']
+    changed = client.post(path, json={**payload, 'rainfall_mm': 80})
+    assert changed.status_code == 409
+    finished = process_one()
+    assert finished['id'] == started['job']['id']
+    assert finished['status'] == 'succeeded', finished
+    assert client.get(f"/api/v1/planning/runs/{finished['result_id']}").status_code == 200
+
+
 @pytest.mark.parametrize('mode', ['screening', 'native'])
 def test_saved_mixed_floors_feed_screening_without_duplicate_geometry(client, plan, parcel_source, tmp_path, monkeypatch, mode):
     monkeypatch.setenv("PLANNING_SQLITE_PATH", str(tmp_path / "simulation.sqlite"))
@@ -108,6 +128,20 @@ def test_selected_generated_baseline_can_run_without_new_proposal(client, plan, 
     assert study['projects'][0]['baseline_occupancy'] == 'estimated'
     # Reading a source parcel for simulation must not create an editor revision.
     assert client.get(f"/api/v1/zoning/plans/{plan['id']}").json()['revision'] == plan['revision']
+
+
+def test_selected_goong_snapshot_is_frozen_in_study(client, plan, parcel_source, monkeypatch, tmp_path):
+    monkeypatch.setenv('PLANNING_SQLITE_PATH', str(tmp_path / 'goong.sqlite'))
+    monkeypatch.setattr(baseline, 'buildings', lambda *_: None)
+    response = freeze(client, plan, parcel_id='3885881', map_buildings={'features': [{
+        'id': 11, 'geometry': building()['geometry'], 'properties': {'height': 16, 'levels': 5}}]})
+    assert response.status_code == 201, response.text
+    study = store.load_document(response.json()['id'], 'study')['inputs']
+    block = study['projects'][0]['baseline']['buildings'][0]
+    assert block['floors'] == 5
+    assert block['height_m'] == pytest.approx(16)
+    assert 'Goong' in study['projects'][0]['baseline_source']
+    assert freeze(client, plan, map_buildings={'features': []}).status_code == 422
 
 
 def test_excluded_gfa_keeps_physical_floor_demand(client, plan, parcel_source, tmp_path, monkeypatch):

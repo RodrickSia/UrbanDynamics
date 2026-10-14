@@ -2,6 +2,7 @@
 from collections import defaultdict
 from math import ceil
 from uuid import UUID
+from typing import Literal
 
 from pydantic import Field
 from shapely.geometry import mapping, shape
@@ -12,6 +13,7 @@ from .development import floor_stack
 from ..simulation.engine import polygon_and_area
 from ..simulation.models import PolygonInput
 from ..simulation.planning.models import PlanningStudy
+from ..simulation.integrated.models import MapBuildingCollection
 
 
 class SimulationInput(Input):
@@ -23,6 +25,12 @@ class SimulationInput(Input):
     visitors_per_100m2_day: float = Field(default=10, ge=0, le=1000)
     green_open_percent: float = Field(default=30, ge=0, le=100)
     rainfall_mm: float = Field(default=60, ge=0, le=300)
+    map_buildings: MapBuildingCollection | None = None
+
+
+class SimulationRunInput(SimulationInput):
+    mode: Literal['screening', 'native'] = 'screening'
+    idempotency_key: str = Field(min_length=8, max_length=100, pattern=r'^[A-Za-z0-9_-]+$')
 
 
 def polygon(value, label):
@@ -55,6 +63,8 @@ def building_program(building, settings):
 
 
 def study_from_plan(plan, settings):
+    if settings.map_buildings is not None and not settings.parcel_id:
+        raise ValueError('Map building context requires a selected parcel')
     scenario = next((s for s in plan["scenarios"] if s["id"] == str(settings.scenario_id)), None)
     if scenario is None:
         raise ValueError("Scenario not found")
@@ -77,10 +87,13 @@ def study_from_plan(plan, settings):
         if parcel is None:
             raise ValueError("Saved parcel snapshot is unavailable")
         existing_blocks = []
-        for source in baseline.buildings(parcel, plan['study_area']) or []:
+        records = baseline.buildings(parcel, plan['study_area'])
+        if settings.map_buildings is not None:
+            records = baseline.with_map_buildings(parcel, plan['study_area'], records, settings.map_buildings)
+        for source in records or []:
             parts = source['geometry']['coordinates'] if source['geometry']['type'] == 'MultiPolygon' else [source['geometry']['coordinates']]
             for coordinates in parts:
-                existing_blocks.append(building_program({**source, 'name':'Existing generated building',
+                existing_blocks.append(building_program({**source, 'name':'Existing mapped building',
                     'geometry': {'type':'Polygon','coordinates':coordinates},
                     'floor_height':source['height_m']/source['floors'], 'counts_gfa':True, 'counts_far':True}, settings))
         baseline_blocks.extend(existing_blocks)
@@ -102,7 +115,7 @@ def study_from_plan(plan, settings):
     projects = [{'id':'parcel_0', 'title':f'Parcel {settings.parcel_id}' if settings.parcel_id else 'Whole scenario',
                  'site':site.model_dump(), 'baseline':design(baseline_blocks,0), 'baseline_kind':'estimated',
                  'baseline_occupancy':'estimated' if settings.parcel_id and baseline_blocks else 'unknown',
-                 'baseline_source':'Generated mapped buildings; assumed occupancy and surfaces; inventory may be incomplete',
+                 'baseline_source':'Generated buildings / supplied Goong tile context; estimated heights, floors, occupancy and surfaces; inventory may be incomplete',
                  'development':design(blocks,settings.green_open_percent), 'utility_zone_id':'unknown'}]
     return PlanningStudy(**{
         "title": f"{plan['name']} / {scenario['name']}"[:160], "mode": "cumulative", "planning_catalog":"qcvn_urban_2021",

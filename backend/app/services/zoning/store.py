@@ -1,5 +1,6 @@
 """Atomic revision-checked documents; PostgreSQL or durable local SQLite."""
 import json
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -8,6 +9,8 @@ from pathlib import Path
 import psycopg
 from psycopg.types.json import Jsonb
 from src.shared.database import connect_to_warehouse, warehouse_configured
+
+logger = logging.getLogger(__name__)
 
 
 class Conflict(Exception):
@@ -40,6 +43,7 @@ def database():
         finally:
             connection.close()
     except (OSError, sqlite3.Error, psycopg.Error) as error:
+        logger.exception('Plan storage transaction failed (%s)', 'postgres' if remote else 'sqlite')
         raise StorageUnavailable("Plan storage is temporarily unavailable") from error
 
 

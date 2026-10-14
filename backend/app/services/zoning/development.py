@@ -66,6 +66,12 @@ def floor_stack(building):
     return result
 
 
+def minimum_setback(parcel, buildings):
+    """Smallest footprint-to-cadastral-boundary distance, not legal frontage."""
+    boundary = projected(parcel['geometry']).boundary
+    return min((projected(b.get('setback_geometry', b['geometry'])).distance(boundary) for b in buildings), default=None)
+
+
 def validation(plan, scenario, parcel, buildings):
     measured = metrics(buildings, parcel["area_m2"])
     rule = rules_for(plan, scenario, parcel)
@@ -80,7 +86,8 @@ def validation(plan, scenario, parcel, buildings):
                      "assumption_source": rule.get("source") if rule else None,
                      "rule_version": rule.get("version") if rule else None})
     for key in ("setbacks", "allowed_uses"):
-        rows.append({"rule": key, "actual": None, "allowed": None, "status": "UNKNOWN", "unit": "",
+        rows.append({"rule": key, "actual": minimum_setback(parcel, buildings) if key == 'setbacks' else None,
+                     "allowed": None, "status": "UNKNOWN", "unit": "m" if key == 'setbacks' else "",
                      "source": "Frontage / verified rule unavailable", "assumed_limit": None,
                      "assumption_status": "UNKNOWN", "rule_version": None})
     return {"metrics": measured, "checks": rows, "rule_status": "UNKNOWN"}
