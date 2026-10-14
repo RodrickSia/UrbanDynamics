@@ -111,9 +111,10 @@ docker compose --profile etl-traffic-history run --rm \
 
 These commands populate warehouse data; they do not create SUMO demand. The
 separate SUMO congestion simulation can be started from the map's Data layers
-sidebar after applying migration `11-sumo-congestion-simulation.sql` and
+sidebar after applying migrations `11-sumo-congestion-simulation.sql` and
+`12-sumo-congestion-scenario-cache.sql` and
 starting the `traffic-prediction-worker` Compose service. For its assumptions
-and operations, see [`backend/README.md`](backend/README.md). For the available
+and the resumable 336-scenario cache workflow, see [`backend/README.md`](backend/README.md). For the available
 ETL profiles and input limitations, see [`etl/README.md`](etl/README.md). For
 frontend development commands, see
 [`frontend/README.md`](frontend/README.md).

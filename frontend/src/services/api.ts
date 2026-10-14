@@ -57,6 +57,19 @@ export async function getSumoSimulationCatalog(signal?: AbortSignal): Promise<Su
   };
 }
 export async function runSumoSimulation(period: TrafficPeriod, signal?: AbortSignal) {
+  const scenarioPath = `/api/v1/traffic/sumo-simulations/scenarios/${period.weekday}/${encodeURIComponent(period.period)}`;
+  try {
+    const cached = await requestJson(scenarioPath, signal);
+    requireShape(typeof cached.run_id === 'string');
+    return {
+      runId: cached.run_id as string,
+      status: 'completed' as const,
+      metadata: cached.metadata && typeof cached.metadata === 'object' ? object(cached.metadata) : undefined,
+      cached: true,
+    };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+  }
   const response = await fetch(`${API_BASE_URL}/api/v1/traffic/sumo-simulations/runs`, {
     method: 'POST',
     signal,
@@ -71,7 +84,12 @@ export async function runSumoSimulation(period: TrafficPeriod, signal?: AbortSig
   }
   const result = object(await response.json());
   requireShape(typeof result.run_id === 'string');
-  return { runId: result.run_id as string, status: String(result.status ?? 'queued') };
+  return {
+    runId: result.run_id as string,
+    status: String(result.status ?? 'queued') as 'queued' | 'running' | 'completed',
+    metadata: result.metadata && typeof result.metadata === 'object' ? object(result.metadata) : undefined,
+    cached: result.cached === true,
+  };
 }
 export async function getSumoSimulationRun(runId: string, signal?: AbortSignal) {
   const result = await requestJson(`/api/v1/traffic/sumo-simulations/runs/${runId}`, signal);

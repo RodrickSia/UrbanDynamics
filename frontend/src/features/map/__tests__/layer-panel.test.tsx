@@ -24,8 +24,11 @@ function mockCatalog() {
   vi.stubGlobal(
     'fetch',
     vi.fn(
-      async (input: string, init?: RequestInit) =>
-        new Response(
+      async (input: string, init?: RequestInit) => {
+        if (input.includes('/traffic/sumo-simulations/scenarios/')) {
+          return new Response(JSON.stringify({ detail: 'not precomputed' }), { status: 404 });
+        }
+        return new Response(
           JSON.stringify(
             input.endsWith('/population')
               ? {
@@ -49,7 +52,8 @@ function mockCatalog() {
                   ],
                 },
           ),
-        ),
+        );
+      },
     ),
   );
 }

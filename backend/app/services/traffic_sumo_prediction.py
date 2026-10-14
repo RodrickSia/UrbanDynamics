@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import gzip
 import json
 import os
 import subprocess
@@ -120,18 +121,39 @@ def _target_demand(weekday: int, period: str) -> tuple[float, int]:
     with connect_to_warehouse() as connection:
         row = connection.execute(
             """
-            SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
-                                WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END), count(*)
-            FROM transport.traffic_observation
-            WHERE sumo_edge_id IS NOT NULL
-              AND extract(isodow FROM observed_at)::integer = %s
-              AND (extract(hour FROM observed_at)::integer * 2
-                   + extract(minute FROM observed_at)::integer / 30) = %s
+            WITH target_period AS (
+                SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
+                                    WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los,
+                       count(*) AS sample_rows
+                FROM transport.traffic_observation
+                WHERE sumo_edge_id IS NOT NULL
+                  AND extract(isodow FROM observed_at)::integer = %s
+                  AND (extract(hour FROM observed_at)::integer * 2
+                       + extract(minute FROM observed_at)::integer / 30) = %s
+            ), weekday_periods AS (
+                SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
+                                    WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los,
+                       count(*) AS sample_rows
+                FROM transport.traffic_observation
+                WHERE sumo_edge_id IS NOT NULL
+                  AND extract(isodow FROM observed_at)::integer = %s
+            ), all_periods AS (
+                SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
+                                    WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los,
+                       count(*) AS sample_rows
+                FROM transport.traffic_observation
+                WHERE sumo_edge_id IS NOT NULL
+            )
+            SELECT coalesce(target_period.mean_los, weekday_periods.mean_los, all_periods.mean_los),
+                   coalesce(nullif(target_period.sample_rows, 0),
+                            nullif(weekday_periods.sample_rows, 0),
+                            all_periods.sample_rows, 0)
+            FROM target_period CROSS JOIN weekday_periods CROSS JOIN all_periods
         """,
-            (weekday, slot),
+            (weekday, slot, weekday),
         ).fetchone()
     if not row or row[1] == 0:
-        raise ValueError("No matched historical LOS observations exist for that weekday/time")
+        raise ValueError("No matched historical LOS observations exist in the traffic history")
     mean_los = float(row[0])
     # Higher observed LOS grades imply a denser estimated trip stream. This is a
     # scenario prior, not a measured vehicle count or a fitted OD matrix.
@@ -435,6 +457,38 @@ def read_result(run_id: str) -> dict | None:
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_cached_result(run_id: str) -> dict | None:
+    """Read a persisted result when the worker's shared runtime file is unavailable."""
+    with connect_to_warehouse() as connection:
+        row = connection.execute(
+            """
+            SELECT result_gzip
+            FROM transport.sumo_congestion_scenario_cache
+            WHERE run_id = %s
+            """,
+            (run_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return json.loads(gzip.decompress(row[0]))
+
+
+def cached_scenario(weekday: int, period: str) -> dict | None:
+    """Return cache identity and metadata for a weekday/half-hour, if computed."""
+    with connect_to_warehouse() as connection:
+        row = connection.execute(
+            """
+            SELECT run_id, metadata
+            FROM transport.sumo_congestion_scenario_cache
+            WHERE weekday = %s AND period = %s
+            """,
+            (weekday, period),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"run_id": str(row[0]), "metadata": row[1]}
 
 
 def catalog() -> dict:

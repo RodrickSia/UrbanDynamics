@@ -28,6 +28,7 @@ order. Spatial query bboxes use `west,south,east,north`.
 | Population point sample | `/api/v1/population/{year}/value?lng=106.7&lat=10.8` |
 | Population viewport statistics | `/api/v1/population/{year}/stats?bbox=west,south,east,north` |
 | Historical weekday/time traffic congestion layer | `/api/v1/traffic/prediction` |
+| Cached SUMO weekday/time scenario | `/api/v1/traffic/sumo-simulations/scenarios/{weekday}/{period}` |
 | Standalone SUMO congestion runs | `POST /api/v1/traffic/sumo-simulations/runs` |
 | SUMO run status and map GeoJSON | `/api/v1/traffic/sumo-simulations/runs/{run_id}` and `/features` |
 
@@ -71,7 +72,13 @@ result as an estimated-demand scenario, not a validated forecast. The map
 includes all network road edges and colors them by SUMO-estimated passenger-car
 passages over the simulated 30-minute interval; motorcycle traffic affects the
 simulation but is not included in that car count. Apply
-`11-sumo-congestion-simulation.sql` before using the queue API.
+`11-sumo-congestion-simulation.sql` and `12-sumo-congestion-scenario-cache.sql`
+before using the queue API. The `Precompute SUMO traffic scenarios` workflow
+queues all 336 weekday/half-hour combinations and stores completed GeoJSON
+results compressed in PostGIS. It is resumable: rerunning it skips cached
+scenarios and retries failed or unfinished ones. The map checks this cache
+first; on a cache miss, it queues the selected scenario through the worker and
+that result is added to the same cache for later requests.
 
 ## Configuration and operation
 

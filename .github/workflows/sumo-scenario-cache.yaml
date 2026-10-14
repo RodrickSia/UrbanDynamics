@@ -1,0 +1,57 @@
+name: Precompute SUMO traffic scenarios
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sumo-scenario-cache
+  cancel-in-progress: false
+
+jobs:
+  precompute:
+    name: Run and cache all 336 weekday/time scenarios
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 360
+    environment: production
+    env:
+      WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}
+      WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
+      WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start database and check cache migration
+        run: |
+          set -eu
+          test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
+          created_env=false
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            created_env=true
+          fi
+          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
+          docker compose --env-file .env up -d --wait --wait-timeout 180 postgis
+          docker compose --env-file .env exec -T postgis sh -c \
+            'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"' \
+            sh "SELECT to_regclass('transport.sumo_congestion_scenario_cache') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '12-sumo-congestion-scenario-cache.sql')" | grep -Fxq t || {
+              echo "::error::SUMO scenario-cache migration is missing. Run the Deploy database workflow first." >&2
+              exit 1
+            }
+      - name: Run or resume all SUMO weekday/time scenarios
+        run: |
+          set -eu
+          created_env=false
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            created_env=true
+          fi
+          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
+          docker compose --env-file .env up -d --build --wait --wait-timeout 180 traffic-prediction-worker
+          docker compose --env-file .env ps --status running --services | grep -Fxq traffic-prediction-worker || {
+            echo "::error::Could not start the traffic-prediction-worker." >&2
+            exit 1
+          }
+          docker compose --env-file .env exec -T traffic-prediction-worker \
+            python -m app.services.traffic_sumo_batch --poll-seconds 15 --timeout-minutes 350

@@ -203,9 +203,9 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
   const runSumo = useCallback(async (period: TrafficPeriod) => {
     const result = await runSumoSimulation(period);
     setSumoRunId(result.runId);
-    setSumoRunStatus(result.status as 'queued' | 'running');
+    setSumoRunStatus(result.status);
     setSumoRunError(null);
-    setSumoRunMetadata(null);
+    setSumoRunMetadata(result.metadata ?? null);
     setCatalog((current) => ({
       ...current,
       'sumo-simulation': { status: 'ready', available: true },

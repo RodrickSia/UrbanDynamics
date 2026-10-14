@@ -1,6 +1,8 @@
 """Dedicated worker for standalone SUMO congestion-prediction runs."""
 
 import argparse
+import gzip
+import json
 import logging
 import time
 
@@ -38,14 +40,34 @@ def process_one() -> bool:
     try:
         result = run_prediction(int(weekday), period.strftime("%H:%M"), str(run_id))
         with connect_to_warehouse() as connection:
-            connection.execute(
-                """
-                UPDATE transport.sumo_congestion_run
-                SET status = 'completed', metadata = %s, updated_at = now()
-                WHERE run_id = %s
-            """,
-                (Jsonb(result["metadata"]), run_id),
-            )
+            with connection.transaction():
+                connection.execute(
+                    """
+                    INSERT INTO transport.sumo_congestion_scenario_cache
+                        (weekday, period, run_id, metadata, result_gzip)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (weekday, period) DO UPDATE
+                    SET run_id = EXCLUDED.run_id,
+                        metadata = EXCLUDED.metadata,
+                        result_gzip = EXCLUDED.result_gzip,
+                        generated_at = now()
+                    """,
+                    (
+                        weekday,
+                        period,
+                        run_id,
+                        Jsonb(result["metadata"]),
+                        gzip.compress(json.dumps(result, separators=(",", ":")).encode("utf-8")),
+                    ),
+                )
+                connection.execute(
+                    """
+                    UPDATE transport.sumo_congestion_run
+                    SET status = 'completed', metadata = %s, updated_at = now()
+                    WHERE run_id = %s
+                    """,
+                    (Jsonb(result["metadata"]), run_id),
+                )
     except Exception as error:
         logger.exception("Standalone SUMO run %s failed", run_id)
         with connect_to_warehouse() as connection:
