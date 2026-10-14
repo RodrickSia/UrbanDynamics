@@ -41,7 +41,7 @@ describe('3D measurement regressions', () => {
     expect(readBuildingHeight({ max_height: '0', height: 18 })).toBe(18);
     expect(readBuildingHeight({ max_height: -2, render_height: 24 })).toBe(24);
   });
-  it('removes the Goong extrusion in 2D without changing the generated layer', () => {
+  it('keeps the Goong layer cached but hidden in 2D without changing the generated layer', () => {
     const setLayoutProperty = vi.fn();
     const removeLayer = vi.fn();
     const map = {
@@ -53,8 +53,8 @@ describe('3D measurement regressions', () => {
     } as unknown as MapLibreMap;
     setBuildings3d(map, false);
     expect(setLayoutProperty).toHaveBeenCalledWith('building', 'visibility', 'none');
-    expect(setLayoutProperty).toHaveBeenCalledTimes(1);
-    expect(removeLayer).toHaveBeenCalledWith(BUILDINGS_LAYER_ID);
+    expect(setLayoutProperty).toHaveBeenCalledWith(BUILDINGS_LAYER_ID, 'visibility', 'none');
+    expect(removeLayer).not.toHaveBeenCalled();
   });
   it('does not mistake the unloaded DEM zero for acquired sea-level elevation', () => {
     const map = {

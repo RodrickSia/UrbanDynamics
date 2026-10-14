@@ -26,6 +26,7 @@ export interface DataSelection {
   url: string;
   year: number;
   dates: DateQuery;
+  visible?: boolean;
 }
 // Keep synchronized with backend/app/services/raster_tiles.py; values are people/cell.
 export const PALETTE_STOPS: Record<Palette, ReadonlyArray<readonly [number, string]>> = {

@@ -8,6 +8,7 @@ import {
   type Bounds,
 } from '../../../services/api';
 import type { LayerOpacityState } from '../types/map';
+import { notifyBuildingUpdates } from '../layers/buildingUpdates';
 import { type DataSelection, type DataLayerId, type LayerReport } from './datasets';
 import { dataSourceId, datasetStyle } from './datasetStyle';
 import { floodLocationDetails } from './floodLocation';
@@ -171,12 +172,14 @@ function DatasetSource({
               layer.type === 'fill-extrusion' ||
               String(layer.type) === 'custom',
           )?.id;
-        map.addLayer(datasetStyle(selectedAtAttach), before);
+        const style = datasetStyle(selectedAtAttach);
+        map.addLayer({ ...style, layout: { ...style.layout, visibility: current.current.visible === false ? 'none' : 'visible' } }, before);
         if (selectedAtAttach.dataset === 'parcels' && !map.getLayer(PARCEL_OUTLINE)) {
           map.addLayer(parcelOutline(), before);
         }
       }
       applyOpacity(map, selectedAtAttach, opacityRef.current);
+      if (selectedAtAttach.dataset === 'synthetic_buildings') notifyBuildingUpdates(map);
       publish('loading', 'Loading…');
       schedule();
     };
@@ -223,11 +226,14 @@ function DatasetSource({
       if (selectedAtAttach.dataset === 'parcels' && map.getLayer(PARCEL_OUTLINE)) map.removeLayer(PARCEL_OUTLINE);
       if (map.getLayer(sourceId)) map.removeLayer(sourceId);
       if (map.getSource(sourceId)) map.removeSource(sourceId);
+      if (selectedAtAttach.dataset === 'synthetic_buildings') notifyBuildingUpdates(map);
     };
   }, [map, sourceId, selection.id, selection.dataset, selection.url, revision, report]);
   useEffect(() => {
     applyOpacity(map, selection, opacity);
-  }, [map, selection, opacity]);
+    if (map.getLayer(sourceId)) map.setLayoutProperty(sourceId, 'visibility', selection.visible === false ? 'none' : 'visible');
+    if (selection.dataset === 'synthetic_buildings') notifyBuildingUpdates(map);
+  }, [map, selection, opacity, sourceId]);
   return null;
 }
 function applyOpacity(map: MapLibreMap, selection: DataSelection, opacity: number) {

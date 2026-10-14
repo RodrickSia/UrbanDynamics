@@ -1,4 +1,5 @@
 import type { FillExtrusionLayerSpecification, Map as MapLibreMap, StyleSpecification } from 'maplibre-gl';
+import { notifyBuildingUpdates } from './buildingUpdates';
 
 export const BUILDINGS_LAYER_ID = 'urban-buildings-3d';
 export const BUILDING_LAYER_IDS = [BUILDINGS_LAYER_ID, 'dataset-synthetic-buildings'];
@@ -33,13 +34,16 @@ export function setBuildings3d(map: MapLibreMap, enabled: boolean, opacity = 0.8
     }
   }
   if (!enabled) {
-    if (map.getLayer(BUILDINGS_LAYER_ID)) map.removeLayer(BUILDINGS_LAYER_ID);
+    if (map.getLayer(BUILDINGS_LAYER_ID)) map.setLayoutProperty(BUILDINGS_LAYER_ID, 'visibility', 'none');
+    notifyBuildingUpdates(map);
     return true;
   }
 
   if (map.getLayer(BUILDINGS_LAYER_ID)) {
+    map.setLayoutProperty(BUILDINGS_LAYER_ID, 'visibility', 'visible');
     map.setPaintProperty(BUILDINGS_LAYER_ID, 'fill-extrusion-opacity', opacity);
     map.moveLayer(BUILDINGS_LAYER_ID, firstLabelLayer(map.getStyle()));
+    notifyBuildingUpdates(map);
     return true;
   }
   const hasBuildingSourceLayer = style.layers?.some(
@@ -61,5 +65,6 @@ export function setBuildings3d(map: MapLibreMap, enabled: boolean, opacity = 0.8
     },
     firstLabelLayer(style),
   );
+  notifyBuildingUpdates(map);
   return true;
 }

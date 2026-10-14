@@ -57,21 +57,25 @@ function fixture(
   );
 }
 describe('backend layer availability and selections', () => {
-  it('streams generated 3D tiles only in 3D mode when the model snapshot exists', async () => {
+  it('retains generated tile identity but hides buildings in 2D when the snapshot exists', async () => {
     fixture({ buildings: true });
     const { result, rerender } = renderHook(
       ({ mode }) => useBackendLayers({ 'synthetic-buildings': true }, mode),
       { initialProps: { mode: '2d' as '2d' | '3d' } },
     );
     await waitFor(() => expect(result.current.catalog['synthetic-buildings']?.available).toBe(true));
-    expect(result.current.selections).toEqual([]);
+    expect(result.current.selections).toEqual([expect.objectContaining({ id: 'synthetic-buildings', visible: false })]);
+    const hidden = result.current.selections[0];
     rerender({ mode: '3d' });
     expect(result.current.selections).toEqual([
       expect.objectContaining({
-        id: 'synthetic-buildings', dataset: 'synthetic_buildings',
+        id: 'synthetic-buildings', dataset: 'synthetic_buildings', visible: true,
         url: expect.stringContaining('/synthetic_buildings/tiles/{z}/{x}/{y}.pbf'),
       }),
     ]);
+    expect(result.current.selections[0].url).toBe(hidden.url);
+    rerender({ mode: '2d' });
+    expect(result.current.selections).toEqual([hidden]);
   });
   it('accepts main spatially checked prices without claiming manual review', async () => {
     fixture({ land: true, reviewed: false, spatial: true });

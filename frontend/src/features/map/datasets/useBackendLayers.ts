@@ -121,10 +121,10 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
     () =>
       definitions.flatMap((layer) => {
         if (!isDataLayer(layer.id) || !layers[layer.id] || layer.status !== 'available') return [];
-        if (layer.id === 'synthetic-buildings' && mode !== '3d') return [];
         const dataset = DATASETS[layer.id];
         return [
-          { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette), year, dates },
+          { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette), year, dates,
+            visible: layer.id !== 'synthetic-buildings' || mode === '3d' },
         ];
       }),
     [definitions, layers, year, palette, dates, mode],
