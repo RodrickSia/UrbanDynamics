@@ -169,11 +169,12 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
             </div>
             <button type="submit">Apply</button>
           </form>
-          <div className="dataset-legend">
-            {[
-              ['A', '#168a58'], ['B', '#71ad45'], ['C', '#d2b83f'],
-              ['D', '#e58b32'], ['E', '#d9583c'], ['F', '#8c3047'],
-            ].map(([grade, color]) => <Legend key={grade} color={color} label={grade} />)}
+          <div className="traffic-score-legend" role="group" aria-label="Historical congestion score from 0 to 100">
+            <small>Estimated congestion score · low to high</small>
+            <div className="traffic-score-ramp" aria-hidden="true" />
+            <div className="traffic-score-ticks">
+              {[0, 25, 50, 75, 100].map((score) => <span key={score}>{score}</span>)}
+            </div>
           </div>
           <DatasetNote>
             Colors cover the loaded road network. Directly matched roads use historical

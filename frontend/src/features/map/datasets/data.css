@@ -60,6 +60,24 @@
   color: var(--text-secondary);
   font-size: 0.65rem;
 }
+.traffic-score-legend {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+}
+.traffic-score-ramp {
+  height: 0.7rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: linear-gradient(to right, #168a58, #71ad45, #f2c14e, #e76f32, #c43d3d);
+}
+.traffic-score-ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
 .sumo-volume-ramp {
   height: 0.7rem;
   border: 1px solid rgba(0, 0, 0, 0.15);

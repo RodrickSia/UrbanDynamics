@@ -89,6 +89,9 @@ it('lets users display historical traffic and the SUMO road graph when the API r
   expect(traffic).toBeChecked();
   expect(screen.getByRole('combobox', { name: 'Traffic prediction day of week' })).toBeInTheDocument();
   expect(screen.getByLabelText('Traffic prediction time of day')).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Historical congestion score from 0 to 100' })).toBeInTheDocument();
+  expect(screen.getByText('Estimated congestion score · low to high')).toBeInTheDocument();
+  expect(screen.queryByText('A', { selector: '.dataset-legend-item' })).not.toBeInTheDocument();
 
   const sumo = screen.getByRole('checkbox', { name: 'SUMO road network' });
   await userEvent.click(sumo);

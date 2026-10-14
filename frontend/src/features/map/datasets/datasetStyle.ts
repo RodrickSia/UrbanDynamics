@@ -94,9 +94,12 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': [
-            'match', ['get', 'predicted_los'],
-            'A', '#168a58', 'B', '#71ad45', 'C', '#d2b83f',
-            'D', '#e58b32', 'E', '#d9583c', 'F', '#8c3047', '#8a9199',
+            'interpolate', ['linear'], ['to-number', ['get', 'congestion_score'], 50],
+            0, '#168a58',
+            25, '#71ad45',
+            50, '#f2c14e',
+            75, '#e76f32',
+            100, '#c43d3d',
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 13, 2.5, 17, 5],
           'line-opacity': 0.85,
