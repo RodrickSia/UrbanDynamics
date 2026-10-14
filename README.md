@@ -1,20 +1,140 @@
 # UrbanDynamics — demo simulation tác động công trình
 
-**Branch:** `feat/khoi-building-impact-simulation` · **Cập nhật:** 13/10/2026.
+**Branch:** `feat/khoi-building-impact-simulation` · **Cập nhật:** 14/10/2026.
 
-**Bổ sung nền/capacity, độ nhạy và luồng thao tác:** xem [hướng dẫn chi tiết](docs/simulation-capacity-sensitivity.md). Khi nạp parcel có thể chọn **Nguồn thật** (giữ dữ liệu thiếu) hoặc **Minh họa capacity v1** (occupancy, tải và capacity giả lập có nhãn, cố định giữa các phương án). Bộ độ nhạy thử nhu cầu low/high, capacity giảm 20%, mưa tăng 20%, OD ×0,5/×1,25; native dùng ba seed. Những mô tả capacity/occupancy “chưa biết” trong bảng bên dưới áp dụng cho case nguồn thật và các job cũ, không phải gói giả lập mới.
+## Đọc phần này trước: simulation làm được gì?
 
-## Đọc nhanh: hệ thống làm gì?
+Simulation trả lời: **Nếu xây công trình ở đây, các nhu cầu và điều kiện xung quanh thay đổi bao nhiêu? Phương án nào có đánh đổi đáng chú ý?**
 
-Kiểm thử lần bổ sung này: **27/27 backend**, hai job độ nhạy (Screening và native) và **4 nhóm UI** đạt. Xem [báo cáo kiểm thử](docs/simulation-capacity-test-report.md); không đồng nghĩa dữ liệu giả lập đã được hiệu chỉnh với thực địa.
+Bạn chọn đất và nhập **building plan** — phương án công trình gồm công năng, quy mô, tầng/sàn, số người và các thiết kế liên quan. Hệ thống tính hiện trạng và phương án sau xây bằng cùng điều kiện, rồi so sánh hai kết quả. Khi xây thay công trình cũ, tải của công trình cũ được bỏ và tải mới được thêm; không cộng cả hai như thể cùng hoạt động.
 
-Demo trả lời: **Nếu xây công trình tại một khu đất, hoặc xây nhiều công trình theo giai đoạn, khu vực sẽ chịu tác động gì? Giữa các vị trí và phương án có những đánh đổi nào?**
+### Chức năng đang có
 
-Người dùng khai báo **building plan**: công năng, hình khối, quy mô và thiết kế công trình. Backend kết hợp plan với dữ liệu nền đã chuẩn bị, tính các kịch bản, lưu kết quả và xuất sơ đồ/layers cho frontend. Có thể khai báo nhà ở, văn phòng, trường học, bệnh viện và công năng khác theo schema.
+| Chức năng | Bạn xem được gì? | Tính từ đâu? |
+|---|---|---|
+| Quy mô và bề mặt đất | Số căn, cư dân, diện tích sàn, đất xanh, bề mặt không thấm | Ranh đất, công trình/bề mặt nền và building plan |
+| Điện | Điện năng ngày, đỉnh tải chung, có vượt capacity không | Sàn × hệ số điện theo công năng, phân bổ theo giờ, cộng tải nền |
+| Nước cấp | Nhu cầu m³/ngày, còn dư hay vượt capacity | Số người × định mức, cộng tưới cây, trừ tái sử dụng nếu khai báo |
+| Nước thải | Lượng nước thải và đối chiếu capacity | Nước dùng trong nhà × hệ số hồi lưu, trừ phần tái sử dụng |
+| Chỗ học | Học sinh phát sinh, được/chưa được phân bổ, khoảng đi bộ | Cư dân × tỷ lệ tuổi học; đường tới trường và chỗ học còn trống |
+| Giao thông | Chuyến phát sinh; native có delay, hàng chờ, xe hoàn thành/tồn đọng và lớp đường | Nhu cầu đi lại từ plan + luồng nền; SUMO mô phỏng từng xe |
+| Thoát nước | Runoff — lượng nước chảy tràn; native có tràn nút, lưu lượng và diễn biến SWMM | Mưa, bề mặt thấm/không thấm, bể trữ và mạng cống khai báo |
+| Bóng công trình | Diện tích bóng trong/ngoài khu đất, thay đổi theo giờ | Vị trí mặt trời, footprint, chiều cao và công trình/cây nền |
+| Đối chiếu quy hoạch | Công năng đề xuất có xung đột với nhãn nguồn không | Nhãn quy hoạch parcel và công năng trong plan; không xác nhận quyền xây |
 
-Đây là công cụ **what-if trong phạm vi demo**, chưa phải dự báo đã hiệu chỉnh thực địa hoặc công cụ xác nhận được phép xây. Solver thật có thể chạy trên dữ liệu giả định; kết quả chạy thành công không tự chứng minh đầu vào đúng ngoài thực tế.
+Ngoài chín nhóm trên, demo còn có:
 
-Trang được hướng dẫn ở đây là **`/simulation/planning`**, preview độc lập của backend. Nó chưa thay thế frontend map chính của nhóm. Demo integrated legacy `/simulation/integrated` có contract/tài liệu riêng.
+- **So sánh vị trí:** cùng một chương trình xây dựng trên các ứng viên đất khác nhau.
+- **Tác động cộng dồn:** xây nhiều công trình và so các tổ hợp.
+- **Theo giai đoạn:** xem tác động tăng thêm khi xây tiếp từng giai đoạn.
+- **Độ nhạy:** thay giả định đầu vào để xem kết luận có đổi; native chạy nhiều seed — các lượt có ngẫu nhiên khác nhau.
+- **Lưu và mở lại:** giữ đầu vào, kết quả, nguồn; theo dõi/hủy/chạy tiếp job và tải artifact.
+- **Counting:** pipeline riêng dùng YOLO/tracking để đếm xe video, tạo tham chiếu cho luồng nền. Không phải camera trực tiếp của toàn thành phố.
+
+### Dữ liệu nào thật, dữ liệu nào giả lập?
+
+Khi nạp parcel, có hai lựa chọn:
+
+| Chế độ | Ý nghĩa |
+|---|---|
+| **Nguồn thật** | Dùng dữ liệu đã cài có nguồn. Occupancy và capacity chưa có sẽ giữ **Chưa biết**, không tự điền số để kết luận |
+| **Minh họa capacity v1** | Giữ geometry có nguồn, bổ sung hiện trạng vận hành và capacity **giả lập có nhãn** để thử mô hình và vượt ngưỡng |
+
+"Nguồn thật" không có nghĩa mọi layer đều là đo đạc đầy đủ hoặc mới nhất. Parcel lấy từ hệ thống nhóm; footprint/đường/trường từ OSM; WorldCover 2021 là proxy bề mặt; WorldPop là ước tính dân số vùng. Không suy đất trống chỉ vì thiếu footprint.
+
+Trong **gói giả lập v1**, các số sau được đặt trước, không phải mô hình tự tìm được:
+
+| Đầu vào | Giá trị giả lập | Cách dùng |
+|---|---|---|
+| Cư dân công trình nền | Giả định nhà ở, `floor(sàn / 35)` người, `ceil(người / 3)` căn | Không phải khảo sát occupancy; giữ footprint/bề mặt đã nạp |
+| Cư dân ngoài các parcel chọn | 1.200 người | Thay WorldPop cho nhu cầu trong case này; WorldPop vẫn giữ làm thông tin nền |
+| Điện ngoài parcel / capacity | 80 kW mỗi giờ / 95 kW | Cộng tải parcel rồi so đỉnh chung với 95 kW |
+| Nước ngoài parcel / capacity | 140 / 160 m³/ngày | Cộng nhu cầu parcel rồi so ngưỡng |
+| Nước thải ngoài parcel / capacity | 112 / 128 m³/ngày | Cộng nhu cầu parcel rồi so ngưỡng |
+| Trường và học sinh nền | 240 chỗ/trường; 216 học sinh ngoài parcel đặt tại trường đầu; không reserved chỗ ngoài vùng | Vị trí trường dùng OSM khi có, nếu thiếu thì thêm điểm giả lập trong vùng; chỗ học và phân bố học sinh đều giả lập |
+
+Capacity là **khả năng phục vụ khai báo**, ví dụ hệ thống nước cung cấp tối đa 160 m³/ngày. Building làm thay đổi **nhu cầu**; capacity giữ nguyên nếu chưa có phương án nâng cấp hạ tầng. Các phương án dùng cùng nền/capacity để so sánh công bằng.
+
+Traffic mặc định có thể lấy từ counts video UIT-ADrone đã cài và chuyển thành luồng nền giả định. Đây chưa phải lưu lượng thực tại từng con đường đang chọn. OD (xe đi từ đâu đến đâu), tín hiệu và mạng cống còn giả định; solver chạy thành công không chứng minh chúng đúng ngoài thực tế.
+
+### Cách tính dễ hiểu — ví dụ chung cư 60 người, 1.600 m² sàn
+
+Các hệ số dưới đây đúng với **case nhà ở base đã test**, không áp cho mọi công năng. Code lưu bộ hệ số thực tế trong từng run.
+
+| Chỉ số | Cách tính trong case | Ví dụ |
+|---|---|---|
+| Nước sinh hoạt | Cư dân × 120 lít/người/ngày ÷ 1.000 | `60 × 120 / 1.000 = 7,2 m³/ngày` |
+| Nước tưới | Đất xanh × 2 lít/m²/ngày ÷ 1.000 | 500 m² xanh cần 1 m³/ngày; 500 m² chỉ là ví dụ minh họa |
+| Nước cấp | Nước trong nhà + tưới − tái sử dụng được giới hạn | Plan có thiết bị tiết kiệm/reuse thì nhu cầu được điều chỉnh |
+| Nước thải | Nước trong nhà × 0,8 − tái sử dụng | Không reuse: `7,2 × 0,8 = 5,76 m³/ngày`; không tính nước tưới thành nước thải |
+| Điện năng | Sàn × 0,11 kWh/m²/ngày | `1.600 × 0,11 = 176 kWh/ngày` |
+| Đỉnh điện | Phân bổ điện năng theo giờ sử dụng, cộng tải cùng giờ, lấy giá trị lớn nhất | Building P1 tăng khoảng 16,88 kW tại đỉnh trong case đã chạy; không coi 176 kWh là 176 kW |
+| Nhu cầu chỗ học | `ceil(cư dân × 18%)` theo project | `ceil(60 × 0,18) = 11 học sinh` |
+| Chuyến người | Cư dân × hệ số trips/ngày, phân bổ giờ | Base nhà ở: `60 × 2 = 120 chuyến người/ngày`; chưa phải 120 xe |
+
+Văn phòng, trường và bệnh viện có hệ số/đối tượng sử dụng khác; có thể tính thêm nhân viên, khách và người dùng. Điện có thể thêm sạc EV và xử lý nước tái sử dụng. Đỉnh toàn vùng là **đỉnh của tổng tải tại cùng giờ**, không cộng các peak ở các giờ khác nhau.
+
+**Chỗ học:** hệ thống tìm đường đi bộ rồi phân bổ, ưu tiên phục vụ nhiều học sinh và giảm tổng khoảng đi bộ trong phạm vi chỗ còn trống và ngưỡng khoảng cách. Có chỗ trống nhưng trường quá xa vẫn có học sinh chưa được phân bổ. Trong P1, trường gần nhất cách khoảng 1.405 m, vượt ngưỡng 1.200 m nên 11 học sinh mới chưa được phân bổ.
+
+**SUMO:** chuyến người được chuyển thành chuyến xe theo tỷ lệ phương tiện, số người/xe và giờ; kết hợp luồng nền, route, đèn/cổng để mô phỏng từng xe. Delay và queue là đầu ra mô phỏng, không phải số cư dân nhân một hệ số delay cố định. Luồng OD là lượng xe dự kiến xuất phát, không đồng nghĩa lượng xe trên mọi đường.
+
+**Thoát nước:** Screening ước tính nước chảy tràn từ mưa × diện tích × hệ số bề mặt, xét lưu trữ. Native dùng SWMM để tính dòng chảy và trạng thái nút/cống theo thời gian. Chưa phải bản đồ độ sâu ngập 2D đã hiệu chỉnh.
+
+**Bóng:** tính vị trí mặt trời theo ngày/giờ và bóng của hình khối công trình/cây. Đây là diện tích bóng, chưa phải dự báo nhiệt độ hay nhiệt độ cảm nhận.
+
+**So sánh:** chạy hiện trạng và phương án với cùng điều kiện. `Chênh lệch = sau xây − trước xây`. Với xây thay thế: `tải sau = nền ngoài khu đất + tải công trình mới + tải các khu đất khác giữ nguyên`.
+
+### Một case đã chạy ra kết quả gì?
+
+Case ba parcel 1959486, 1958467, 1958799: mỗi building đề xuất 20 căn, 60 cư dân, 4 tầng và 1.600 m² sàn. Dùng **nền/capacity giả lập v1**. Các số là tổng vùng và các parcel đã đăng ký:
+
+| Chỉ số | Hiện trạng mô phỏng | Chỉ xây P1 | Xây cả ba |
+|---|---:|---:|---:|
+| Cư dân | 1.210 | 1.270 | 1.380 |
+| Đỉnh điện chung (kW) | 84,25 | 101,12 | 130,63 |
+| Nước cấp (m³/ngày) | 144,23 | 150,07 | 166,67 |
+| Nước thải (m³/ngày) | 112,96 | 118,72 | 129,28 |
+| Học sinh cần chỗ | 218 | 229 | 249 |
+| Học sinh chưa được phân bổ | 0 | 11 | 11 |
+
+Chỉ xây P1 vượt capacity điện 95 kW; xây cả ba vượt cả điện, nước và nước thải. Tổng sau xây không bằng "hiện trạng + 180 người" vì phương án thay cả occupancy nền giả lập của các parcel. Chênh lệch nước cấp cũng xét thay đổi diện tích xanh/nước tưới. Kết luận vượt ngưỡng áp dụng **trong case giả lập**, không phải chứng cứ mạng hạ tầng thật quá tải.
+
+### Chạy và xem như thế nào?
+
+1. Mở **`/simulation/planning`** (local mặc định `http://127.0.0.1:8007/simulation/planning`).
+2. Chọn preset hoặc nạp snapshot, chọn parcel và nhập plan. Form parcel hiện tạo chung cư sơ bộ; schema/JSON hỗ trợ thêm công năng khác.
+3. Chọn **Nguồn thật** hoặc **Minh họa capacity v1**, rồi bấm **Nạp plan và dữ liệu nền**.
+4. Bấm **Kiểm tra đầu vào**, xem dữ liệu thiếu và khối lượng chạy dự kiến.
+5. Chọn cách chạy, bấm **Chạy và lưu**, chờ job hoàn thành.
+6. Trong kết quả, chọn trạng thái **hiện trạng** hoặc phương án. Xem bảng **So với hiện trạng**, các kiểm tra capacity bên biểu đồ điện, lớp tác động, bảng **Thông số SUMO** và nguồn trong audit.
+
+| Cách chạy | Có gì? | Khi nào dùng? |
+|---|---|---|
+| Screening | Nhu cầu, capacity, chỗ học, bóng, runoff sơ bộ; không có delay/queue SUMO hoặc kết quả solver SWMM | Xem tác động nhanh trước |
+| SUMO + SWMM | Các phân tích trên và kết quả native theo giờ/seed | Xem giao thông và thoát nước sâu hơn |
+| Độ nhạy | Reference và các ca thay giả định; có thể dùng engine Screening hoặc native | Xem kết luận có đổi khi dữ liệu/hệ số chưa chắc chắn |
+
+Bộ độ nhạy mới thử nhu cầu low/high, capacity hạ tầng và trường −20%, mưa +20%, OD ×0,5/×1,25. Có OD thì gồm reference + sáu ca; không có OD thì bỏ hai ca traffic. Native dùng seed 2026–2028; Screening không sinh delay/queue khi thay OD. Đây là thử từng nhóm giả định, không phải khoảng tin cậy thống kê hoặc mọi tổ hợp bất lợi.
+
+Nếu kết quả ghi **Chưa biết**, đó là chưa đủ đầu vào để kết luận; không phải bằng 0. Nếu ghi **scenario_only**, đó là kết quả trong giả định của kịch bản, không phải đo đạc hiện trạng thật. Nhiều phương án có thể đánh đổi; hệ thống không mặc định có một phương án thắng mọi tiêu chí.
+
+### Đang có và chưa có trên web chính
+
+- **Đã có:** demo độc lập, model, lưu job/run, so ứng viên, cộng dồn, giai đoạn, độ nhạy và kết quả có nguồn/layers.
+- **Chưa nối vào React map của main:** cần frontend gọi API và adapter lấy đất/dữ liệu nền đúng khu được chọn. Không cần xây lại phần model đã làm. [Đánh giá nối main](docs/simulation-main-integration-review.md).
+- **Chưa có một building trải trên nhiều parcel:** chọn nhiều parcel hiện tạo nhiều project riêng; 20 căn là 20 căn mỗi project. Cần gộp khu đất và một plan chung.
+- **Chưa có:** occupancy/capacity khảo sát đầy đủ, OD và tín hiệu hiệu chỉnh, mạng cống thực, flood depth 2D/thermal model và AI giải thích (đang hoãn).
+
+Kiểm thử lần bổ sung nền/capacity: **27/27 backend**, hai job độ nhạy Screening/native và **4 nhóm UI** đạt. Đó là kiểm chứng tính toán và luồng demo, không chứng minh đầu vào giả lập đúng thực địa. [Báo cáo test](docs/simulation-capacity-test-report.md), [chi tiết hệ số nền/độ nhạy](docs/simulation-capacity-sensitivity.md).
+
+Checkout mới chạy được preset synthetic. Parcel/snapshot thật, counts, dữ liệu job và video cần cài riêng; Git không chứa các artifact đó. `/simulation/integrated` là demo cũ có contract riêng; hướng dẫn chính của branch này dùng `/simulation/planning`.
+
+## Tham khảo kỹ thuật
+
+<details>
+<summary>Mở chi tiết nguồn, cài đặt, API, code và bằng chứng cũ</summary>
+
+Các mô tả occupancy/capacity "chưa biết" trong bảng và case cũ bên dưới áp dụng cho chế độ nguồn thật hoặc job cũ. Gói giả lập v1 được mô tả ở phần dễ hiểu phía trên.
 
 ### Mục lục
 
@@ -440,3 +560,5 @@ explanation is deferred; advanced thermal/2D/water-pressure solvers are pending.
 
 Deployment workflows use the protected `production` environment. Configure its
 `WAREHOUSE_PASSWORD` secret to match the production database.
+
+</details>
