@@ -84,10 +84,18 @@ class Prepare(BuildingProgram):
     background_mode: Literal["sourced", "synthetic_capacity_v1"] = "sourced"
     sensitivity: bool = False
     sensitivity_engine: Literal["screening", "native"] = "screening"
+    planning_catalog: Literal["none", "qcvn_urban_2021"] = "none"
+    parcel_groups: list[list[str]] = Field(default_factory=list, max_length=6)
+    group_developments: dict[str, Design] = Field(default_factory=dict, max_length=6)
 
 
-def prepare(body):
-    document = load(body.snapshot_id)
+def prepare(body, *, _document=None):
+    document = load(body.snapshot_id) if _document is None else _document
+    if body.parcel_groups:
+        from .parcel_groups import prepare_grouped
+        return prepare_grouped(body, document)
+    if body.group_developments:
+        raise ValueError("Group developments require parcel_groups")
     available = {str(f["id"]): f for f in candidates(document)}
     if len(set(body.parcel_ids)) != len(body.parcel_ids) or not set(body.parcel_ids) <= available.keys():
         raise ValueError("Choose unique eligible parcel IDs from this snapshot")
@@ -161,6 +169,7 @@ def prepare(body):
         phases = [{"id": "phase_"+str(i+1), "title": "Stage "+str(i+1), "sequence": i+1,
                    "active_project_ids": [p["id"] for p in projects[:n]]} for i,n in enumerate(steps)]
     study = {"title": "System parcels and background — test demo only", "mode": body.mode,
+             "planning_catalog": body.planning_catalog,
              "data_mode": "demo_system", "system_snapshot_id": body.snapshot_id, "system_parcel_bindings": bindings,
              "traffic_network_mode": body.traffic_network_mode,
              "study_area": mapping(box(*document["bbox"])), "conditions": body.conditions.model_dump(mode="json"),
@@ -192,6 +201,7 @@ def prepare(body):
         if region.covers(point) and len(study["school_facilities"]) < 12:
             study["school_facilities"].append({"id": "OSM"+str(service["properties"]["osm_id"]),
                 "location": list(point.coords[0]), "capacity_places": None,
+                "education_level": "kindergarten" if service["properties"].get("amenity") == "kindergarten" else "unknown",
                 "source": "OSM school location; capacity and enrollment unavailable"})
     if body.background_mode == "synthetic_capacity_v1":
         from .demo_capacity import apply_package
@@ -206,23 +216,25 @@ def prepare(body):
 def attach_context(study, context):
     document = load(study.system_snapshot_id)
     registered = {str(f["id"]): f for f in candidates(document)}
-    if set(study.system_parcel_bindings) != {p.id for p in study.projects}:
+    from .parcel_groups import bindings, union_members
+    groups = bindings(study)
+    if set(groups) != {p.id for p in study.projects}:
         raise ValueError("Every demo project requires a system parcel binding")
     for project in study.projects:
-        feature = registered.get(study.system_parcel_bindings[project.id])
-        if feature is None or not shape(project.site.model_dump()).equals(shape(feature["geometry"])):
+        members = [registered.get(key) for key in groups[project.id]]
+        if any(f is None for f in members) or not shape(project.site.model_dump()).equals(shape(union_members(members))):
             raise ValueError("Project geometry does not match the selected system parcel")
     from .planning_review import review
     context["source_kind"] = "mixed_demo"
     context["system_background"] = {"snapshot_id": study.system_snapshot_id, "captured_at": document["captured_at"],
-        "bbox": document["bbox"], "sources": document.get("sources", {}), "parcel_bindings": study.system_parcel_bindings,
+        "bbox": document["bbox"], "sources": document.get("sources", {}), "parcel_bindings": study.system_parcel_bindings, "parcel_groups": groups,
         "population": document.get("population"), "context_layers": document.get("layers", {}),
         "osm_element_count": len(document.get("osm", {}).get("elements", [])), "failures": document.get("failures", {}),
         "limitations": ["WorldPop bbox total includes selected parcels; their occupancy is unknown. It is retained as an inclusive regional prior, not a deduplicated population census; demand/traffic changes remain unavailable.",
                         "Public road topology is imported from OSM when osm_snapshot is selected; accesses, OD/turning demand and signal timings remain estimates. Otherwise the corridor is generated; no observed sewer capacity.",
                         "Flood/land-price layers are context only, not flood calibration, parcel legal applicability or a market-price prediction."],
         "osm_context": document.get("osm", {})}
-    context["system_background"]["selected_parcels"] = [registered[study.system_parcel_bindings[p.id]] for p in sorted(study.projects,key=lambda p:p.id)]
+    context["system_background"]["selected_parcels"] = [registered[key] for key in sorted({key for values in groups.values() for key in values})]
     from ..integrated.context import digest
     buildings, greens, _ = osm_features(document.get("osm", {}))
     quality = {}
@@ -243,7 +255,21 @@ def attach_context(study, context):
             "school_facilities": [s.model_dump(mode="json") for s in sorted(study.school_facilities, key=lambda s: s.id)]}
         context["system_background"]["limitations"][0] = "WorldPop is retained as context only. This explicit fictional case replaces demand with 1200 external residents plus hashed parcel occupancy assumptions; no occupancy survey or verified vacant land."
     context["system_background"]["limitations"].append("School walking uses installed OSM foot paths and estimated endpoint connectors; unreachable pairs remain unavailable. Capacity and enrollment are not inferred from locations.")
-    context["system_background"]["planning_review"] = [review(p,registered[study.system_parcel_bindings[p.id]].get("properties",{})) for p in sorted(study.projects,key=lambda p:p.id)]
+    reviews = []
+    for project in sorted(study.projects, key=lambda p: p.id):
+        members = [{"parcel_id": key, **review(project, registered[key].get("properties", {}))} for key in sorted(groups[project.id])]
+        combined = dict(members[0])
+        combined["source_parcel_reviews"] = members
+        combined["source_parcel_ids"] = sorted(groups[project.id])
+        combined["flags"] = sorted({flag for member in members for flag in member["flags"]})
+        if len(members) > 1:
+            combined.update(source_land_use_code=None, source_planning_land_use=None, source_plan=None, source_decision=None,
+                            status="potential_conflict" if any(m["status"] == "potential_conflict" for m in members) else "requires_verification")
+        if study.planning_catalog == "qcvn_urban_2021":
+            from .vietnam_rules import density_check
+            combined["qcvn_density_check"] = density_check(project)
+        reviews.append(combined)
+    context["system_background"]["planning_review"] = reviews
     if study.traffic_prior and study.traffic_prior.counting_reference_id:
         from .counting_reference import load as load_counting
         context['system_background']['counting_reference']=load_counting(study.traffic_prior.counting_reference_id)

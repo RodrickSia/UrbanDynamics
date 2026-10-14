@@ -77,7 +77,7 @@ def evaluate(study, context, active_project_ids):
     metrics.update(school["metrics"])
     shadow = spatial.shadows(study, parcel_results, context.get("fixed_solar_context"))
     metrics.update(shadow["metrics"])
-    return {"active_project_ids": sorted(active), "metrics": metrics, "parcels": parcel_results,
+    output = {"active_project_ids": sorted(active), "metrics": metrics, "parcels": parcel_results,
             "baseline_ledger": baseline.ledger(study, context, parcel_results),
             "resolved_background": deepcopy(background),
             "school_services": school,
@@ -88,6 +88,10 @@ def evaluate(study, context, active_project_ids):
             "kind": "coefficient_screening_on_synthetic_context", "native_simulation": False,
             "unavailable_modules": ["traffic_SUMO", "drainage_SWMM", "healthcare_capacity_allocation", "park_capacity_allocation", "flood_depth_2D", "thermal_comfort"],
             "note": "Runoff sums screening parcel volumes, not peak network flow or node flooding. Geometry totals cover registered parcels only."}
+    if study.planning_catalog == "qcvn_urban_2021":
+        from .vietnam_rules import assess
+        output["vietnam_planning_requirements"] = assess(study, output)
+    return output
 
 
 def compare(before, after, context_hash, context=None):

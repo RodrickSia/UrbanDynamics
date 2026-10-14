@@ -1,11 +1,13 @@
 // Patch existing local containers only; preserve their database, snapshots and old jobs.
-const cp=require('child_process'),path=require('path');
+const cp=require('child_process'),path=require('path'),fs=require('fs');
 const root=path.resolve(__dirname,'..');
 const docker=args=>cp.execFileSync('docker',args,{encoding:'utf8',timeout:60000,stdio:['ignore','pipe','pipe']});
 const check="import sqlite3; c=sqlite3.connect('/runtime/studies.sqlite'); n=c.execute(\"select count(*) from planning_jobs where status in ('queued','running')\").fetchone()[0]; print(n); assert n==0, 'Wait for active jobs before updating'";
 try {
   docker(['run','--rm','--mount','type=volume,source=planning-program-runtime,target=/runtime','--entrypoint','python','planning-demo-backend:local','-c',check]);
-  const files=['services/simulation/planning/demo_capacity.py','services/simulation/planning/system_demo.py','services/simulation/planning/provenance.py','static/planning.html','static/planning.js'];
+  const planning='services/simulation/planning/';
+  const files=fs.readdirSync(path.join(root,'backend','app',planning)).filter(f=>/\.(py|json)$/.test(f)).map(f=>planning+f);
+  files.push('routers/planning_system_demo.py','static/planning.html','static/planning.js');
   for(const name of ['planning-program-api','planning-program-worker']) {
     const state=JSON.parse(docker(['inspect',name]))[0].State;
     if(state.Running)docker(['stop',name]);

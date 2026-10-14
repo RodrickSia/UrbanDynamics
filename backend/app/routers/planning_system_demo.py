@@ -74,3 +74,10 @@ def prepare(body: system_demo.Prepare):
         return {"demo_only": True, "study": system_demo.prepare(body)}
     except (ValueError, OSError) as error:
         raise HTTPException(422, str(error)) from None
+
+
+@router.get("/vietnam-catalog")
+def vietnam_catalog():
+    require_demo()
+    from app.services.simulation.planning.vietnam_rules import catalog
+    return catalog()
