@@ -196,7 +196,10 @@ def test_recovery_stops_verified_orphan_of_dead_worker_only(tmp_path):
     queued("orphan-recovery")
     job = store.claim()
     code = "import subprocess,sys,time,json,os; from app.services.simulation.planning.identity import snapshot,snapshot_tree; p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'],cwd=sys.argv[1],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); time.sleep(.1); print(json.dumps({'owner':snapshot(os.getpid()),'child':snapshot_tree(p.pid)}),flush=True); time.sleep(.5)"
-    owner = subprocess.Popen([sys.executable, "-c", code, str(directory)], stdout=subprocess.PIPE, text=True)
+    # Pytest's configured import paths are not inherited by a new interpreter.
+    owner = subprocess.Popen([sys.executable, "-c", code, str(directory)],
+                             cwd=Path(__file__).resolve().parents[1],
+                             stdout=subprocess.PIPE, text=True)
     try:
         recorded = json.loads(owner.stdout.readline())
         owner_info, child = recorded["owner"], recorded["child"]
