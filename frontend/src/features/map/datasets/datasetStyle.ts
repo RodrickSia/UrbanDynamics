@@ -83,6 +83,32 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
           'line-opacity': 0.8,
         },
       };
+    case 'traffic':
+      return {
+        ...common,
+        type: 'line',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': [
+            'match', ['get', 'predicted_los'],
+            'A', '#168a58', 'B', '#71ad45', 'C', '#d2b83f',
+            'D', '#e58b32', 'E', '#d9583c', 'F', '#8c3047', '#8a9199',
+          ],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 13, 2.5, 17, 5],
+          'line-opacity': 0.85,
+        },
+      };
+    case 'sumo_network':
+      return {
+        ...common,
+        type: 'line',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#647987',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.45, 12, 1.2, 17, 3],
+          'line-opacity': 0.72,
+        },
+      };
     case 'parcels':
       return parcelFill();
     case 'synthetic_buildings':

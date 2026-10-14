@@ -1,4 +1,4 @@
-import type { Dataset, Palette, DateQuery } from '../../../services/api';
+import type { Dataset, Palette, DateQuery, TrafficPeriod } from '../../../services/api';
 import type { UrbanLayerId } from '../types/map';
 
 export const DATASETS = {
@@ -9,6 +9,8 @@ export const DATASETS = {
   'land-price': 'land_price',
   parcels: 'parcels',
   'synthetic-buildings': 'synthetic_buildings',
+  traffic: 'traffic',
+  'sumo-network': 'sumo_network',
 } as const satisfies Partial<Record<UrbanLayerId, Dataset>>;
 export type DataLayerId = keyof typeof DATASETS;
 export const DATA_LAYER_IDS = Object.keys(DATASETS) as DataLayerId[];
@@ -27,6 +29,7 @@ export interface DataSelection {
   year: number;
   dates: DateQuery;
   visible?: boolean;
+  trafficPeriod?: TrafficPeriod;
 }
 // Keep synchronized with backend/app/services/raster_tiles.py; values are people/cell.
 export const PALETTE_STOPS: Record<Palette, ReadonlyArray<readonly [number, string]>> = {

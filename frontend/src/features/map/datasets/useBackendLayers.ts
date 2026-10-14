@@ -3,10 +3,12 @@ import {
   getLayerCatalog,
   getPopulationCatalog,
   getFeatures,
+  getTrafficCatalog,
   tileUrl,
   type Palette,
   type DateQuery,
   type CatalogLayer,
+  type TrafficPeriod,
 } from '../../../services/api';
 import { URBAN_LAYERS } from '../layers/layerRegistry';
 import type { LayerState, MapMode } from '../types/map';
@@ -29,6 +31,17 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
   const [chosenYear, setYear] = useState<number | null>(null);
   const [palette, setPalette] = useState<Palette>('pseudocolor');
   const [dates, setDates] = useState<DateQuery>({});
+  const [trafficSchedule, setTrafficSchedule] = useState<TrafficPeriod>(() => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date());
+    const value = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    const minute = Number(value.minute) < 30 ? '00' : '30';
+    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long' }).format(new Date());
+    const weekdayNumber = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(weekday) + 1;
+    return { weekday: weekdayNumber, period: `${value.hour}:${minute}` };
+  });
   const [revision, setRevision] = useState(0);
   const [reports, setReports] = useState<Partial<Record<DataLayerId, LayerReport>>>({});
   const year =
@@ -100,6 +113,15 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
           ),
         ),
       );
+    void getTrafficCatalog(controller.signal)
+      .then((traffic) => save({
+        traffic: { status: 'ready', available: traffic.available },
+        'sumo-network': { status: 'ready', available: traffic.networkAvailable },
+      }))
+      .catch(() => save({
+        traffic: { status: 'error', available: false },
+        'sumo-network': { status: 'error', available: false },
+      }));
     return () => controller.abort();
   }, [revision]);
   const definitions = useMemo(
@@ -126,11 +148,13 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
         if (!isDataLayer(layer.id) || !layers[layer.id] || layer.status !== 'available') return [];
         const dataset = DATASETS[layer.id];
         return [
-          { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette), year, dates,
-            visible: layer.id !== 'synthetic-buildings' || mode === '3d' },
+          { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette, dataset === 'traffic' ? trafficSchedule : undefined), year, dates,
+            visible: layer.id !== 'synthetic-buildings' || mode === '3d',
+            ...(dataset === 'traffic' ? { trafficPeriod: trafficSchedule } : {}),
+          },
         ];
       }),
-    [definitions, layers, year, palette, dates, mode],
+    [definitions, layers, year, palette, dates, trafficSchedule, mode],
   );
   const report = useCallback(
     (id: DataLayerId, value: LayerReport) =>
@@ -155,6 +179,8 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
     setPalette,
     dates,
     setDates,
+    trafficSchedule,
+    setTrafficSchedule,
     reports,
     report,
     retry,

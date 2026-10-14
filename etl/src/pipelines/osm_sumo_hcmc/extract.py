@@ -14,6 +14,14 @@ logger = logging.getLogger(__name__)
 def run(settings: OsmSumoConfig = config, refresh: bool = False) -> Path:
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     source = settings.data_dir / "vietnam-latest.osm.pbf"
+    cropped = settings.data_dir / "hcmc.osm.pbf"
+
+    # A committed HCMC crop is sufficient for the pipeline; downloading the
+    # much larger Vietnam extract is only needed when generating a fresh crop.
+    if cropped.is_file() and not refresh:
+        logger.info("Using cached HCMC OSM extract at %s", cropped)
+        return cropped
+
     temporary = source.with_suffix(".osm.pbf.part")
     if refresh or not source.exists():
         logger.info("Downloading OSM extract from %s", settings.pbf_url)
@@ -25,7 +33,6 @@ def run(settings: OsmSumoConfig = config, refresh: bool = False) -> Path:
                         output.write(chunk)
         temporary.replace(source)
 
-    cropped = settings.data_dir / "hcmc.osm.pbf"
     if not cropped.exists() or cropped.stat().st_mtime < source.stat().st_mtime:
         bounds = f"{settings.west},{settings.south},{settings.east},{settings.north}"
         subprocess.run(

@@ -36,10 +36,16 @@ etl/data/buildings_footprint/*
 etl/data/traffic_history/*
 !etl/data/traffic_history/.gitkeep
 !etl/data/traffic_history/traffic.csv
-# Keep the TomTom road-flow input directory in git; fetched snapshots stay local.
+# Keep the TomTom traffic input snapshot in git; generated observations stay local.
 !etl/data/road_data_tomtom/
 etl/data/road_data_tomtom/*
 !etl/data/road_data_tomtom/.gitkeep
+!etl/data/road_data_tomtom/tomtom_hcmc_traffic_sample.csv
+# Keep the cropped HCMC OSM input in git; large source and generated files stay local.
+!etl/data/osm_sumo_hcmc/
+etl/data/osm_sumo_hcmc/*
+!etl/data/osm_sumo_hcmc/.gitkeep
+!etl/data/osm_sumo_hcmc/hcmc.osm.pbf
 test-results/
 
 # Frontend dependencies and build output

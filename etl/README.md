@@ -159,6 +159,31 @@ interpreted as km/h for comparison. The source value is retained unchanged, and
 this comparison does not modify SUMO lane speeds. It does not infer vehicle
 counts or generate SUMO routes/demand.
 
+### Historical time-of-week congestion layer
+
+After the SUMO network and historical traffic observations are loaded, the API
+provides `GET /api/v1/traffic/prediction?weekday=1&period=08:00` and matching
+MapLibre vector tiles at `/api/v1/traffic/prediction/tiles/{z}/{x}/{y}.pbf`.
+`weekday` uses ISO numbering (Monday=1 through Sunday=7), and `period` is a
+HCMC-local time on a 30-minute boundary (for example `08:00` or `08:30`). The
+endpoint selects the matching weekday and period, calculates each edge's modal LOS
+within each historical day, then returns the modal daily LOS per matched SUMO
+edge. The response includes sample days, observations, modal share, a heuristic
+confidence label, and an ordinal 0–100 congestion score (not a probability).
+
+This is a typical historical profile, not a live forecast or a citywide SUMO
+simulation. TomTom's loaded sample is a single-time snapshot, and the historical
+source has LOS but no observed vehicle counts or OD trips. Therefore this path
+does not synthesize vehicle demand or calibrate SUMO. Treat it as descriptive
+until evaluated against held-out dates; confidence summarizes only the count
+and agreement of available historical days.
+
+The separate `SUMO road network` map layer reads the loaded edge graph from
+`transport.sumo_edge` using `/api/v1/traffic/network` and its vector-tile route.
+It displays SUMO edge geometry, road type, lane count, and network speed limit;
+it does not represent simulated traffic. The `Traffic` layer overlays the
+historical LOS estimate on the subset of roads matched to observations.
+
 ## Warehouse and data
 
 ETL containers connect to the main PostGIS warehouse at `postgis:5432` using

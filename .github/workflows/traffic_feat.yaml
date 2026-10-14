@@ -22,14 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # The OSM extract and source snapshots are local, ignored ETL inputs.
+          # Preserve generated ETL outputs on the self-hosted runner.
           clean: false
       - name: Validate seeded traffic inputs
         run: |
           set -eu
           test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
           for source in \
-            etl/data/osm_sumo_hcmc/vietnam-latest.osm.pbf \
+            etl/data/osm_sumo_hcmc/hcmc.osm.pbf \
             etl/data/traffic_history/traffic.csv \
             etl/data/road_data_tomtom/tomtom_hcmc_traffic_sample.csv; do
             if [ ! -s "$source" ]; then
@@ -37,8 +37,6 @@ jobs:
               exit 1
             fi
           done
-          test -s etl/data/osm_sumo_hcmc/hcmc.osm.pbf || echo "HCMC OSM crop will be generated from vietnam-latest.osm.pbf."
-          test -s etl/data/osm_sumo_hcmc/hcmc.net.xml || echo "SUMO network will be generated from the HCMC OSM crop."
       - name: Run sequential traffic feature pipeline
         env:
           WAREHOUSE_MIGRATION_TARGET: compose
@@ -54,7 +52,7 @@ jobs:
             echo "The PostGIS service must be running and migrated before traffic_feat." >&2
             exit 1
           fi
-          migration_query="to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND to_regclass('transport.tomtom_traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '09-traffic-speed-comparison.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '10-tomtom-traffic-observation.sql')"
+          migration_query="SELECT to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND to_regclass('transport.tomtom_traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '09-traffic-speed-comparison.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '10-tomtom-traffic-observation.sql')"
           if ! docker compose exec -T postgis sh -c \
             'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "$1"' \
             sh "$migration_query" | grep -Fxq t; then
