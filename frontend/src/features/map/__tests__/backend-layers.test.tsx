@@ -11,6 +11,7 @@ function fixture(
     reviewed?: boolean;
     automatic?: boolean;
     spatial?: boolean;
+    reference?: boolean;
   } = {},
 ) {
   vi.stubGlobal(
@@ -31,8 +32,9 @@ function fixture(
                   {
                     properties: {
                       geometry_reviewed: options.reviewed,
-                      match_confidence: options.spatial ? 'spatially_checked' : undefined,
-                      publication_match_mode: options.automatic ? 'automatic' : undefined,
+                      match_confidence: options.reference ? 'automatic_reference' : options.spatial ? 'spatially_checked' : undefined,
+                      publication_match_mode: options.automatic || options.reference ? 'automatic' : undefined,
+                      residential_vnd_m2: options.reference ? 20000000 : undefined,
                       geometry_coverage: options.automatic ? 'whole_named_road_proxy' : undefined,
                     },
                   },
@@ -55,6 +57,12 @@ function fixture(
   );
 }
 describe('backend layer availability and selections', () => {
+  it('enables the citywide automatic-reference layer without manual review flags', async () => {
+    fixture({ land: true, reviewed: false, reference: true });
+    const { result } = renderHook(() => useBackendLayers({ 'land-price': true }));
+    await waitFor(() => expect(result.current.catalog['land-price']?.available).toBe(true));
+    expect(result.current.selections.map((s) => s.dataset)).toEqual(['land_price']);
+  });
   it('accepts main spatially checked prices without claiming manual review', async () => {
     fixture({ land: true, reviewed: false, spatial: true });
     const { result } = renderHook(() => useBackendLayers({ 'land-price': true }));
