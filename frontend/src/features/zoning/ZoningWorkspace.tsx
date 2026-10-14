@@ -41,11 +41,11 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
       <MotionIconButton className="zoning-nav-button" title="Indicators" aria-label="Indicators" aria-pressed={w.panel === 'indicators'} disabled={w.busy} onClick={() => { if (w.panel === 'indicators') w.close(); else { w.setSection('dashboard', () => { onActivate(); w.setPanel('indicators'); }); } }}><ChartPie aria-hidden="true" size={19}/></MotionIconButton>
     </nav>
     {w.panel && !searchOpen && <>
-      {!w.plan && <aside className="zoning-plan-drawer solid-panel zoning-ui" data-creating={w.sketch.tool === 'study'} aria-label="Plans panel">
-        <header><div><h2>Plans</h2></div>
+      {!w.plan && <aside className="zoning-plan-drawer solid-panel zoning-ui" data-creating={w.sketch.tool === 'study'} aria-label={w.panel === 'indicators' ? 'Indicators panel' : 'Plans panel'}>
+        <header><div><h2>{w.panel === 'indicators' ? 'Indicators' : 'Plans'}</h2></div>
           <button className="quiet-icon-button" aria-label="Close zoning workspace" disabled={w.busy} onClick={() => w.close()}><X size={18}/></button></header>
         {!w.plan && w.error && <div className="zoning-error" role="alert">{w.error}</div>}
-        <PlansPanel workspace={w}/>
+        {w.panel === 'indicators' ? <IndicatorsPanel workspace={w}/> : <PlansPanel workspace={w}/>}
       </aside>}
       {w.plan && <>
         <aside className="zoning-detail-drawer solid-panel zoning-ui" aria-label="Plan details">

@@ -23,6 +23,8 @@ function data(bridge: ZoningBridge): FeatureCollection {
   if (!bridge.active) return EMPTY;
   const features: Feature[] = [];
   if (bridge.plan) features.push(feature(bridge.plan.study_area, { kind: 'study', color: '#005b65', alpha: 0, width: 3 }));
+  if (bridge.analysis?.active && bridge.analysis.geometry) features.push(feature(bridge.analysis.geometry,
+    { kind: 'analysis', color: '#2877dc', alpha: .06, width: 3 }));
   if (bridge.visible) for (const zone of bridge.scenario?.zones ?? []) {
     const type = bridge.plan?.types.find(t => t.id === zone.type_id);
     features.push(feature(zone.geometry, { kind: 'zone', id: zone.id, label: type?.code ?? 'Unknown',
@@ -131,6 +133,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         }
         return;
       }
+      if (b.analysis?.active) return;
       const picked = query(e, FILL).find(f => f.properties.kind === 'zone');
       b.onPick(picked ? String(picked.properties.id) : null, e.originalEvent.shiftKey);
     };

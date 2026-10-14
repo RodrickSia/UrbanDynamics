@@ -34,6 +34,23 @@
 .zoning-ui footer { justify-content: flex-end; margin-top: 1rem; }
 .zoning-wide { width: 100%; }
 .zoning-muted, .zoning-ui small { color: var(--text-secondary); font-size: .76rem; line-height: 1.5; }
+.indicator-area-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.indicator-draw-state { margin: .75rem 0; padding: .75rem; background: var(--accent-muted); border-radius: var(--radius-control); }
+.indicator-draw-state .zoning-row { margin-top: .5rem; }
+.indicator-assumptions, .indicator-methods, .indicator-plan-report { margin: 1rem 0; }
+.indicator-loading { padding: 1.25rem .75rem; background: var(--surface-raised); color: var(--text-secondary); }
+.indicator-metric-table caption { text-align: left; padding: .6rem 0; font-weight: 650; }
+.indicator-metric-table th small { display: block; font-weight: 400; }
+.indicator-metric-table td { text-align: right; font-variant-numeric: tabular-nums; }
+.indicator-methods li { margin: .5rem 0; line-height: 1.5; }
+.indicator-methods ul { padding-left: 1rem; color: var(--text-secondary); font-size: .76rem; }
+.indicator-share-bar { display: flex; height: .7rem; background: var(--border); overflow: hidden; }
+.indicator-distribution ul { list-style: none; padding: 0; }
+.indicator-distribution li { display: flex; gap: .4rem; align-items: center; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .76rem; }
+.indicator-distribution li > span:nth-child(2) { flex: 1; overflow-wrap: anywhere; }
+.indicator-distribution li strong { font-variant-numeric: tabular-nums; }
+.indicator-transit-value { display: flex; gap: .75rem; align-items: center; }
+.indicator-transit-value strong { font-size: 1.6rem; color: var(--accent-strong); white-space: nowrap; }
 .zoning-empty { padding: 1.5rem 0; }
 .zoning-plan-list, .zoning-type-list, .zoning-findings { list-style: none; padding: 0; margin: .75rem 0; }
 .zoning-plan-list li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }

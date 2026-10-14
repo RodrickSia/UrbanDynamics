@@ -52,13 +52,14 @@ export interface CurrentLandUse {
   basis: 'observed_parcels';
   rows: { code: string | null; parcels: number; area_m2: number; category: string | null; color: string }[];
 }
-export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | 'building' | 'edit-building' | null;
+export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | 'building' | 'edit-building' | 'analysis' | null;
 export interface Sketch { tool: Tool; points: Position[]; geometry: SketchGeometry | null }
 export interface ZoningBridge {
   active: boolean; plan: Plan | null; scenario: Scenario | null; selected: string[];
   sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; showParcels: boolean;
   parcelAvailable: boolean; busy: boolean;
   development?: DevelopmentBridge;
+  analysis?: { active: boolean; geometry: PolygonGeometry | null };
   onPick: (id: string | null, multiple: boolean) => void;
   onSketch: (sketch: Sketch) => void;
   onFinish: () => void; onCancel: () => void;

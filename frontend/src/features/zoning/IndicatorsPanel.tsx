@@ -1,43 +1,66 @@
 import { useEffect, useState } from 'react';
-import { zoningRequest } from './api';
-import { areaText } from './geometry';
-import type { Indicators } from './types';
+import { Check, Pentagon, RotateCcw, X } from 'lucide-react';
+import { API_BASE_URL } from '../../services/api';
+import { AreaIndicatorResults } from './AreaIndicatorResults';
+import { indicatorDefaults, indicatorFields, type AreaIndicators, type IndicatorAssumptions } from './areaIndicatorTypes';
+import { ZoningReport } from './ZoningReport';
 import type { ZoningWorkspace } from './useZoning';
-import { DevelopmentComparison } from './DevelopmentComparison';
 
 export function IndicatorsPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
-  const [compareId, setCompareId] = useState('');
-  const [result, setResult] = useState<{ key: string; data?: Indicators; error?: string } | null>(null);
-  const plan = w.plan, scenario = w.scenario;
-  const comparison = plan?.scenarios.find(s => s.id === compareId) ?? plan?.scenarios[0];
-  const key = `${plan?.id}/${plan?.revision}/${scenario?.id}/${comparison?.id}`;
+  const [assumptions, setAssumptions] = useState({ ...indicatorDefaults });
+  const [draft, setDraft] = useState({ ...indicatorDefaults });
+  const [retry, setRetry] = useState(0);
+  const [showPlanReport, setShowPlanReport] = useState(false);
+  const [result, setResult] = useState<{ key: string; data?: AreaIndicators; error?: string }>();
+  const drawing = w.sketch.tool === 'analysis';
+  const key = JSON.stringify({ geometry: w.analysisArea,
+    ...(w.plan && w.scenario ? { plan_id: w.plan.id, revision: w.plan.revision, scenario_id: w.scenario.id } : {}),
+    include_scenario: !!w.plan && w.includeScenario, assumptions });
   useEffect(() => {
-    if (!plan || !scenario || !comparison) return;
+    if (!JSON.parse(key).geometry || drawing) return;
     const controller = new AbortController();
-    void zoningRequest<Indicators>(`/${plan.id}/indicators?scenario_id=${scenario.id}&compare_id=${comparison.id}`, undefined, controller.signal)
-      .then(data => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(error => { if (!controller.signal.aborted) setResult({ key, error: error.message }); });
+    const calculate = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/indicators/area`, { method: 'POST',
+          headers: { 'Content-Type': 'application/json' }, body: key,
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35000)]) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Check the selected area and assumptions.');
+        if (!controller.signal.aborted) setResult({ key, data });
+      } catch (cause) {
+        if (!controller.signal.aborted) setResult({ key, error: cause instanceof Error ? cause.message : 'Indicators unavailable' });
+      }
+    };
+    void calculate();
     return () => controller.abort();
-  }, [plan, scenario, comparison, key]);
-  if (!plan || !scenario) return <div className="zoning-empty"><h3>Choose a plan</h3><p>Open a plan to compare zoning areas and inspect its findings.</p><button onClick={() => w.setPanel('plans')}>Open Plans</button></div>;
-  const data = result?.key === key ? result.data : null;
-  return <>
-    <DevelopmentComparison plan={plan} scenario={scenario}/>
-    <label>Compare with<select value={comparison?.id} onChange={e => setCompareId(e.target.value)}>{plan.scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-    {!result || result.key !== key ? <p role="status">Calculating indicators…</p> : result.error ? <p role="alert">{result.error}</p> : null}
-    {data && <>
-      <div className="zoning-metrics">{[['Assigned', data.assigned_m2], ['Unassigned', data.unassigned_m2], ['Changed', data.changed_m2]] .map(([label, value]) => <div key={label}><span>{label}</span><strong>{areaText(Number(value))}</strong></div>)}</div>
-      <p className="zoning-muted">Compared with {comparison?.name} · {data.comparison_status}</p>
-      <h3>Zone distribution</h3>
-      <div className="zoning-table-scroll"><table><thead><tr><th>Type</th><th>Area</th><th>Change</th></tr></thead><tbody>{data.rows.map(row => <tr key={row.type_id}><th>{plan.types.find(t => t.id === row.type_id)?.code ?? 'Unknown'}</th><td>{areaText(row.area_m2)}</td><td>{row.delta_m2 > 0 ? '+' : ''}{areaText(row.delta_m2)}</td></tr>)}</tbody></table></div>
-      {!data.rows.length && <p className="zoning-muted">Draw a zone to start measuring your proposal.</p>}
-      <details><summary>Development bounds</summary><p className="zoning-muted">{data.area_basis}. Setbacks, heights and other controls may reduce capacity.</p>{data.rows.map(row => <div className="zoning-bound" key={row.type_id}><strong>{plan.types.find(t => t.id === row.type_id)?.code}</strong><span>FAR bound: {areaText(row.far_bound_m2)}</span><span>Footprint bound: {areaText(row.footprint_bound_m2)}</span></div>)}</details>
-      <h3>Validation <span className="zoning-count">{data.findings.length}</span></h3>
-      <ul className="zoning-findings">{data.findings.map(f => <li key={f.id}><button onClick={() => {
-        const zone = scenario.zones.find(z => z.id === f.zone_id);
-        if (zone) { w.pick(zone.id, false); w.zoomTo(zone.geometry); }
-        else w.zoomTo(f.geometry ?? plan.study_area);
-      }}><span className="zoning-badge">{f.certainty}</span><span>{f.message}</span></button></li>)}</ul>
+  }, [key, drawing, retry]);
+  const data = result?.key === key ? result.data : undefined;
+  const error = result?.key === key ? result.error : undefined;
+  const change = (field: keyof IndicatorAssumptions, value: number) => setDraft(previous => ({ ...previous, [field]: value }));
+  return <section className="area-indicators" aria-label="Selected area indicators">
+    <div className="indicator-area-actions">
+      <button disabled={w.busy || drawing} onClick={() => w.begin('analysis')}><Pentagon size={16}/>Draw area</button>
+      {w.plan && <button disabled={w.busy || drawing} onClick={w.useStudyArea}><RotateCcw size={15}/>Study area</button>}
+    </div>
+    {drawing ? <div className="indicator-draw-state"><p>Click to draw · Enter to finish · Ctrl pauses snapping</p><small>{w.sketch.points.length} points</small>
+      <div className="zoning-row"><button aria-label="Cancel analysis area" onClick={w.cancel}><X size={16}/>Cancel</button>
+        <button className="zoning-primary" disabled={w.sketch.points.length < 3} onClick={() => void w.finish()}><Check size={16}/>Analyze area</button></div>
+    </div> : !w.analysisArea && <p className="zoning-muted">Draw a region or choose a plan to start.</p>}
+    {!w.plan && <label>Plan<select value="" disabled={w.loading || w.busy} onChange={event => { if (event.target.value) void w.openPlan(event.target.value); }}>
+      <option value="">Select a plan (optional)</option>{w.plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></label>}
+    {w.plan && <label className="zoning-check"><input type="checkbox" checked={w.includeScenario}
+      disabled={drawing || w.busy} onChange={event => w.setIncludeScenario(event.target.checked)}/>Include plan scenario</label>}
+    <details className="indicator-assumptions"><summary>Assumptions</summary><form onSubmit={event => { event.preventDefault(); setAssumptions({ ...draft }); }}>
+      <p className="zoning-muted">Illustrative defaults · adjust to local data</p>
+      {indicatorFields.map(([field,label,,min,max]) => <label key={field}>{label}<input type="number" required min={min} max={max}
+        step={field === 'transit_radius_m' ? 1 : 'any'} value={Number.isFinite(draft[field]) ? draft[field] : ''} onChange={event => change(field,event.target.valueAsNumber)}/></label>)}
+      <button className="zoning-primary" type="submit">Apply assumptions</button>
+    </form></details>
+    {!drawing && w.analysisArea && <>
+      {error ? <div role="alert" className="zoning-error"><p>{error}</p><button onClick={() => setRetry(value => value+1)}>Retry</button></div>
+        : data ? <AreaIndicatorResults data={data}/> : <div className="indicator-loading" role="status" aria-busy="true">Calculating selected area…</div>}
     </>}
-  </>;
+    {w.plan && !drawing && <details className="indicator-plan-report" onToggle={event => setShowPlanReport(event.currentTarget.open)}>
+      <summary>Plan comparison & validation</summary>{showPlanReport && <ZoningReport workspace={w}/>}</details>}
+  </section>;
 }

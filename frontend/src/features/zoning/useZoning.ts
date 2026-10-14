@@ -24,6 +24,8 @@ export function useZoning(parcelAvailable = false) {
   const [error, setError] = useState('');
   const [focus, setFocus] = useState<{ key: number; geometry: PolygonGeometry } | null>(null);
   const [section, setSectionState] = useState<'info' | 'zoning' | 'development' | 'dashboard'>('zoning');
+  const [analysisSelection, setAnalysisSelection] = useState<{ planId: string | null; geometry: PolygonGeometry } | null>(null);
+  const [includeScenario, setIncludeScenario] = useState(true);
   const [leaving, setLeaving] = useState(false);
   const leaveAction = useRef<(() => void) | null>(null);
   const pending = useRef(false);
@@ -31,6 +33,9 @@ export function useZoning(parcelAvailable = false) {
   const readOnly = !scenario || scenario.locked || scenario.kind === 'reference';
   const chosenType = plan?.types.find(t => t.id === typeId) ?? plan?.types[0];
   const active = panel !== null;
+  const analyzing = active && (panel === 'indicators' || (!!plan && section === 'dashboard'));
+  const analysisArea = analysisSelection?.planId === (plan?.id ?? null) ? analysisSelection.geometry : plan?.study_area ?? null;
+  const useStudyArea = () => { setAnalysisSelection(null); cancel(); };
   useEffect(() => {
     if (plan && scenario) {
       try { localStorage.setItem(`urban-plan-scenario-${plan.id}`, scenario.id); } catch { /* Browser storage is optional. */ }
@@ -95,7 +100,7 @@ export function useZoning(parcelAvailable = false) {
     if (choice === 'discard') development.cancel();
     setLeaving(false); leaveAction.current?.(); leaveAction.current = null;
   };
-  const setSection = (value: typeof section, after?: () => void) => leave(() => { setSelected([]); cancel(); setSectionState(value); after?.(); });
+  const setSection = (value: typeof section, after?: () => void) => leave(() => { setSelected([]); cancel(); setSectionState(value); if (value !== 'dashboard') setPanel('plans'); after?.(); });
   const create = async (name: string, description: string, horizon: number | null) => {
     const geometry = sketchGeometry(sketch);
     if (!geometry || geometry.type === 'LineString') { setError('Draw a study area with at least three points'); return; }
@@ -120,6 +125,11 @@ export function useZoning(parcelAvailable = false) {
     } };
   };
   const finish = async () => {
+    if (sketch.tool === 'analysis') {
+      const geometry = sketchGeometry(sketch);
+      if (!geometry || geometry.type === 'LineString') { setError('Draw at least three points'); return; }
+      setAnalysisSelection({ planId: plan?.id ?? null, geometry }); cancel(); return;
+    }
     if (sketch.tool === 'building' || sketch.tool === 'edit-building') { await development.previewBuilding(); return; }
     if (sketch.tool === 'study' || sketch.tool === 'edit-study') return;
     const command = buildCommand();
@@ -150,6 +160,7 @@ export function useZoning(parcelAvailable = false) {
   };
   const close = (after?: () => void) => leave(() => { setPanel(null); cancel(); after?.(); });
   return { panel, setPanel, active, close, plan, plans, scenario, chosenType, typeId, setTypeId, selected, pick,
+    analyzing, analysisArea, includeScenario, setIncludeScenario, useStudyArea,
     sketch, setSketch, begin, cancel: development.dirty ? development.cancel : cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
     section, setSection, development, leaving, resolveLeave, leave,
     visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy: busy || development.working, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,

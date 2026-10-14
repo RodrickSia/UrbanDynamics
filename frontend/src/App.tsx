@@ -42,13 +42,15 @@ export default function App() {
         onPointerDownCapture={workspace.handleMapPointerDown}
       >
         <UrbanMap
-          zoning={{ active: zoning.active, plan: zoning.plan, scenario: zoning.scenario,
+          zoning={{ active: zoning.active, plan: zoning.plan,
+            scenario: zoning.analyzing && !zoning.includeScenario ? zoning.plan?.scenarios[0] ?? null : zoning.scenario,
+            analysis: { active: zoning.analyzing, geometry: zoning.analysisArea },
             selected: zoning.selected, sketch: zoning.sketch, preview: zoning.preview,
             opacity: zoning.opacity, visible: zoning.visible, showParcels: zoning.showParcels,
             parcelAvailable: zoning.parcelAvailable, busy: zoning.busy,
             onPick: zoning.pick, onSketch: zoning.setSketch, onFinish: () => void zoning.finish(),
             onCancel: zoning.cancel, focus: zoning.focus,
-            development: { active: zoning.section === 'development', parcel: zoning.development.parcel,
+            development: { active: !zoning.analyzing && zoning.section === 'development', parcel: zoning.development.parcel,
               selectedBuilding: zoning.development.selectedBuilding, preview: zoning.development.preview?.building ?? null,
               onPickParcel: zoning.development.pickParcel, onPickBuilding: zoning.development.pickBuilding,
               onDelete: () => { if (!zoning.readOnly && !zoning.busy && !zoning.development.dirty && zoning.development.selectedBuilding) zoning.development.setDeleteRequested(true); },
