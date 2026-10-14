@@ -1,0 +1,11 @@
+const fs=require('fs'),path=require('path'),cp=require('child_process');
+const root=path.resolve(__dirname,'..'),out=path.join(root,'test-results','submission-features');fs.mkdirSync(out,{recursive:true});
+const python=process.env.SIMULATION_TEST_PYTHON||path.join(root,'..','UrbanDynamics','.venv','Scripts','python.exe');
+const tests=fs.readdirSync(path.join(root,'backend','tests')).filter(f=>/^test_(planning_|simulation_)/.test(f)||['test_integrated_simulation.py','test_counting_flow_default.py'].includes(f)).map(f=>'backend/tests/'+f);
+tests.push('scripts/traffic-counting/test_count_core.py','scripts/traffic-counting/test_recount_tracks.py');
+const log=fs.openSync(path.join(out,'regression.log'),'w');
+const manifest=path.join(out,'regression-execution.json');fs.writeFileSync(manifest,JSON.stringify({status:'running',started_at:new Date().toISOString(),tests}));
+const child=cp.spawn(python,['-m','pytest','-q',...tests,'--tb=short','--junitxml='+path.join(out,'regression.xml')],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'backend')+path.delimiter+path.join(root,'etl')},stdio:['ignore',log,log]});
+child.on('error',e=>fs.writeFileSync(manifest,JSON.stringify({status:'error',error:e.message})));
+child.on('close',code=>{fs.closeSync(log);fs.writeFileSync(manifest,JSON.stringify({status:code===0?'passed':'failed',code,finished_at:new Date().toISOString(),tests}));console.log('Regression exit '+code);});
+console.log('Started '+tests.length+' test files; evidence in '+out);

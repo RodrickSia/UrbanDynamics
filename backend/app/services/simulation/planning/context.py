@@ -5,7 +5,7 @@ from ..integrated.context import digest
 from ..integrated.library import parameters
 from .models import PlanningStudy
 
-VERSION = "planning-studies-0.18"
+VERSION = "planning-studies-0.19"
 
 
 def canonical_numbers(value):
@@ -22,6 +22,7 @@ def canonical_numbers(value):
 
 def canonical_input(study: PlanningStudy):
     document = study.model_dump(mode="json")
+    document["system_parcel_groups"] = {key: sorted(values) for key, values in document["system_parcel_groups"].items()}
     document["normalization_bases"] = sorted(document["normalization_bases"])
     for collection in ("projects", "options", "utility_zones", "catchments", "school_facilities", "background_school_groups", "resident_transfers"):
         document[collection] = sorted(document[collection], key=lambda x: x["id"])
@@ -62,6 +63,9 @@ def build_context(study: PlanningStudy):
                                "School access uses a synthetic pedestrian spine; age fraction and places are assumptions, not enrollment forecasts. Healthcare/park capacity allocation is unavailable.",
                                "No legal planning approval, 2D flood depth, thermal comfort or power-flow inference."]}
     context = canonical_numbers(context)
+    if study.planning_catalog == "qcvn_urban_2021":
+        from .vietnam_rules import catalog
+        context["vietnam_planning_catalog"] = catalog()
     if study.data_mode == "demo_system":
         from .system_demo import attach_context
         context = attach_context(study, context)

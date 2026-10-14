@@ -1,5 +1,7 @@
 # Nối simulation với map của main
 
+**Cập nhật sau đánh giá:** branch simulation đã bổ sung gộp parcel từ snapshot và catalog QCVN. Những mục "chưa có" dưới đây mô tả thời điểm đối chiếu main `93a44c6`/simulation `4c764fe`; xem [contract mới dùng ngay](simulation-submission-handoff.md) để nối grouped mode. Adapter live toàn thành phố/zoning revision và React main vẫn chưa được triển khai trong nâng cấp này.
+
 Ngày đọc: 14/10/2026. Đã fetch và đọc `origin/main` tại commit **93a44c6** bằng `git show`; không đổi branch, merge hoặc sửa frontend nhóm. Simulation được đối chiếu với branch `feat/khoi-building-impact-simulation`, commit **4c764fe**.
 
 ## 1. Main hiện có gì?

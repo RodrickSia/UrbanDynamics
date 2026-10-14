@@ -142,3 +142,8 @@ Khoảng ±30% mặc định là **kịch bản thử độ nhạy**, không ph�
 ## 7. Việc còn cần dữ liệu
 
 Ưu tiên tiếp theo là hiệu chỉnh trips, mode share và hourly profiles bằng counts/khảo sát; thu thập điện/nước theo công năng, occupancy và điều kiện vận hành địa phương; đo/thu thập capacity hạ tầng. Có thể dùng kịch bản giả lập hợp lý trong cuộc thi, nhưng phải giữ nhãn và trình bày các kết luận nhạy với giả định. Chuẩn hóa hệ số chưa tạo ra xác thực ngoài thực địa cho mô hình.
+# Bổ sung trước khi nộp — 14/10/2026
+
+Catalog QCVN máy đọc nằm ở [vietnam_catalog.json](../backend/app/services/simulation/planning/vietnam_catalog.json). Nó chứa chỉ tiêu tối thiểu nước sinh hoạt đô thị, chỗ/đất học theo cấp và bảng mật độ nhóm chung cư có nội suy. Bật `planning_catalog: qcvn_urban_2021` để có `vietnam_planning_requirements` trong mỗi state.
+
+Chỉ tiêu quy hoạch không được âm thầm thay thế consumption forecast. Hệ số vận hành của run vẫn giữ source/kind/profile của nó; capacity chưa khảo sát vẫn unknown hoặc synthetic có nhãn. Bán kính dịch vụ 500 m tách khỏi walk-network; không coi mọi trường là cùng cấp và không mặc định THCS 1.000 m. [Phạm vi và contract bàn giao](simulation-submission-handoff.md).

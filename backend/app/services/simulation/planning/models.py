@@ -123,6 +123,7 @@ class ResidentTransfer(StrictModel):
 
 
 class SchoolFacility(StrictModel):
+    education_level: Literal["unknown", "kindergarten", "primary", "lower_secondary"] = "unknown"
     id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,39}$")
     location: tuple[float, float]
     capacity_places: int | None = Field(default=None, ge=0, le=100000)
@@ -270,6 +271,8 @@ class TrafficPrior(StrictModel):
 
 
 class PlanningStudy(StrictModel):
+    planning_catalog: Literal["none", "qcvn_urban_2021"] = "none"
+    system_parcel_groups: dict[str, list[str]] = Field(default_factory=dict, max_length=6)
     schema_version: Literal[1] = 1
     title: str = Field(min_length=1, max_length=160)
     mode: Literal["site_selection", "cumulative"]
@@ -305,7 +308,13 @@ class PlanningStudy(StrictModel):
     def coherent_study(self):
         if self.data_mode == "demo_system" and not self.system_snapshot_id:
             raise ValueError("Demo system study requires an installed snapshot ID")
-        if self.data_mode == "synthetic" and (self.system_snapshot_id or self.system_parcel_bindings):
+        if self.system_parcel_groups:
+            if self.system_parcel_bindings or any(not values or len(values) != len(set(values)) for values in self.system_parcel_groups.values()):
+                raise ValueError("Use either individual bindings or unique nonempty parcel groups")
+            flat = [key for values in self.system_parcel_groups.values() for key in values]
+            if len(flat) != len(set(flat)) or len(flat) > 6:
+                raise ValueError("Grouped projects require at most six disjoint source parcels")
+        if self.data_mode == "synthetic" and (self.system_snapshot_id or self.system_parcel_bindings or self.system_parcel_groups):
             raise ValueError("System snapshot references require demo_system mode")
         if self.traffic_network_mode == "osm_snapshot" and self.data_mode != "demo_system":
             raise ValueError("OSM planning network requires an installed demo system snapshot")

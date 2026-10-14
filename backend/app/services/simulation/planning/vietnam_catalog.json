@@ -1,0 +1,36 @@
+{
+  "id": "qcvn-urban-2021-v1",
+  "reference": "QCVN 01:2021/BXD",
+  "source_url": "https://tailieuxaydung.quangngai.gov.vn/vi/phap-luat/thong-tu/01-2021-tt-bxd",
+  "source_pdf": "https://banqlkcn.hungyen.gov.vn/portal/VanBan/2021-06/f944af1a0d790c6d01-2021-tt-bxd-quy-chuan-ky-thuat-quoc-gia-ve-quy-hoach-xay-dung.pdf",
+  "reviewed_on": "2026-10-14",
+  "scope": "Urban residential planning screening; minimum requirements, not measured demand or approval",
+  "water": {
+    "clause": "2.10.2",
+    "domestic_min_l_person_day": 80,
+    "park_irrigation_min_l_m2_day": 3,
+    "note": "80 is the inner-urban domestic minimum; actual demand requires local time-series and urban-class/context. Park/flower-garden rate is not automatically applicable to every private green surface. Other city-wide water categories, losses and firefighting are not included in this project check."
+  },
+  "schools": {
+    "clause": "2.3.3, Table 2.4",
+    "service_radius_m": 500,
+    "exception_radius_m": 1000,
+    "exception": "Complex terrain and low population density; not a universal lower-secondary radius",
+    "levels": {
+      "kindergarten": {"required_places_per_1000_residents": 50, "min_land_m2_per_place": 12},
+      "primary": {"required_places_per_1000_residents": 65, "min_land_m2_per_place": 10},
+      "lower_secondary": {"required_places_per_1000_residents": 55, "min_land_m2_per_place": 10}
+    },
+    "note": "Minimum planning provision, not a forecast of actual enrollment. Service radius is assessed separately from walk-network distance. School classification and remaining places are not inferred from OSM amenity alone."
+  },
+  "apartment_density": {
+    "clause": "Table 2.9 and notes in 2.6.3",
+    "area_m2": [3000, 10000, 18000, 35000],
+    "height_m": [16, 19, 22, 25, 28, 31, 34, 37, 40, 43, 46],
+    "percent": [[75,65,63,60],[75,60,58,55],[75,57,55,52],[75,53,51,48],[75,50,48,45],[75,48,46,43],[75,46,44,41],[75,44,42,39],[75,43,41,38],[75,42,40,37],[75,41,39,36]],
+    "above_46_percent": [75,40,38,35],
+    "above_46_max_far": 13,
+    "note": "Apartment-group screening only. Interpolation uses adjacent area/height values. Mixed heights, podium/tower groups and non-residential developments require a separate assessment; no automatic compliance pass."
+  },
+  "related_standards": [{"id": "TCVN 13606:2023", "source_url": "https://tieuchuan.vsqi.gov.vn/tieuchuan/view?sohieu=TCVN+13606%3A2023", "use": "Water-network design reference; no unverified numeric values copied into this catalog"}]
+}

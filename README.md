@@ -30,6 +30,27 @@ Ngoài chín nhóm trên, demo còn có:
 - **Độ nhạy:** thay giả định đầu vào để xem kết luận có đổi; native chạy nhiều seed — các lượt có ngẫu nhiên khác nhau.
 - **Lưu và mở lại:** giữ đầu vào, kết quả, nguồn; theo dõi/hủy/chạy tiếp job và tải artifact.
 - **Counting:** pipeline riêng dùng YOLO/tracking để đếm xe video, tạo tham chiếu cho luồng nền. Không phải camera trực tiếp của toàn thành phố.
+- **Gộp đất cho một building plan:** chọn các thửa chung cạnh, gộp thành một project và nhập tổng căn/cư dân/sàn một lần. Có kiểm tra ranh, nguồn từng thửa và baseline không đếm trùng.
+- **Đối chiếu QCVN đô thị 2021:** tính chỉ tiêu nước sinh hoạt tối thiểu, chỗ/đất học theo từng cấp, bán kính dịch vụ và mật độ nhóm chung cư. Đây là yêu cầu bố trí tham chiếu, tách khỏi consumption forecast và capacity thực tế.
+
+### Hai nâng cấp trước khi nộp — dùng như thế nào?
+
+**Gộp parcel:** nạp snapshot, chọn hai hoặc nhiều thửa liền kề rồi bật **Gộp các parcel đang chọn thành một khu dự án**. Nhập 20 căn, 60 cư dân, 1.600 m² sàn nghĩa là tổng của **một project**, không nhân theo số thửa. Building phải nằm trong union; các thửa rời nhau, chỉ chạm góc hoặc chồng lấn bị từ chối. Gộp geometry không thay quyền sử dụng đất hoặc nhãn quy hoạch. Chưa tính GPMB khi thiếu giá áp dụng và đơn giá tài sản/phá dỡ.
+
+**QCVN:** bật **Kèm đối chiếu QCVN đô thị 2021**, nạp lại và chạy một revision mới. Kết quả có panel **Chỉ tiêu tối thiểu theo QCVN — tách khỏi nhu cầu vận hành**:
+
+| Đối chiếu | Cách tính / phạm vi |
+|---|---|
+| Nước sinh hoạt nội thị tối thiểu | Dân số đủ căn cứ × 80 L/người/ngày / 1.000, theo mục 2.10.2; không phải tổng mọi thành phần cấp nước hoặc mức tiêu thụ thực |
+| Chỗ học tối thiểu | Mầm non/tiểu học/THCS: 50/65/55 chỗ trên 1.000 dân, làm tròn lên; đất theo 12/10/10 m²/chỗ, bảng 2.4 |
+| Bán kính dịch vụ | 500 m trong profile này; không mặc định THCS 1.000 m. Khoảng thẳng tâm khu đất tới trường có cấp xác định khác với khoảng đi bộ trên mạng đường |
+| Mật độ chung cư | Nội suy bảng 2.9 theo diện tích đất và chiều cao; hơn 46 m xét thêm FAR 13. Công trình hỗn hợp chiều cao/công năng hoặc đế-tháp cần đánh giá riêng |
+
+Catalog có số phiên bản, hash, điều khoản, nguồn và phạm vi. Trường OSM không rõ cấp không được tự coi là tiểu học/THCS. Thiếu occupancy thì không biến requirement thành 0. Capacity giả lập vẫn ghi giả lập; kết quả trong ngưỡng tham chiếu không xác nhận được phép xây.
+
+Mô hình **nhu cầu vận hành** bên dưới vẫn dùng hệ số theo công năng/profile của run (ví dụ nhà ở base 120 L/người/ngày). Không hạ số dự báo xuống 80 L rồi gọi đó là chính xác hơn: 80 là mức tối thiểu trong quy hoạch. Xem [contract API và hướng dẫn bàn giao frontend](docs/simulation-submission-handoff.md) và [catalog máy đọc](backend/app/services/simulation/planning/vietnam_catalog.json).
+
+Kiểm thử nâng cấp 14/10: **209/209 test simulation/counting**, case gộp hai parcel thật chạy Screening và SUMO/SWMM OSM với ba seed, **3 nhóm UI đạt**. [Báo cáo và case mở lại local](docs/simulation-submission-test-report.md). Chứng cứ kiểm thử không đồng nghĩa dữ liệu giả lập đã được hiệu chỉnh thực địa.
 
 ### Dữ liệu nào thật, dữ liệu nào giả lập?
 
@@ -122,7 +143,7 @@ Nếu kết quả ghi **Chưa biết**, đó là chưa đủ đầu vào để k
 
 - **Đã có:** demo độc lập, model, lưu job/run, so ứng viên, cộng dồn, giai đoạn, độ nhạy và kết quả có nguồn/layers.
 - **Chưa nối vào React map của main:** cần frontend gọi API và adapter lấy đất/dữ liệu nền đúng khu được chọn. Không cần xây lại phần model đã làm. [Đánh giá nối main](docs/simulation-main-integration-review.md).
-- **Chưa có một building trải trên nhiều parcel:** chọn nhiều parcel hiện tạo nhiều project riêng; 20 căn là 20 căn mỗi project. Cần gộp khu đất và một plan chung.
+- **Đã có một building trên nhiều parcel chung cạnh:** bật gộp để tạo một project. Khi không bật gộp, chọn nhiều parcel vẫn tạo project riêng và quy mô nhập áp dụng cho từng project. Chưa có chuẩn bị live mọi parcel/zoning revision từ main; demo dùng snapshot đã cài.
 - **Chưa có:** occupancy/capacity khảo sát đầy đủ, OD và tín hiệu hiệu chỉnh, mạng cống thực, flood depth 2D/thermal model và AI giải thích (đang hoãn).
 
 Kiểm thử lần bổ sung nền/capacity: **27/27 backend**, hai job độ nhạy Screening/native và **4 nhóm UI** đạt. Đó là kiểm chứng tính toán và luồng demo, không chứng minh đầu vào giả lập đúng thực địa. [Báo cáo test](docs/simulation-capacity-test-report.md), [chi tiết hệ số nền/độ nhạy](docs/simulation-capacity-sensitivity.md).

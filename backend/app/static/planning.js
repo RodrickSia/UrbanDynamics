@@ -127,8 +127,24 @@
     for(const [label,a,b,unit] of rows){const tr=document.createElement('tr');for(const value of [label,number(a),number(b),unit]){const td=document.createElement('td');td.textContent=value;tr.append(td);}body.append(tr);}
     const tr=document.createElement('tr');for(const text of ['Bảo toàn số xe',before?.count_balanced==null?'Chưa biết':before.count_balanced?'Đạt':'Không đạt',after.count_balanced?'Đạt':'Không đạt','']){const td=document.createElement('td');td.textContent=text;tr.append(td);}body.append(tr);
   }
+  function renderVietnamRequirements(option) {
+    const before=result.baseline.vietnam_planning_requirements,after=option.state.vietnam_planning_requirements;
+    $('vietnam-requirements').hidden=!after;if(!after)return;
+    const names={kindergarten:'Mầm non',primary:'Tiểu học',lower_secondary:'THCS'};
+    const statuses={within_reference_limit:'Trong ngưỡng tham chiếu',exceeds_reference_limit:'Vượt ngưỡng tham chiếu',requires_separate_assessment:'Cần đánh giá riêng',unknown_school_level_or_inventory:'Chưa đủ dữ liệu cấp trường',outside_reference_radius:'Ngoài bán kính tham chiếu',within_reference_radius:'Trong bán kính tham chiếu'};
+    $('vietnam-note').textContent=`QCVN 01:2021/BXD: sinh hoạt đô thị tối thiểu ${after.water_minimum_l_person_day} L/người/ngày; đây là mức bố trí tối thiểu, không phải số đo hoặc dự báo tiêu thụ. Nước vận hành vẫn tính trong bảng chính. Bán kính dịch vụ 500 m tách khỏi giới hạn đi bộ đang khai báo. Năng lực phục vụ và điều kiện pháp lý chưa được xác nhận.`;
+    const body=$('vietnam-table').tBodies[0];body.replaceChildren();
+    const rows=[['Nước sinh hoạt tối thiểu',before?.water_domestic_minimum_m3_day,after.water_domestic_minimum_m3_day,'m³/ngày; chỉ sinh hoạt, chưa gồm các nhóm nước khác']];
+    for(const level of after.school_provision){const old=before?.school_provision.find(x=>x.level===level.level);rows.push([`Chỗ ${names[level.level]} cần bố trí tối thiểu`,old?.required_places,level.required_places,`chỗ; ${level.places_per_1000_residents}/1.000 dân`]);rows.push([`Đất ${names[level.level]} tối thiểu`,old?.minimum_land_m2,level.minimum_land_m2,'m²; theo số chỗ tối thiểu']);}
+    for(const row of rows){const tr=document.createElement('tr');row.forEach((v,i)=>{const td=document.createElement('td');td.textContent=i===1||i===2?number(v):v;tr.append(td);});body.append(tr);}
+    const detail=$('vietnam-density');detail.replaceChildren();
+    for(const row of after.density_checks){const p=document.createElement('p');p.textContent=`${row.project_id} · mật độ đề xuất ${number(row.proposed_percent)}% / tham chiếu tối đa ${number(row.maximum_percent)}%: ${statuses[row.status]||row.status}. Giả định nhóm chung cư; không xác nhận được phép xây.`;if(row.status==='exceeds_reference_limit')p.className='bad';detail.append(p);}
+    for(const row of after.school_radius_checks){const p=document.createElement('p');p.textContent=`${row.project_id} · ${names[row.level]}: khoảng thẳng từ tâm khu đất ${number(row.straight_line_distance_m)} m / ${row.service_radius_m} m — ${statuses[row.status]||row.status}. Trường chưa rõ cấp không được tự phân loại.`;detail.append(p);}
+    const source=document.createElement('a');source.href=after.source_url;source.target='_blank';source.rel='noopener noreferrer';source.textContent='Nguồn QCVN và phạm vi áp dụng';detail.append(source);
+  }
   function render() {
     const option=selected();if(!option)return;
+    renderVietnamRequirements(option);
     function choices(id, items){const select=$(id),previous=select.value;select.replaceChildren(...items.map(([value,label])=>new Option(label,String(value))));if(items.some(([value])=>String(value)===previous))select.value=previous;}
     choices('traffic-seed',[...new Set((option.state.traffic?.runs||[]).filter(r=>r.hour_local===Number($('traffic-hour').value)).map(r=>r.seed))].map(seed=>[seed,String(seed)]));
     const minutes=option.state.drainage?.catchments[0]?.timeseries.minute||[];
@@ -279,10 +295,12 @@
     try{
       const ids=[...$('system-parcels').selectedOptions].map(o=>o.value);if(!ids.length||ids.length>6)throw new Error('Chọn từ 1 đến 6 parcel.');
       // Send explicit assumptions separately; real-source mode remains the default.
-      const demoOptions={background_mode:$('system-background').value,sensitivity:$('system-sensitivity').checked,sensitivity_engine:$('system-sensitivity-engine').value};
+      const merged=$('system-merge-parcels').checked;
+      const demoOptions={background_mode:$('system-background').value,sensitivity:$('system-sensitivity').checked,sensitivity_engine:$('system-sensitivity-engine').value,planning_catalog:$('system-vietnam-catalog').checked?'qcvn_urban_2021':'none',parcel_groups:merged?[ids]:[]};
+      if(merged&&systemScenarios.length)throw new Error('Bỏ các nhóm xây đồng thời trước khi gộp thành một project.');
       const equal=$('system-equal').checked&&$('system-mode').value==='site_selection';
-      const prepared=await api('/demo/system/prepare',{...demoOptions,snapshot_id:$('system-snapshot').value,parcel_ids:ids,mode:$('system-mode').value,scenario_parcels:$('system-mode').value==='cumulative'?systemScenarios:[],traffic_network_mode:$('system-osm').checked?'osm_snapshot':'synthetic_corridor',counting_reference_id:$('system-counting').value||null,traffic_peak_vehicles_hour:$('system-traffic-peak').value.trim()===''?null:Number($('system-traffic-peak').value),equal_program:equal,housing_units:Number($('system-units').value),residents:Number($('system-residents').value),floors:Number($('system-floors').value),floor_area_m2:Number($('system-floor-area').value),programs:equal?{}:Object.fromEntries(ids.map(id=>[id,systemPrograms.get(id)]))});
-      invalidate();$('input').value=JSON.stringify(prepared.study,null,2);$('study-mode').value=prepared.study.mode==='cumulative'?'cumulative':ids.length===1?'single_site':'site_selection';$('preset-description').textContent=demoOptions.background_mode==='sourced'?'Parcel thật; dữ liệu chưa có được giữ unknown.':'Parcel thật + NỀN/CAPACITY GIẢ LẬP v1. Các ngưỡng không phải khảo sát thực tế.';status('Bước 3: kiểm tra đầu vào và số lần chạy dự kiến. Sau đó chạy Screening trước, hoặc chọn Độ nhạy.');
+      const prepared=await api('/demo/system/prepare',{...demoOptions,snapshot_id:$('system-snapshot').value,parcel_ids:ids,mode:$('system-mode').value,scenario_parcels:$('system-mode').value==='cumulative'?systemScenarios:[],traffic_network_mode:$('system-osm').checked?'osm_snapshot':'synthetic_corridor',counting_reference_id:$('system-counting').value||null,traffic_peak_vehicles_hour:$('system-traffic-peak').value.trim()===''?null:Number($('system-traffic-peak').value),equal_program:equal,housing_units:Number($('system-units').value),residents:Number($('system-residents').value),floors:Number($('system-floors').value),floor_area_m2:Number($('system-floor-area').value),programs:equal||merged?{}:Object.fromEntries(ids.map(id=>[id,systemPrograms.get(id)]))});
+      invalidate();$('input').value=JSON.stringify(prepared.study,null,2);$('study-mode').value=prepared.study.mode==='cumulative'?'cumulative':prepared.study.projects.length===1?'single_site':'site_selection';$('preset-description').textContent=(merged?`Đã gộp ${ids.length} parcel thành một project; quy mô nhập là tổng cả nhóm. `:'')+(demoOptions.background_mode==='sourced'?'Parcel thật; dữ liệu chưa có được giữ unknown.':'Parcel thật + NỀN/CAPACITY GIẢ LẬP v1. Các ngưỡng không phải khảo sát thực tế.');status('Bước 3: kiểm tra đầu vào và số lần chạy dự kiến. Sau đó chạy Screening trước, hoặc chọn Độ nhạy.');
     }catch(error){status(error.message,true);}
   };
   api('/demo/system/snapshots').then(value=>{
