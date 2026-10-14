@@ -32,3 +32,13 @@ From `etl/`, run `python -m src.main run land_price --full-city --automatic-refe
 For scheduled refreshes set `LAND_PRICE_AUTOMATIC_REFERENCE=true` on the Khôi
 ETL service. This reuses cached sources; source refresh is an explicit CLI task.
 Keep the verified segment snapshot when refreshing to preserve earlier matches.
+
+## Persistent deployment data
+
+Set `URBANDYNAMICS_DATA_DIR` to an absolute directory outside the Git checkout
+on deployed hosts. Backend and ETL share this directory.
+The local default remains `./etl/data`. Copy existing data and the verified
+land-price snapshot before switching the mount; retain a backup.
+This protects raw sources, row matches and PDF files from checkout cleanup.
+Keep deployment credentials and the Goong build key in an environment file
+outside the checkout and pass it using `docker compose --env-file PATH`.
