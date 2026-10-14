@@ -64,6 +64,13 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
         filter: [
           'any',
           ['==', ['get', 'geometry_reviewed'], true],
+          ['==', ['get', 'match_confidence'], 'spatially_checked'],
+          [
+            'all',
+            ['==', ['get', 'publication_match_mode'], 'automatic'],
+            ['==', ['get', 'match_confidence'], 'automatic_reference'],
+            ['>', ['to-number', ['get', 'residential_vnd_m2'], 0], 0],
+          ],
           [
             'all',
             ['==', ['get', 'publication_match_mode'], 'automatic'],

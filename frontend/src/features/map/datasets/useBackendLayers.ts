@@ -78,6 +78,9 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
                     f.properties.geometry_reviewed === true ||
                     f.properties.match_confidence === 'spatially_checked' ||
                     (f.properties.publication_match_mode === 'automatic' &&
+                      f.properties.match_confidence === 'automatic_reference' &&
+                      Number(f.properties.residential_vnd_m2) > 0) ||
+                    (f.properties.publication_match_mode === 'automatic' &&
                       f.properties.geometry_coverage === 'whole_named_road_proxy'),
                 ),
               },
