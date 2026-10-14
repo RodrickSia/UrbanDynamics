@@ -109,6 +109,8 @@ class Service:
         return flood_satellite(boundary=str(self.settings.boundary),limit=100)
 
     def job_land_price(self):
+        if os.getenv('LAND_PRICE_AUTOMATIC_REFERENCE', '').lower() in ('1', 'true', 'yes'):
+            return land_price(full_city=True, automatic_reference=True, refresh_source=False)
         path = data_dir()/'review/land_price_reviewed.geojson'
         if not path.exists():
             path = data_dir()/'review/land_price_auto_segments.geojson'

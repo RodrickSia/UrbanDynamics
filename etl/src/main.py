@@ -17,18 +17,64 @@ PIPELINES = (
     "buildings_footprint",
     "buildings_footprint_gba",
     "model_generation",
+    "osm_sumo_hcmc",
+    "traffic_history",
+    "road_data_tomtom",
 )
 STAGES = ("all", "extract", "transform", "load")
 
 
 def _run(pipeline_name: str, stage: str, options) -> None:
+    if pipeline_name == "osm_sumo_hcmc":
+        from src.pipelines.osm_sumo_hcmc import extract, load, transform
+
+        if stage in ("all", "extract"):
+            extract.run(refresh=options.refresh)
+        if stage in ("all", "transform"):
+            transform.run()
+        if stage in ("all", "load"):
+            load.run()
+        return
+
+    if pipeline_name == "traffic_history":
+        from src.pipelines.traffic_history import extract, load, transform
+        from src.pipelines.traffic_history.config import config
+
+        if stage in ("all", "extract"):
+            source = extract.run()
+        else:
+            source = config.source_file
+        if stage in ("all", "transform"):
+            transformed = transform.run(source)
+        else:
+            transformed = config.transformed_file
+        if stage in ("all", "load"):
+            load.run(transformed)
+        return
+
+    if pipeline_name == "road_data_tomtom":
+        from src.pipelines.road_data_tomtom import extract, load, transform
+        from src.pipelines.road_data_tomtom.config import config
+
+        if stage in ("all", "extract"):
+            source = extract.run()
+        else:
+            source = config.source_file
+        if stage in ("all", "transform"):
+            transformed = transform.run(source)
+        else:
+            transformed = config.transformed_file
+        if stage in ("all", "load"):
+            load.run(transformed)
+        return
+
     if stage == "all":
         option_names = {
             "rainwater": ("boundary", "refresh_history"),
             "flood_history": ("source", "boundary"),
             "flood_satellite": ("boundary", "catalog_only", "limit"),
             "flood_risk": ("weather_input", "history_input"),
-            "land_price": ("source", "segments", "full_city"),
+            "land_price": ("source", "segments", "full_city", "automatic_reference"),
             "buildings_footprint": ("source", "refresh"),
             "buildings_footprint_gba": ("source", "refresh"),
         }.get(pipeline_name, ())
@@ -171,6 +217,8 @@ def main() -> None:
     )
     run_parser.add_argument("--refresh-history", action="store_true")
     run_parser.add_argument("--full-city", action="store_true")
+    run_parser.add_argument("--automatic-reference", action="store_true",
+                            help="Automatically allocate table reference prices to all cached city roads")
 
     argv = sys.argv[1:]
     if argv and argv[0] in PIPELINES:
