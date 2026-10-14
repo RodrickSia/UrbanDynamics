@@ -6,13 +6,19 @@ export type VectorDataset =
   | 'flood_risk'
   | 'land_price'
   | 'parcels'
-  | 'synthetic_buildings';
+  | 'synthetic_buildings'
+  | 'sumo_network'
+  | 'traffic';
 export type Dataset = VectorDataset | 'population';
 export type Palette = 'pseudocolor' | 'greyscale' | 'fire';
 export type Bounds = [number, number, number, number];
 export interface DateQuery {
   start?: string;
   end?: string;
+}
+export interface TrafficPeriod {
+  weekday: number;
+  period: string;
 }
 export interface CatalogLayer {
   id: string;
@@ -24,6 +30,14 @@ export interface FeatureSummary {
   type: 'FeatureCollection';
   features: Array<{ properties: Record<string, unknown> }>;
   metadata: Record<string, unknown>;
+}
+export async function getTrafficCatalog(signal?: AbortSignal) {
+  const result = await requestJson('/api/v1/traffic/catalog', signal);
+  requireShape(typeof result.available === 'boolean' && typeof result.network_available === 'boolean');
+  return {
+    available: result.available === true,
+    networkAvailable: result.network_available === true,
+  };
 }
 export class ApiError extends Error {
   constructor(public readonly status: number) {
@@ -101,10 +115,15 @@ export function tileUrl(
   dates: DateQuery = {},
   year = 2024,
   palette: Palette = 'pseudocolor',
+  trafficPeriod?: TrafficPeriod,
 ) {
   const path =
     dataset === 'population'
       ? `/api/v1/population/${year}/tiles/{z}/{x}/{y}.png${queryString({ palette, render: '2' })}`
+      : dataset === 'traffic'
+        ? `/api/v1/traffic/prediction/tiles/{z}/{x}/{y}.pbf${queryString(trafficPeriod ? { weekday: String(trafficPeriod.weekday), period: trafficPeriod.period } : {})}`
+      : dataset === 'sumo_network'
+        ? `/api/v1/traffic/network/tiles/{z}/{x}/{y}.pbf`
       : `/api/v1/layers/${dataset}/tiles/{z}/{x}/{y}.pbf${queryString(
           dataset === 'land_price' || dataset === 'parcels'
             ? (dataset === 'parcels' ? { schema: '2' } : {})
@@ -117,13 +136,18 @@ export async function getFeatures(
   bounds?: Bounds,
   dates: DateQuery = {},
   signal?: AbortSignal,
+  trafficPeriod?: TrafficPeriod,
 ): Promise<FeatureSummary> {
   const result = await requestJson(
-    `/api/v1/layers/${dataset}/features${queryString({
+    dataset === 'sumo_network'
+      ? `/api/v1/traffic/network${queryString({ bbox: bounds?.join(','), limit: '1' })}`
+      : dataset === 'traffic'
+      ? `/api/v1/traffic/prediction${queryString({ ...(trafficPeriod ? { weekday: String(trafficPeriod.weekday), period: trafficPeriod.period } : {}), bbox: bounds?.join(','), limit: '1' })}`
+      : `/api/v1/layers/${dataset}/features${queryString({
       ...(dataset === 'land_price' || dataset === 'parcels' ? {} : dates),
       bbox: bounds?.join(','),
       limit: '1',
-    })}`,
+      })}`,
     signal,
   );
   requireShape(result.type === 'FeatureCollection' && Array.isArray(result.features));

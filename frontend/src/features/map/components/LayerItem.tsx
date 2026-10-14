@@ -22,6 +22,8 @@ const ICONS: Partial<Record<UrbanLayerDefinition['id'], LucideIcon>> = {
   'flood-satellite': Satellite,
   flood: CloudRain,
   'land-price': Route,
+  traffic: Route,
+  'sumo-network': Route,
   parcels: MapPinned,
   poi: MapPin,
   'buildings-3d': Box,

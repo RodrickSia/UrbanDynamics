@@ -7,6 +7,8 @@ import './data.css';
 
 export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLayers }) {
   const report = data.reports[id];
+  const [trafficWeekday, setTrafficWeekday] = useState(data.trafficSchedule.weekday);
+  const [trafficPeriod, setTrafficPeriod] = useState(data.trafficSchedule.period);
   const StatusIcon =
     report?.status === 'error'
       ? CircleAlert
@@ -121,6 +123,65 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           boundaries, and heights are sampled from observed GBA residential buildings; they are
           not surveyed building outlines or heights.
         </DatasetNote>
+      )}
+      {id === 'traffic' && (
+        <>
+          <form
+            className="dataset-dates"
+            onSubmit={(event) => {
+              event.preventDefault();
+              data.setTrafficSchedule({ weekday: trafficWeekday, period: trafficPeriod });
+            }}
+          >
+            <strong>Typical conditions <small>30-minute historical slot</small></strong>
+            <div className="dataset-fields">
+              <label>
+                Day of week
+                <select
+                  aria-label="Traffic prediction day of week"
+                  value={trafficWeekday}
+                  onChange={(event) => setTrafficWeekday(Number(event.target.value))}
+                >
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => (
+                    <option key={day} value={index + 1}>{day}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Time of day (HCMC)
+                <input
+                  type="time"
+                  step={1800}
+                  aria-label="Traffic prediction time of day"
+                  value={trafficPeriod}
+                  onChange={(event) => setTrafficPeriod(event.target.value)}
+                />
+              </label>
+            </div>
+            <button type="submit">Apply</button>
+          </form>
+          <div className="dataset-legend">
+            {[
+              ['A', '#168a58'], ['B', '#71ad45'], ['C', '#d2b83f'],
+              ['D', '#e58b32'], ['E', '#d9583c'], ['F', '#8c3047'],
+            ].map(([grade, color]) => <Legend key={grade} color={color} label={grade} />)}
+          </div>
+          <DatasetNote>
+            Historical typical level for this weekday and half-hour, computed from matched
+            traffic observations. Not live traffic, a validated future forecast, or a SUMO
+            vehicle-count simulation. Confidence reflects historical sample count and agreement.
+          </DatasetNote>
+        </>
+      )}
+      {id === 'sumo-network' && (
+        <>
+          <Legend color="#647987" label="SUMO network edge" />
+          <DatasetNote>
+            Roads come from the loaded HCMC SUMO network. This layer shows network geometry and
+            attributes only; it is not a SUMO run or a congestion prediction. Turn on Traffic to
+            view the separate historical LOS estimate for matched roads.
+          </DatasetNote>
+        </>
       )}
       {data.catalog[id]?.stale && (
         <small className="dataset-warning">Source expired · historical values</small>

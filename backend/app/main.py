@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.repository import readiness
 from app.routers import parcels
 from app.routers import zoning
-from app.routers import floods, land_prices, layers, population, scenarios, urban, building_scenarios, weather, integrated_scenarios
+from app.routers import floods, land_prices, layers, population, scenarios, urban, building_scenarios, weather, integrated_scenarios, traffic
 from app.routers import planning_scenarios, planning_system_demo, area_indicators
 
 app = FastAPI(
@@ -52,6 +52,7 @@ for router in (
     planning_scenarios.router,
     planning_scenarios.preview_router,
     planning_system_demo.router,
+    traffic.router,
 ):
     app.include_router(router)
 
@@ -88,5 +89,7 @@ def api_index():
             "urban_land_price": "/api/v1/urban/land-price",
             "floods": "/api/v1/floods/{history,satellite,risk}",
             "land_prices": "/api/v1/land-prices",
+            "traffic_prediction": "/api/v1/traffic/prediction?weekday=1&period=08:00",
+            "sumo_network": "/api/v1/traffic/network",
         },
     }

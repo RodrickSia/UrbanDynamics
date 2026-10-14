@@ -108,7 +108,7 @@ function DatasetSource({
         const count =
           selected.dataset === 'population'
             ? await getPopulationStats(selected.year, bounds, signal)
-            : (await getFeatures(selected.dataset, bounds, selected.dates, signal)).features.length;
+            : (await getFeatures(selected.dataset, bounds, selected.dates, signal, selected.trafficPeriod)).features.length;
         if (signal.aborted) return;
         publish(
           count === 0 ? 'empty' : tileError ? 'error' : 'ready',
@@ -161,6 +161,8 @@ function DatasetSource({
           'flood',
           'flood-satellite',
           'land-price',
+          'sumo-network',
+          'traffic',
           'flood-history',
         ].map((id) => `dataset-${id}`);
         const before = map
@@ -246,6 +248,10 @@ function applyOpacity(map: MapLibreMap, selection: DataSelection, opacity: numbe
         ? 'circle'
       : selection.dataset === 'land_price'
         ? 'line'
+      : selection.dataset === 'traffic'
+        ? 'line'
+      : selection.dataset === 'sumo_network'
+        ? 'line'
         : selection.dataset === 'synthetic_buildings'
           ? 'fill-extrusion'
         : 'fill';
@@ -293,6 +299,16 @@ const FIELDS: Record<string, string> = {
   quyet_dinh: 'Decision',
   do_an: 'Plan',
   population: 'People / source cell',
+  predicted_los: 'Typical LOS (A–F)',
+  congestion_score: 'Ordinal congestion score (0–100)',
+  sample_dates: 'Historical sample days',
+  sample_rows: 'Matched observations',
+  los_mode_share: 'Share of days at modal LOS',
+  confidence: 'Historical confidence',
+  edge_id: 'SUMO edge ID',
+  road_type: 'OSM road type',
+  lane_count: 'SUMO lanes',
+  speed_limit_kmh: 'SUMO lane speed limit (km/h)',
   height_m: 'Estimated height (m)',
   floors: 'Estimated floors',
   inset_m: 'Footprint inset (m)',
