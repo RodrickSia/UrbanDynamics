@@ -8,7 +8,7 @@ from app.services import parcels
 from pydantic import ValidationError
 from shapely.errors import GEOSException
 
-from app.services.zoning import development, engine, store
+from app.services.zoning import baseline, development, engine, store
 from app.services.zoning.indicators import report
 from app.services.zoning.models import Command, PlanInput
 from app.services.zoning.simulation import SimulationInput, study_from_plan
@@ -164,6 +164,8 @@ def development_parcel(identifier: UUID, parcel_id: str, scenario_id: str):
         parcel = selected_parcel(plan, parcel_id)
         buildings = [b for b in scenario.get("buildings", []) if b["parcel_id"] == parcel_id]
         return {"parcel": parcel, "catalog": development.CATALOG,
+                "baseline": baseline.report(parcel, plan['study_area'], baseline.buildings(parcel, plan['study_area'])),
+                "zoning": baseline.zoning(plan, scenario, parcel), "scenario_kind": scenario['kind'],
                 **development.validation(plan, scenario, parcel, buildings)}
     return execute(read)
 
@@ -192,6 +194,9 @@ def simulation_study(identifier: UUID, body: SimulationInput):
     plan = execute(lambda: require_plan(identifier))
     if plan["revision"] != body.revision:
         raise HTTPException(409, "Plan changed. Reload before running simulation.")
+    if body.parcel_id:
+        parcel = execute(lambda: selected_parcel(plan, body.parcel_id))
+        plan.setdefault('parcels', {})[parcel['id']] = parcel
     study = execute(lambda: study_from_plan(plan, body))
     ready = execute(lambda: preflight(study))
     try:

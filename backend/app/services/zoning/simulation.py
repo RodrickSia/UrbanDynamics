@@ -7,6 +7,7 @@ from pydantic import Field
 from shapely.geometry import mapping, shape
 
 from .models import Input
+from . import baseline
 from .development import floor_stack
 from ..simulation.engine import polygon_and_area
 from ..simulation.models import PolygonInput
@@ -16,6 +17,7 @@ from ..simulation.planning.models import PlanningStudy
 class SimulationInput(Input):
     revision: int = Field(ge=1)
     scenario_id: UUID
+    parcel_id: str | None = Field(default=None, pattern=r'^[1-9][0-9]{0,18}$')
     residential_m2_per_person: float = Field(default=35, ge=5, le=500)
     work_m2_per_staff: float = Field(default=20, ge=5, le=500)
     visitors_per_100m2_day: float = Field(default=10, ge=0, le=1000)
@@ -56,39 +58,56 @@ def study_from_plan(plan, settings):
     scenario = next((s for s in plan["scenarios"] if s["id"] == str(settings.scenario_id)), None)
     if scenario is None:
         raise ValueError("Scenario not found")
-    if scenario["kind"] != "proposal" or not scenario.get("buildings"):
+    if scenario["kind"] != "proposal":
         raise ValueError("Save a proposed building before running a simulation")
     region = polygon(plan["study_area"], "Study area")
     grouped = defaultdict(list)
-    for building in scenario["buildings"]:
-        grouped[building["parcel_id"]].append(building)
+    for building in scenario.get("buildings", []):
+        if settings.parcel_id is None or settings.parcel_id == building['parcel_id']:
+            grouped[building["parcel_id"]].append(building)
+    if settings.parcel_id:
+        grouped.setdefault(settings.parcel_id, [])
+    if not grouped:
+        raise ValueError('Select a parcel or save a proposed building before running simulation')
     if len(grouped) > 6:
         raise ValueError("Simulation supports up to six developed parcels per scenario")
-    projects = []
-    for index, (parcel_id, buildings) in enumerate(sorted(grouped.items())):
-        if len(buildings) > 20:
-            raise ValueError("Simulation supports up to twenty buildings per developed parcel")
+    blocks, baseline_blocks = [], []
+    for parcel_id, proposals in sorted(grouped.items()):
         parcel = plan.get("parcels", {}).get(parcel_id)
         if parcel is None:
             raise ValueError("Saved parcel snapshot is unavailable")
-        clipped = mapping(shape(parcel["geometry"]).intersection(shape(plan["study_area"])))
-        site = polygon(clipped, "Parcel inside the study area")
-        site_area = polygon_and_area(site)[1]
-        blocks = [building_program(b, settings) for b in buildings]
-        roof = sum(polygon_and_area(PolygonInput(**b["footprint"]))[1] for b in blocks)
+        existing_blocks = []
+        for source in baseline.buildings(parcel, plan['study_area']) or []:
+            parts = source['geometry']['coordinates'] if source['geometry']['type'] == 'MultiPolygon' else [source['geometry']['coordinates']]
+            for coordinates in parts:
+                existing_blocks.append(building_program({**source, 'name':'Existing generated building',
+                    'geometry': {'type':'Polygon','coordinates':coordinates},
+                    'floor_height':source['height_m']/source['floors'], 'counts_gfa':True, 'counts_far':True}, settings))
+        baseline_blocks.extend(existing_blocks)
+        demolished = any(m['parcel_id'] == parcel_id for m in scenario.get('demolition_masks', []))
+        blocks.extend([building_program(b, settings) for b in proposals] if proposals else [] if demolished else existing_blocks)
+    if not blocks and not baseline_blocks:
+        raise ValueError('No building data for this scope. Draw and save a building first.')
+    if max(len(blocks), len(baseline_blocks)) > 20:
+        raise ValueError('Simulation supports twenty buildings per run. Select a smaller scope.')
+    # A whole-scenario run uses one study-area site. Separate source parcels can
+    # overlap slightly; summing them as independent projects double counts land.
+    site = polygon(mapping(shape(plan['parcels'][settings.parcel_id]['geometry']).intersection(shape(plan['study_area']))), 'Selected parcel') if settings.parcel_id else region
+    site_area = polygon_and_area(site)[1]
+    def design(buildings, green_percent):
+        roof = sum(polygon_and_area(PolygonInput(**b['footprint']))[1] for b in buildings)
         open_area = max(0, site_area-roof)
-        projects.append({"id": f"parcel_{index}", "title": f"Parcel {parcel_id}", "site": site.model_dump(),
-                         "baseline": {"paved_m2": site_area}, "baseline_kind": "estimated",
-                         "baseline_occupancy": "unknown",
-                         "baseline_source": "Unknown existing buildings and surfaces; paved geometry placeholder, not surveyed vacant land",
-                         "development": {"buildings": blocks,
-                                         "green_m2": open_area*settings.green_open_percent/100,
-                                         "paved_m2": open_area*(1-settings.green_open_percent/100)},
-                         "utility_zone_id": "unknown"})
+        return {'buildings': buildings, 'green_m2': open_area*green_percent/100,
+                'paved_m2': open_area*(1-green_percent/100)}
+    projects = [{'id':'parcel_0', 'title':f'Parcel {settings.parcel_id}' if settings.parcel_id else 'Whole scenario',
+                 'site':site.model_dump(), 'baseline':design(baseline_blocks,0), 'baseline_kind':'estimated',
+                 'baseline_occupancy':'estimated' if settings.parcel_id and baseline_blocks else 'unknown',
+                 'baseline_source':'Generated mapped buildings; assumed occupancy and surfaces; inventory may be incomplete',
+                 'development':design(blocks,settings.green_open_percent), 'utility_zone_id':'unknown'}]
     return PlanningStudy(**{
-        "title": f"{plan['name']} / {scenario['name']}"[:160], "mode": "cumulative",
+        "title": f"{plan['name']} / {scenario['name']}"[:160], "mode": "cumulative", "planning_catalog":"qcvn_urban_2021",
         "study_area": region.model_dump(), "comparison_policy": "declared_programs",
-        "source_note": f"Zoning plan {plan['id']}, revision {plan['revision']}, scenario {scenario['id']}. Saved parcel geometry and proposed buildings; assumed occupancy/surfaces, unknown baseline/capacity. Commercial uses Other coefficients. Demand includes physical floors excluded from GFA.",
+        "source_note": f"Zoning plan {plan['id']}, revision {plan['revision']}, scenario {scenario['id']}. Source parcels {sorted(grouped)}. Scope {settings.parcel_id or "study area"}. Selected saved buildings or generated current buildings; proposed design replaces the site program. Assumed occupancy/surfaces; baseline inventory and capacity may be incomplete. Commercial uses Other coefficients. Demand includes physical floors excluded from GFA.",
         "conditions": {"rainfall_mm": settings.rainfall_mm}, "background_residents": 0,
         "background_vehicles_hour": 0, "projects": projects,
         "options": [{"id": "proposal", "title": scenario["name"], "active_project_ids": [p["id"] for p in projects]}],

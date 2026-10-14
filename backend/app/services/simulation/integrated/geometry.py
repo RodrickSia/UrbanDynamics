@@ -15,9 +15,12 @@ def analyze(site_input, design):
     footprints, floor_areas, heights = [], [], []
     for building in design.buildings:
         footprint, footprint_area = polygon_and_area(building.footprint)
-        if not site.covers(footprint):
-            raise ValueError("Every building footprint must lie inside the site")
         projected = transform(forward, footprint)
+        # GEOS round trips can put a shared boundary a few nanometres outside.
+        # Bound both distance (10 micrometres) and area (one square millimetre).
+        if not site.covers(footprint) and not (metric_site.buffer(.00001).covers(projected)
+                and projected.difference(metric_site).area <= .000001):
+            raise ValueError("Every building footprint must lie inside the site")
         if any(projected.intersection(other).area > .01 for other in footprints):
             raise ValueError("Building footprints may not overlap")
         footprints.append(projected)

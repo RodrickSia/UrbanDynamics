@@ -11,6 +11,9 @@ from app.services.simulation.integrated.models import Building
 from app.services.simulation.planning import store
 from app.services.simulation.planning.jobs import process_one
 from app.services.simulation.planning.models import PlanningStudy
+from app.services.zoning import baseline
+from app.services.zoning.simulation import SimulationInput, study_from_plan
+from test_zoning import rectangle
 
 
 def freeze(client, plan, **settings):
@@ -74,6 +77,37 @@ def test_space_use_totals_are_validated():
                "space_uses": [{"use": "residential", "floor_area_m2": 100, "residents": 9}]}
     with pytest.raises(ValidationError, match="sum to the building total"):
         Building(**payload)
+
+
+def test_scope_filters_buildings_and_counts_overlapping_source_parcels_once(client, plan, parcel_source):
+    plan = command(client, plan, 'save_building', building())
+    scenario = plan['scenarios'][1]
+    second = {**deepcopy(scenario['buildings'][0]), 'id':'second', 'parcel_id':'3885882',
+              'geometry':rectangle(106.761,10.821,106.7613,10.8213)}
+    scenario['buildings'].append(second)
+    plan['parcels']['3885882'] = {**plan['parcels']['3885881'],'id':'3885882'}
+    settings = SimulationInput(revision=plan['revision'],scenario_id=scenario['id'])
+    whole = study_from_plan(plan,settings)
+    assert len(whole.projects) == 1
+    assert len(whole.projects[0].development.buildings) == 2
+    assert whole.projects[0].site.model_dump(mode='json') == plan['study_area']
+    selected = study_from_plan(plan,settings.model_copy(update={'parcel_id':'3885881'}))
+    assert len(selected.projects[0].development.buildings) == 1
+    assert selected.planning_catalog == 'qcvn_urban_2021'
+
+
+def test_selected_generated_baseline_can_run_without_new_proposal(client, plan, parcel_source, monkeypatch, tmp_path):
+    monkeypatch.setenv('PLANNING_SQLITE_PATH',str(tmp_path/'baseline.sqlite'))
+    monkeypatch.setattr(baseline,'buildings',lambda *_: [{'id':'generated', 'geometry':building()['geometry'],
+        'floors':2,'height_m':6.4,'space_use_id':'residential','source':'Generated'}])
+    response=freeze(client,plan,parcel_id='3885881')
+    assert response.status_code == 201,response.text
+    study=store.load_document(response.json()['id'],'study')['inputs']
+    assert study['projects'][0]['baseline']['buildings']
+    assert study['projects'][0]['development']['buildings']
+    assert study['projects'][0]['baseline_occupancy'] == 'estimated'
+    # Reading a source parcel for simulation must not create an editor revision.
+    assert client.get(f"/api/v1/zoning/plans/{plan['id']}").json()['revision'] == plan['revision']
 
 
 def test_excluded_gfa_keeps_physical_floor_demand(client, plan, parcel_source, tmp_path, monkeypatch):
