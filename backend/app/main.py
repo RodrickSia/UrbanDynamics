@@ -8,7 +8,7 @@ from app.repository import readiness
 from app.routers import parcels
 from app.routers import zoning
 from app.routers import floods, land_prices, layers, population, scenarios, urban, building_scenarios, weather, integrated_scenarios
-from app.routers import planning_scenarios, planning_system_demo
+from app.routers import planning_scenarios, planning_system_demo, area_indicators
 
 app = FastAPI(
     title="UrbanDynamics Data API",
@@ -37,6 +37,7 @@ async def invalid_request(_request, error):
 
 
 for router in (
+    area_indicators.router,
     zoning.router,
     parcels.router,
     layers.router,
