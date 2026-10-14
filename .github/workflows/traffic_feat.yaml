@@ -1,4 +1,4 @@
-name: Run traffic feature ETL
+name: traffic_feat — Run all three traffic pipelines
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   run:
-    name: OSM/SUMO, traffic history, and TomTom
+    name: traffic_feat — OSM/SUMO → traffic history → TomTom
     runs-on: [self-hosted, linux]
     environment: production
     env:
