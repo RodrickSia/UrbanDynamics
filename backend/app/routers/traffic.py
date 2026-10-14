@@ -52,8 +52,8 @@ def _validate_bbox(bbox: str | None) -> tuple[float, float, float, float] | None
         raise HTTPException(400, "bbox must be west,south,east,north in WGS84") from None
 
 
-def _prediction_ctes(spatial_filter: str) -> str:
-    return f"""
+def _prediction_ctes() -> str:
+    return """
         WITH period_rows AS (
             SELECT o.sumo_edge_id AS edge_id,
                    o.observed_at::date AS observed_date,
@@ -64,7 +64,6 @@ def _prediction_ctes(spatial_filter: str) -> str:
             WHERE extract(isodow FROM o.observed_at)::integer = %s
               AND (extract(hour FROM o.observed_at)::integer * 2
                    + extract(minute FROM o.observed_at)::integer / 30) = %s
-              AND {spatial_filter}
             GROUP BY o.sumo_edge_id, o.observed_at::date
         ), edge_summary AS (
             SELECT edge_id,
@@ -78,21 +77,109 @@ def _prediction_ctes(spatial_filter: str) -> str:
             GROUP BY edge_id
         ), edge_stats AS (
             SELECT s.*,
-                   count(*) FILTER (WHERE p.daily_los = s.predicted_los)::integer AS matching_dates
+                   count(*) FILTER (WHERE p.daily_los = s.predicted_los)::integer AS matching_dates,
+                   round((s.mean_los_score * 20)::numeric, 1) AS congestion_score,
+                   round((count(*) FILTER (WHERE p.daily_los = s.predicted_los)::numeric
+                          / s.sample_dates), 3) AS los_mode_share,
+                   CASE
+                     WHEN s.sample_dates >= 10
+                          AND count(*) FILTER (WHERE p.daily_los = s.predicted_los)::double precision
+                              / s.sample_dates >= 0.7 THEN 'high'
+                     WHEN s.sample_dates >= 5
+                          AND count(*) FILTER (WHERE p.daily_los = s.predicted_los)::double precision
+                              / s.sample_dates >= 0.5 THEN 'medium'
+                     ELSE 'low'
+                   END AS confidence
             FROM edge_summary AS s
             JOIN period_rows AS p USING (edge_id)
             GROUP BY s.edge_id, s.predicted_los, s.sample_dates, s.sample_rows, s.mean_los_score
+        ), road_type_fallback AS (
+            SELECT e.road_type,
+                   mode() WITHIN GROUP (ORDER BY s.predicted_los) AS predicted_los,
+                   avg(s.mean_los_score) AS mean_los_score
+            FROM edge_stats AS s
+            JOIN transport.sumo_edge AS e ON e.edge_id = s.edge_id
+            GROUP BY e.road_type
+        ), network_fallback AS (
+            SELECT mode() WITHIN GROUP (ORDER BY predicted_los) AS predicted_los,
+                   avg(mean_los_score) AS mean_los_score
+            FROM edge_stats
+        ), weekday_rows AS (
+            SELECT o.sumo_edge_id AS edge_id,
+                   o.observed_at::date AS observed_date,
+                   mode() WITHIN GROUP (ORDER BY o.los) AS daily_los,
+                   count(*)::integer AS sample_rows
+            FROM transport.traffic_observation AS o
+            JOIN transport.sumo_edge AS e ON e.edge_id = o.sumo_edge_id
+            WHERE extract(isodow FROM o.observed_at)::integer = %s
+            GROUP BY o.sumo_edge_id, o.observed_at::date
+        ), weekday_edge_stats AS (
+            SELECT edge_id,
+                   mode() WITHIN GROUP (ORDER BY daily_los) AS predicted_los,
+                   avg(CASE daily_los
+                       WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
+                       WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los_score
+            FROM weekday_rows
+            GROUP BY edge_id
+        ), weekday_road_type_fallback AS (
+            SELECT e.road_type,
+                   mode() WITHIN GROUP (ORDER BY s.predicted_los) AS predicted_los,
+                   avg(s.mean_los_score) AS mean_los_score
+            FROM weekday_edge_stats AS s
+            JOIN transport.sumo_edge AS e ON e.edge_id = s.edge_id
+            GROUP BY e.road_type
+        ), weekday_network_fallback AS (
+            SELECT mode() WITHIN GROUP (ORDER BY predicted_los) AS predicted_los,
+                   avg(mean_los_score) AS mean_los_score
+            FROM weekday_edge_stats
+        ), edge_predictions AS (
+            SELECT e.edge_id,
+                   coalesce(direct.predicted_los, nearby.predicted_los,
+                            road_type.predicted_los, network.predicted_los,
+                            weekday_road_type.predicted_los,
+                            weekday_network.predicted_los) AS predicted_los,
+                   coalesce(direct.sample_dates, 0)::integer AS sample_dates,
+                   coalesce(direct.sample_rows, 0)::integer AS sample_rows,
+                   coalesce(
+                       direct.congestion_score,
+                       round((coalesce(nearby.mean_los_score, road_type.mean_los_score,
+                                      network.mean_los_score,
+                                      weekday_road_type.mean_los_score,
+                                      weekday_network.mean_los_score) * 20)::numeric, 1)
+                   ) AS congestion_score,
+                   coalesce(direct.los_mode_share, 0)::double precision AS los_mode_share,
+                   coalesce(direct.confidence, 'low') AS confidence,
+                   CASE
+                     WHEN direct.edge_id IS NOT NULL THEN 'observed_edge'
+                     WHEN nearby.edge_id IS NOT NULL THEN 'nearby_observed_edge'
+                     WHEN road_type.predicted_los IS NOT NULL THEN 'road_type_estimate'
+                     WHEN network.predicted_los IS NOT NULL THEN 'network_estimate'
+                     WHEN weekday_road_type.predicted_los IS NOT NULL THEN 'weekday_road_type_estimate'
+                     ELSE 'weekday_network_estimate'
+                   END AS prediction_basis,
+                   round(nearby.distance_m::numeric, 1) AS inference_distance_m
+            FROM transport.sumo_edge AS e
+            LEFT JOIN edge_stats AS direct ON direct.edge_id = e.edge_id
+            LEFT JOIN LATERAL (
+                SELECT source_stats.edge_id,
+                       source_stats.predicted_los,
+                       source_stats.mean_los_score,
+                       ST_Distance(e.geom::geography, source.geom::geography) AS distance_m
+                FROM transport.sumo_edge AS source
+                JOIN edge_stats AS source_stats ON source_stats.edge_id = source.edge_id
+                WHERE direct.edge_id IS NULL
+                  AND source.geom && ST_Expand(e.geom, 0.02)
+                  AND ST_DWithin(e.geom::geography, source.geom::geography, 1500)
+                ORDER BY (source.road_type = e.road_type) DESC,
+                         e.geom <-> source.geom
+                LIMIT 1
+            ) AS nearby ON TRUE
+            LEFT JOIN road_type_fallback AS road_type ON road_type.road_type = e.road_type
+            CROSS JOIN network_fallback AS network
+            LEFT JOIN weekday_road_type_fallback AS weekday_road_type
+              ON weekday_road_type.road_type = e.road_type
+            CROSS JOIN weekday_network_fallback AS weekday_network
         )
-    """
-
-
-def _confidence_sql() -> str:
-    return """
-        CASE
-          WHEN sample_dates >= 10 AND matching_dates::double precision / sample_dates >= 0.7 THEN 'high'
-          WHEN sample_dates >= 5 AND matching_dates::double precision / sample_dates >= 0.5 THEN 'medium'
-          ELSE 'low'
-        END
     """
 
 
@@ -220,25 +307,26 @@ def traffic_prediction(
     try:
         with connect_to_warehouse() as connection:
             rows = connection.execute(
-                _prediction_ctes(spatial_filter) + """
+                _prediction_ctes() + f"""
                 SELECT e.edge_id, e.name, e.road_type, ST_AsGeoJSON(e.geom),
-                       s.predicted_los, s.sample_dates, s.sample_rows,
-                       round((s.mean_los_score * 20)::numeric, 1),
-                       round((s.matching_dates::numeric / s.sample_dates), 3),
-                       """ + _confidence_sql() + """
-                FROM edge_stats AS s
-                JOIN transport.sumo_edge AS e ON e.edge_id = s.edge_id
-                ORDER BY s.sample_dates DESC, e.edge_id
+                       p.predicted_los, p.sample_dates, p.sample_rows,
+                       p.congestion_score, p.los_mode_share, p.confidence,
+                       p.prediction_basis, p.inference_distance_m
+                FROM edge_predictions AS p
+                JOIN transport.sumo_edge AS e ON e.edge_id = p.edge_id
+                WHERE {spatial_filter}
+                ORDER BY p.sample_dates DESC, e.edge_id
                 LIMIT %s
                 """,
-                (isodow, slot, *spatial_args, limit + 1),
+                (isodow, slot, isodow, *spatial_args, limit + 1),
             ).fetchall()
     except DatabaseError:
         raise HTTPException(503, "Traffic prediction data unavailable") from None
 
     features = []
     for row in rows[:limit]:
-        edge_id, name, road_type, geometry, los, sample_dates, sample_rows, score, mode_share, confidence = row
+        (edge_id, name, road_type, geometry, los, sample_dates, sample_rows, score,
+         mode_share, confidence, prediction_basis, inference_distance) = row
         features.append({
             "type": "Feature",
             "id": edge_id,
@@ -253,6 +341,8 @@ def traffic_prediction(
                 "sample_rows": sample_rows,
                 "los_mode_share": float(mode_share),
                 "confidence": confidence,
+                "prediction_basis": prediction_basis,
+                "inference_distance_m": float(inference_distance) if inference_distance is not None else None,
             },
         })
     return {
@@ -263,7 +353,7 @@ def traffic_prediction(
             "period_start": target.strftime("%H:%M"),
             "period_minutes": 30,
             "timezone": "Asia/Ho_Chi_Minh",
-            "method": "historical weekday/time-slot LOS mode per matched SUMO edge",
+            "method": "historical weekday/time-slot LOS mode, spatially inferred onto uncovered network edges",
             "interpretation": "Typical historical conditions, not a live forecast or SUMO vehicle-count simulation.",
             "truncated": len(rows) > limit,
             "returned": len(features),
@@ -288,20 +378,20 @@ def traffic_prediction_tile(
     try:
         with connect_to_warehouse() as connection:
             tile = connection.execute(
-                _prediction_ctes("e.geom && ST_Transform(ST_TileEnvelope(%s,%s,%s),4326)") + """
+                _prediction_ctes() + """
                 SELECT ST_AsMVT(tile_rows, 'features', 4096, 'geom')
                 FROM (
-                    SELECT e.edge_id, e.name, e.road_type, s.predicted_los,
-                           round((s.mean_los_score * 20)::numeric, 1) AS congestion_score,
-                           s.sample_dates, s.sample_rows,
-                           round((s.matching_dates::numeric / s.sample_dates), 3) AS los_mode_share,
-                           """ + _confidence_sql() + """ AS confidence,
+                    SELECT e.edge_id, e.name, e.road_type, p.predicted_los,
+                           p.congestion_score, p.sample_dates, p.sample_rows,
+                           p.los_mode_share, p.confidence, p.prediction_basis,
+                           p.inference_distance_m,
                            ST_AsMVTGeom(ST_Transform(e.geom, 3857), ST_TileEnvelope(%s,%s,%s), 4096, 64, true) AS geom
-                    FROM edge_stats AS s
-                    JOIN transport.sumo_edge AS e ON e.edge_id = s.edge_id
+                    FROM edge_predictions AS p
+                    JOIN transport.sumo_edge AS e ON e.edge_id = p.edge_id
+                    WHERE e.geom && ST_Transform(ST_TileEnvelope(%s,%s,%s),4326)
                 ) AS tile_rows
                 """,
-                (isodow, slot, z, x, y, z, x, y),
+                (isodow, slot, isodow, z, x, y, z, x, y),
             ).fetchone()[0]
     except DatabaseError:
         raise HTTPException(503, "Traffic prediction tiles unavailable") from None

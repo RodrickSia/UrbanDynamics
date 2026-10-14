@@ -332,6 +332,8 @@ const FIELDS: Record<string, string> = {
   population: 'People / source cell',
   predicted_los: 'Typical LOS (A–F)',
   congestion_score: 'Ordinal congestion score (0–100)',
+  prediction_basis: 'Traffic estimate basis',
+  inference_distance_m: 'Nearest observation distance (m)',
   sample_dates: 'Historical sample days',
   sample_rows: 'Matched observations',
   los_mode_share: 'Share of days at modal LOS',

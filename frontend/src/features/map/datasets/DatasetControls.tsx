@@ -176,9 +176,12 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
             ].map(([grade, color]) => <Legend key={grade} color={color} label={grade} />)}
           </div>
           <DatasetNote>
-            Historical typical level for this weekday and half-hour, computed from matched
-            traffic observations. Not live traffic, a validated future forecast, or a SUMO
-            vehicle-count simulation. Confidence reflects historical sample count and agreement.
+            Colors cover the loaded road network. Directly matched roads use historical
+            observations; uncovered roads are estimated from a nearby observed road, then the
+            same road type or network average for the selected time/day. If that half-hour has
+            no data, the estimate falls back to other observations from that weekday. Select a
+            road to see its estimate basis and confidence. Not live traffic or a SUMO
+            vehicle-count simulation.
           </DatasetNote>
         </>
       )}
