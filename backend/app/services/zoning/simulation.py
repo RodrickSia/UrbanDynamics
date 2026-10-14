@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import Field
 from shapely.geometry import mapping, shape
 
-from .models import Input
+from .models import Input, SITE_ID_PATTERN
 from . import baseline
 from .development import floor_stack
 from ..simulation.engine import polygon_and_area
@@ -19,7 +19,7 @@ from ..simulation.integrated.models import MapBuildingCollection
 class SimulationInput(Input):
     revision: int = Field(ge=1)
     scenario_id: UUID
-    parcel_id: str | None = Field(default=None, pattern=r'^[1-9][0-9]{0,18}$')
+    parcel_id: str | None = Field(default=None, pattern=SITE_ID_PATTERN)
     residential_m2_per_person: float = Field(default=35, ge=5, le=500)
     work_m2_per_staff: float = Field(default=20, ge=5, le=500)
     visitors_per_100m2_day: float = Field(default=10, ge=0, le=1000)

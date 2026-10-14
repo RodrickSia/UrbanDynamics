@@ -16,6 +16,22 @@ from app.services.zoning.simulation import SimulationInput, study_from_plan
 from test_zoning import rectangle
 
 
+def test_zone_site_runs_simulation_without_a_cadastral_parcel(client, plan, monkeypatch, tmp_path):
+    from test_zoning import add_type, draw
+    monkeypatch.setenv('PLANNING_SQLITE_PATH', str(tmp_path / 'zone.sqlite'))
+    monkeypatch.setenv('SIMULATION_WORK_DIR', str(tmp_path / 'solvers'))
+    monkeypatch.setattr(baseline, 'buildings', lambda *args: None)
+    plan = draw(client, add_type(client, plan), rectangle())
+    site_id = f"zone:{plan['scenarios'][1]['zones'][0]['id']}"
+    plan = command(client, plan, 'save_building', building(parcel_id=site_id))
+    response = client.post(f"/api/v1/zoning/plans/{plan['id']}/simulation/runs", json={
+        'revision': plan['revision'], 'scenario_id': plan['scenarios'][1]['id'],
+        'parcel_id': site_id, 'mode': 'screening', 'idempotency_key': 'zone-simulation'})
+    assert response.status_code == 202, response.text
+    result = process_one()
+    assert result['status'] == 'succeeded', result
+
+
 def freeze(client, plan, **settings):
     return client.post(f"/api/v1/zoning/plans/{plan['id']}/simulation/studies", json={
         "revision": plan["revision"], "scenario_id": plan["scenarios"][1]["id"], **settings})

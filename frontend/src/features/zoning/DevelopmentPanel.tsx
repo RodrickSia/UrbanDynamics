@@ -24,14 +24,14 @@ export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWo
       <button title="Undo development" aria-label="Undo development" disabled={w.busy || w.readOnly || d.dirty || !w.scenario?.can_undo_development} onClick={() => void w.execute('undo_development')}><Undo2 size={16}/></button>
       <button title="Redo development" aria-label="Redo development" disabled={w.busy || w.readOnly || d.dirty || !w.scenario?.can_redo_development} onClick={() => void w.execute('redo_development')}><Redo2 size={16}/></button>
     </div>
-    {!d.parcelId && <p className="zoning-muted">Select a parcel on the map.</p>}
+    {!d.parcelId && <p className="zoning-muted">Select a zone or parcel on the map.</p>}
     {!w.parcelAvailable && !d.parcel && <p role="status">Parcel data unavailable. Saved proposals remain accessible.</p>}
     {d.loading && <p role="status">Loading parcel…</p>}
     {d.error && <div role="alert"><p>{d.error}</p><button onClick={d.retry}>Retry parcel</button></div>}
     {d.parcel && <>
-      <div className="development-parcel"><strong>Parcel {d.parcel.id}</strong>
+      <div className="development-parcel"><strong>{d.parcel.source === 'scenario.zone' ? `Zoning · ${d.parcel.land_use}` : `Parcel ${d.parcel.id}`}</strong>
         {d.data?.zoning?.length ? <><span>{d.data.zoning.map(zone => `${zone.code} · ${zone.name}`).join(' / ')}</span>
-          <small title="Underlying cadastral use">Existing: {d.parcel.land_use ?? 'Unknown'} · {areaText(d.parcel.area_m2)}</small>
+          <small>{d.parcel.source === 'scenario.zone' ? areaText(d.parcel.area_m2) : `Existing: ${d.parcel.land_use ?? 'Unknown'} · ${areaText(d.parcel.area_m2)}`}</small>
           {d.data.zoning.map(zone => <span key={zone.zone_id}><i className="zoning-swatch" style={{backgroundColor:zone.color}}/>{zone.percent.toFixed(1)}%</span>)}</>
           : <span>{d.parcel.land_use ?? 'Unknown use'} · {areaText(d.parcel.area_m2)}</span>}</div>
       {!d.draft && !w.readOnly && <>

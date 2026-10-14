@@ -18,7 +18,6 @@ export function BuildingDraftForm({ workspace: w, onView }: { workspace: ZoningW
         <label className="zoning-checkbox"><input type="checkbox" checked={d.draft.counts_far} onChange={e => d.update({ counts_far: e.target.checked })}/>FAR</label>
       </div>
       <BuildingFloorEditor draft={d.draft} catalog={d.data?.catalog} onChange={d.update}/>
-      <label className="zoning-checkbox"><input type="checkbox" checked={!!d.draft.demolish} onChange={e => d.update({ demolish: e.target.checked })}/>Hide baseline on this parcel</label>
       <footer><button type="button" onClick={d.cancel}>Cancel</button><button type="button" disabled={!d.input} onClick={() => void d.previewBuilding().then(value => { if (value) onView?.('3d'); })}>Preview</button>
         <button className="zoning-primary" disabled={!d.input}>Save proposal</button></footer>
     </fieldset>

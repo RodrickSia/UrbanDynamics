@@ -25,4 +25,4 @@ zoning.selected_parcel = selected_parcel
 
 baseline.buildings = lambda parcel, study: [{'id':'fixture-generated', 'geometry': {'type':'Polygon','coordinates':[
     [[106.761,10.821],[106.7614,10.821],[106.7614,10.8214],[106.761,10.8214],[106.761,10.821]]]},
-    'height_m':12.8,'floors':4,'space_use_id':'residential','source':'Fixture generated buildings'}] if parcel['id'] == PARCEL['id'] else None
+    'height_m':12.8,'floors':4,'space_use_id':'residential','source':'Fixture generated buildings'}] if parcel['id'] == PARCEL['id'] or parcel['id'].startswith('zone:') else None

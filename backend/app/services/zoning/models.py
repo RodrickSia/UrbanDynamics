@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+SITE_ID_PATTERN = r"^(?:[1-9][0-9]{0,18}|zone:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+
 
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_strip_whitespace=True)
@@ -70,7 +72,7 @@ class FloorOverride(Input):
 class BuildingInput(Input):
     id: str | None = Field(default=None, max_length=80)
     origin_id: str | None = Field(default=None, max_length=80)
-    parcel_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
+    parcel_id: str = Field(pattern=SITE_ID_PATTERN)
     geometry: dict
     name: str = Field(default="Proposed building", min_length=1, max_length=120)
     floors: int = Field(ge=1, le=200, strict=True)
@@ -91,7 +93,7 @@ class BuildingInput(Input):
 
 
 class GenerationInput(Input):
-    parcel_id: str = Field(pattern=r"^[1-9][0-9]{0,18}$")
+    parcel_id: str = Field(pattern=SITE_ID_PATTERN)
     floors: int = Field(ge=1, le=200, strict=True)
     floor_height: float = Field(gt=0, le=20)
     coverage: float = Field(gt=0, le=100)

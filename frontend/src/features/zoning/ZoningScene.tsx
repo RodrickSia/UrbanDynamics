@@ -129,6 +129,9 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         const building = query(e, BUILDING_LAYER)[0] ?? query(e, BUILDING_EXCLUDED_LAYER)[0] ?? query(e, BUILDING_FOOTPRINT_LAYER)[0];
         if (building && building.properties.id !== 'preview') b.development.onPickBuilding(String(building.properties.id));
         else {
+          const zone = b.visible && query(e, FILL).find(f => f.properties.kind === 'zone'
+            && b.scenario?.zones.some(zone => zone.id === f.properties.id));
+          if (zone) { b.development.onPickParcel(`zone:${zone.properties.id}`); return; }
           const parcel = query(e, PARCEL_PICK)[0];
           const id = parcel?.properties.parcel_id ?? parcel?.id;
           if (id !== undefined) b.development.onPickParcel(String(id));

@@ -15,6 +15,29 @@ from app.services.simulation.integrated.models import Design
 from app.services.simulation.models import PolygonInput
 
 
+def test_zoning_baseline_queries_all_intersecting_generated_buildings(monkeypatch):
+    statements = []
+    a = rectangle(106.7601, 10.8201, 106.7603, 10.8203)
+    b = rectangle(106.7607, 10.8207, 106.7612, 10.8212)
+    class Connection:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def execute(self, sql, parameters=None):
+            statements.append((sql, parameters))
+            return self
+        def fetchone(self): return ['buildings.synthetic_residential']
+        def fetchall(self): return [(json.dumps(g), 12.8, 4, 'fixture', 'v1') for g in [a, b]]
+    monkeypatch.setattr(baseline, 'warehouse_configured', lambda: True)
+    monkeypatch.setattr(baseline, 'connect_to_warehouse', Connection)
+    site = {'id': 'zone:00000000-0000-0000-0000-000000000001', 'geometry': rectangle()}
+    records = baseline.buildings(site, rectangle())
+    assert len(records) == 2
+    assert len({b['id'] for b in records}) == 2
+    assert 'ST_Intersects' in statements[-1][0]
+    assert json.loads(statements[-1][1][0]) == site['geometry']
+    assert all(projected(site['geometry']).buffer(.001).covers(projected(b['geometry'])) for b in records)
+
+
 def test_setbacks_measure_real_parcel_boundary_not_study_clip():
     parcel = {'geometry': rectangle(), 'area_m2': projected(rectangle()).area}
     footprint = rectangle(106.7602, 10.8202, 106.7605, 10.8205)

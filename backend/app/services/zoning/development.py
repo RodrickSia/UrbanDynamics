@@ -31,6 +31,31 @@ def parcel_snapshot(plan, source):
             "captured_at": datetime.now(timezone.utc).isoformat()}
 
 
+def zone_site(plan, scenario, site_id):
+    """Resolve the current scenario's canonical zone; never trust a stale client snapshot."""
+    zone = next((z for z in scenario['zones'] if f"zone:{z['id']}" == site_id), None)
+    if zone is None:
+        raise ValueError('The selected zoning site no longer exists in this scenario')
+    geometry = projected(zone['geometry']).intersection(projected(plan['study_area']))
+    if geometry.area <= EPSILON:
+        raise ValueError('The zoning site is outside the study area')
+    zone_type = next(t for t in plan['types'] if t['id'] == zone['type_id'])
+    return {'id': site_id, 'geometry': geojson(geometry), 'area_m2': geometry.area,
+            'land_use': zone_type['code'], 'source': 'scenario.zone', 'status': 'user_proposed',
+            'captured_at': scenario['updated_at']}
+
+
+def validate_zone_sites(plan, scenario):
+    # Boundary edits cannot orphan existing buildings or leave them outside their site.
+    for item in [*scenario.get('buildings', []), *scenario.get('demolition_masks', [])]:
+        if not item['parcel_id'].startswith('zone:'):
+            continue
+        site = zone_site(plan, scenario, item['parcel_id'])
+        if not projected(site['geometry']).buffer(.001).covers(projected(item['geometry'])):
+            raise ValueError('Remove development from this zoning site before changing its boundary')
+        plan.setdefault('parcels', {})[site['id']] = site
+
+
 def rules_for(plan, scenario, parcel):
     area = projected(parcel["geometry"]).intersection(projected(plan["study_area"]))
     # A boundary cutting the parcel is not enough evidence for one controlling rule profile.

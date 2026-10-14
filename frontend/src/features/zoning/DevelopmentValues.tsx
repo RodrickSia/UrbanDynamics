@@ -20,7 +20,7 @@ export function DevelopmentValues({ report, baseline, existing = false, scenario
           {!existing && <td>{format(row.rule === 'setbacks' && scenarioSetback !== undefined ? scenarioSetback : row.actual)} {row.unit}</td>}
           <td><span className={row.assumption_status === 'FAIL' ? 'development-fail' : ''}>{row.assumed_limit === null ? 'Unknown' : `${row.assumed_limit} ${row.unit} · ${row.assumption_status}`}</span></td></tr>)}
       </tbody></table></div>
-      <small>Min. setback: footprint to parcel boundary, estimated. Front/rear/side limits require frontage data.</small>
+      <small>Min. setback: footprint to selected site boundary, estimated. Front/rear/side limits require frontage data.</small>
     </details>
   </>;
 }

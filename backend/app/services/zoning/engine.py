@@ -145,9 +145,15 @@ def apply(original, command: Command):
             for zone in clone["zones"]:
                 if zone["type_id"] == type_id:
                     zone["type_id"] = copied["id"]
+        site_ids = {}
         for key in ("zones", "buildings", "demolition_masks"):
             for item in clone.get(key, []):
-                item.update(origin_id=item.get("origin_id") or item["id"], id=new_id())
+                old_id, next_id = item['id'], new_id()
+                if key == 'zones':
+                    site_ids[f'zone:{old_id}'] = f'zone:{next_id}'
+                elif item.get('parcel_id') in site_ids:
+                    item['parcel_id'] = site_ids[item['parcel_id']]
+                item.update(origin_id=item.get("origin_id") or old_id, id=next_id)
         plan["scenarios"].append(clone)
     elif action == "reorder_scenarios":
         ids = data.get("ids", [])
@@ -243,6 +249,7 @@ def apply(original, command: Command):
             scenario["_past"] = [*scenario.get("_past", []), before][-30:]
             scenario["_future"] = []
     for scenario in plan["scenarios"]:
+        development.validate_zone_sites(plan, scenario)
         if (scenario["id"] == command.scenario_id and scenario["kind"] != "reference"
                 and action not in ("add_scenario", "reorder_scenarios")):
             scenario.update(revision=revision, updated_at=now())

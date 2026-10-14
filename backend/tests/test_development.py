@@ -21,6 +21,31 @@ def building(**extra):
             "floors": 2, "floor_height": 3.2, "space_use_id": "residential", **extra}
 
 
+def test_zone_is_a_buildable_site_independent_of_underlying_parcels(client, plan, monkeypatch):
+    from app.services.zoning import baseline
+    monkeypatch.setattr(baseline, 'buildings', lambda *args: None)
+    plan = draw(client, add_type(client, plan), rectangle())
+    scenario = plan['scenarios'][1]
+    zone = scenario['zones'][0]
+    site_id = f"zone:{zone['id']}"
+    response = client.get(f"/api/v1/zoning/plans/{plan['id']}/development/parcels/{site_id}",
+                          params={'scenario_id': scenario['id']})
+    assert response.status_code == 200, response.text
+    assert response.json()['parcel']['source'] == 'scenario.zone'
+    assert projected(response.json()['parcel']['geometry']).area == pytest.approx(projected(zone['geometry']).area)
+    plan = command(client, plan, 'save_building', building(parcel_id=site_id))
+    assert plan['scenarios'][1]['buildings'][0]['parcel_id'] == site_id
+    preview(client, plan, building(parcel_id=site_id, geometry=rectangle(106.759, 10.819)), status=422)
+    # Duplicating a scenario must remap the site to its own zone, not the original.
+    plan = command(client, plan, 'add_scenario', {'name': 'Zone alternative'})
+    clone = plan['scenarios'][-1]
+    clone_id = f"zone:{clone['zones'][0]['id']}"
+    assert clone['buildings'][0]['parcel_id'] == clone_id
+    assert clone_id in plan['parcels']
+    command(client, plan, 'save_building', building(parcel_id=site_id), clone['id'], status=422)
+    command(client, plan, 'delete_zone', {'zone_id': zone['id'], 'confirm': True}, status=422)
+
+
 def preview(client, plan, payload, action="save_building", status=200):
     response = client.post(f"/api/v1/zoning/plans/{plan['id']}/preview", json={
         "revision": plan["revision"], "scenario_id": plan["scenarios"][1]["id"], "action": action, "payload": payload})

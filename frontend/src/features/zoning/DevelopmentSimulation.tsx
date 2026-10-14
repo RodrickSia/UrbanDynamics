@@ -44,11 +44,11 @@ export function DevelopmentSimulation({ plan, scenario, parcelId, disabled, mapB
   };
   return <section className="development-simulation" aria-label="Development simulation">
     <div className="zoning-row"><h3><Activity size={16}/> Simulation</h3><span className="zoning-badge">What-if</span></div>
-    <p className="zoning-muted">{scope === 'parcel' && parcelId ? `Parcel ${parcelId}` : scenario.name}</p>
+    <p className="zoning-muted">{scope === 'parcel' && parcelId ? parcelId.startsWith('zone:') ? 'Selected zoning' : `Parcel ${parcelId}` : scenario.name}</p>
     <form onSubmit={event => { event.preventDefault(); void simulation.run(mode); }}>
       <fieldset disabled={disabled || requesting || running}>
         <label>Scope<select value={scope} onChange={event => setScope(event.target.value as typeof scope)}>
-          <option value="parcel">Selected parcel</option><option value="scenario">Whole scenario</option>
+          <option value="parcel">{parcelId?.startsWith('zone:') ? 'Selected zoning' : 'Selected parcel'}</option><option value="scenario">Whole scenario</option>
         </select></label>
         <label>Engine<select value={mode} onChange={event => setMode(event.target.value as typeof mode)}>
           <option value="screening">Screening</option><option value="native">SUMO + SWMM</option>

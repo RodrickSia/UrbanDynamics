@@ -110,7 +110,7 @@ def change_plan(identifier: UUID, command: Command):
                 engine.editable(plan, command.scenario_id)
                 parcel_id = command.payload.get("parcel_id")
                 if parcel_id:
-                    parcel = selected_parcel(plan, str(parcel_id))
+                    parcel = selected_site(plan, str(parcel_id), command.scenario_id)
                     plan.setdefault("parcels", {})[parcel["id"]] = parcel
             return engine.apply(plan, command)
         result = store.update(identifier, command.revision, mutate)
@@ -128,7 +128,7 @@ def preview(identifier: UUID, command: Command):
             raise store.Conflict("Plan changed. Reload before previewing edits.")
         if command.action in ("save_building", "generate_building"):
             scenario = engine.editable(plan, command.scenario_id)
-            parcel = selected_parcel(plan, str(command.payload.get("parcel_id", "")))
+            parcel = selected_site(plan, str(command.payload.get("parcel_id", "")), command.scenario_id)
             plan.setdefault("parcels", {})[parcel["id"]] = parcel
             operation = development.generate if command.action == "generate_building" else development.prepare_building
             building, report = operation(plan, scenario, command.payload)
@@ -139,6 +139,13 @@ def preview(identifier: UUID, command: Command):
         zones, summary = engine.boundary_change(plan, scenario, command.payload, plan["revision"] + 1)
         return {"zones": zones, **summary}
     return execute(calculate)
+
+
+def selected_site(plan, site_id, scenario_id):
+    if site_id.startswith('zone:'):
+        scenario = engine.find(plan['scenarios'], scenario_id)
+        return development.zone_site(plan, scenario, site_id)
+    return selected_parcel(plan, site_id)
 
 
 def selected_parcel(plan, parcel_id):
@@ -171,7 +178,7 @@ def parcel_development_report(identifier, parcel_id, scenario_id, map_buildings=
     def read():
         plan = require_plan(identifier)
         scenario = engine.find(plan["scenarios"], scenario_id)
-        parcel = selected_parcel(plan, parcel_id)
+        parcel = selected_site(plan, parcel_id, scenario_id)
         buildings = [b for b in scenario.get("buildings", []) if b["parcel_id"] == parcel_id]
         records = baseline.buildings(parcel, plan['study_area'])
         if map_buildings is not None:
@@ -220,7 +227,7 @@ def save_simulation(identifier, body):
     if plan["revision"] != body.revision:
         raise HTTPException(409, "Plan changed. Reload before running simulation.")
     if body.parcel_id:
-        parcel = execute(lambda: selected_parcel(plan, body.parcel_id))
+        parcel = execute(lambda: selected_site(plan, body.parcel_id, str(body.scenario_id)))
         plan.setdefault('parcels', {})[parcel['id']] = parcel
     study = execute(lambda: study_from_plan(plan, body))
     ready = execute(lambda: preflight(study))

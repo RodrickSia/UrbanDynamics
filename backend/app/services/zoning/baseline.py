@@ -21,17 +21,23 @@ def buildings(parcel, study_area):
             connection.execute("SET LOCAL statement_timeout = '5s'")
             if connection.execute("SELECT to_regclass('buildings.synthetic_residential')").fetchone()[0] is None:
                 return None
-            rows = connection.execute('''SELECT ST_AsGeoJSON(geom),height_m,floors,height_source,generator_version
-                FROM buildings.synthetic_residential WHERE parcel_id=%s''', (int(parcel['id']),)).fetchall()
+            if parcel['id'].startswith('zone:'):
+                rows = connection.execute('''SELECT ST_AsGeoJSON(geom),height_m,floors,height_source,generator_version
+                    FROM buildings.synthetic_residential
+                    WHERE ST_Intersects(geom, ST_SetSRID(ST_GeomFromGeoJSON(%s),4326))''',
+                    (json.dumps(parcel['geometry']),)).fetchall()
+            else:
+                rows = connection.execute('''SELECT ST_AsGeoJSON(geom),height_m,floors,height_source,generator_version
+                    FROM buildings.synthetic_residential WHERE parcel_id=%s''', (int(parcel['id']),)).fetchall()
     except (DatabaseError, OSError):
         logger.warning('Generated baseline unavailable for parcel %s', parcel['id'])
         return None
     region = projected(parcel['geometry']).intersection(projected(study_area))
     result = []
-    for geometry, height, floors, source, version in rows:
+    for index, (geometry, height, floors, source, version) in enumerate(rows):
         clipped = projected(json.loads(geometry)).intersection(region)
         if clipped.area > .01:
-            result.append({'id': f"generated-{parcel['id']}", 'geometry': geojson(clipped),
+            result.append({'id': f"generated-{parcel['id']}-{index}", 'geometry': geojson(clipped),
                            'setback_geometry': geojson(projected(json.loads(geometry)).intersection(projected(parcel['geometry']))),
                            'height_m': height, 'floors': floors, 'source': source,
                            'version': version, 'space_use_id': 'residential'})
