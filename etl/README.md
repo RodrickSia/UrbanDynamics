@@ -120,6 +120,43 @@ migration creates that table; apply it with the protected database deployment
 workflow. Extracted inventory and stage files are stored in
 `etl/data/model_generation/`.
 
+Build an OSM-derived SUMO road network for HCMC and publish it to PostGIS:
+
+```sh
+docker compose --profile etl-osm-sumo-hcmc run --rm etl-osm-sumo-hcmc run --stage all
+```
+
+The pipeline downloads Geofabrik's Vietnam PBF, crops it to an expanded HCMC
+bounding box, runs SUMO `netconvert`, then transactionally replaces
+`transport.sumo_edge`, `transport.sumo_junction`, and
+`transport.sumo_connection`. Edge and junction geometries are transformed back
+to WGS84. Input/output files are cached under `etl/data/osm_sumo_hcmc/`;
+`extract`, `transform`, and `load` can also run separately. Apply
+`07-sumo-road-network.sql` before loading. This produces a starting road graph,
+not calibrated traffic demand: verify lane counts, speed limits, turns, and
+signals against local data before interpreting simulation results. The
+bounding-box crop includes fringe roads and is not an administrative HCMC
+boundary.
+
+Load the checked-in historical traffic CSV and match its road-segment
+observations to the SUMO network:
+
+```sh
+docker compose --profile etl-traffic-history run --rm etl-traffic-history run --stage all
+```
+
+The source file is `etl/data/traffic_history/traffic.csv`. The transform stage
+normalizes its date and 30-minute `period` into `observed_at`, preserves LOS and
+the sparsely populated `max_velocity` field without assuming it is observed
+traffic speed, and writes `traffic_observations.csv`. The load
+stage matches source node pairs first, then uses a 40 m spatial search against
+`transport.sumo_edge`; results, including unmatched source rows, are upserted to
+`transport.traffic_observation`, replacing that pipeline's previous snapshot on
+each run. Apply `07-sumo-road-network.sql` and then
+`08-traffic-history.sql` before loading. This records observed conditions for
+analytics and calibration; it does not infer vehicle counts, measured speeds,
+or generate SUMO routes/demand.
+
 ## Warehouse and data
 
 ETL containers connect to the main PostGIS warehouse at `postgis:5432` using

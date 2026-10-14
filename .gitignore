@@ -30,6 +30,11 @@ etl/data/raw/land_price/*
 !etl/data/buildings_footprint/
 etl/data/buildings_footprint/*
 !etl/data/buildings_footprint/hcmc_boundary.geojson
+# Keep the historical HCMC traffic input and its directory placeholder.
+!etl/data/traffic_history/
+etl/data/traffic_history/*
+!etl/data/traffic_history/.gitkeep
+!etl/data/traffic_history/traffic.csv
 test-results/
 
 # Frontend dependencies and build output

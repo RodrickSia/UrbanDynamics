@@ -20,6 +20,8 @@ on:
           - buildings_footprint
           - buildings_footprint_gba
           - model_generation
+          - osm_sumo_hcmc
+          - traffic_history
       stage:
         description: ETL stage to run
         type: choice
@@ -125,10 +127,30 @@ jobs:
               exit 1
             fi
           fi
+          if [ "$ETL_PIPELINE" = osm_sumo_hcmc ] && { [ "$ETL_STAGE" = load ] || [ "$ETL_STAGE" = all ]; }; then
+            sumo_migration_query="to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.sumo_junction') IS NOT NULL AND to_regclass('transport.sumo_connection') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$sumo_migration_query" | grep -Fxq t; then
+              echo "::error::The SUMO road-network migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          fi
+          if [ "$ETL_PIPELINE" = traffic_history ] && { [ "$ETL_STAGE" = load ] || [ "$ETL_STAGE" = all ]; }; then
+            traffic_migration_query="to_regclass('transport.sumo_edge') IS NOT NULL AND to_regclass('transport.traffic_observation') IS NOT NULL AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '07-sumo-road-network.sql') AND EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '08-traffic-history.sql')"
+            if ! docker compose exec -T postgis sh -c \
+              'psql -X --set ON_ERROR_STOP=1 --tuples-only --no-align --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --command "SELECT $1"' \
+              sh "$traffic_migration_query" | grep -Fxq t; then
+              echo "::error::The SUMO road-network or traffic-history migration is missing. Run the protected Deploy database workflow before this ETL job." >&2
+              exit 1
+            fi
+          fi
           if [ "$ETL_PIPELINE" != parcels_hcmc ] && [ "$ETL_PIPELINE" != buildings_footprint ] && \
              [ "$ETL_PIPELINE" != buildings_footprint_gba ] && [ "$ETL_PIPELINE" != model_generation ] && [ "$ETL_PIPELINE" != all ] && \
+             [ "$ETL_PIPELINE" != osm_sumo_hcmc ] && \
+             [ "$ETL_PIPELINE" != traffic_history ] && \
              { [ "$ETL_STAGE" = transform ] || [ "$ETL_STAGE" = load ]; }; then
-            echo "::error::The transform and load stages are currently supported only for parcels_hcmc and building-footprint pipelines." >&2
+            echo "::error::The transform and load stages are supported only for staged parcel, building-footprint, model-generation, OSM/SUMO, and traffic-history pipelines." >&2
             exit 1
           fi
 
