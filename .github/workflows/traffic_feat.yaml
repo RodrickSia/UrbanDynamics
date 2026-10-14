@@ -19,46 +19,24 @@ jobs:
       WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}
       WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
       WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
-      TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
     steps:
       - uses: actions/checkout@v5
         with:
-          # The OSM extract and source snapshots are local, ignored ETL inputs.
+          # Preserve generated ETL outputs on the self-hosted runner.
           clean: false
       - name: Validate seeded traffic inputs
         run: |
           set -eu
           test -n "$WAREHOUSE_PASSWORD" || { echo "Set WAREHOUSE_PASSWORD in the production environment." >&2; exit 1; }
-          for source in etl/data/traffic_history/traffic.csv; do
+          for source in \
+            etl/data/osm_sumo_hcmc/hcmc.osm.pbf \
+            etl/data/traffic_history/traffic.csv \
+            etl/data/road_data_tomtom/tomtom_hcmc_traffic_sample.csv; do
             if [ ! -s "$source" ]; then
               echo "::error::Required seeded traffic input is missing or empty: $source" >&2
               exit 1
             fi
           done
-          echo "OSM input is downloaded/cropped by the OSM/SUMO ETL when absent."
-      - name: Fetch TomTom snapshot when no cached copy exists
-        run: |
-          set -eu
-          snapshot=etl/data/road_data_tomtom/tomtom_hcmc_traffic_sample.csv
-          if [ -s "$snapshot" ]; then
-            echo "Using cached TomTom snapshot: $snapshot"
-            exit 0
-          fi
-          test -n "$TOMTOM_API_KEY" || {
-            echo "::error::TomTom snapshot is not present on this runner. Add TOMTOM_API_KEY to the production environment secrets." >&2
-            exit 1
-          }
-          created_env=false
-          if [ ! -f .env ]; then
-            cp .env.example .env
-            created_env=true
-          fi
-          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
-          docker compose --profile traffic_feat build etl-road-data-tomtom
-          docker compose --profile traffic_feat run --rm \
-            -e TOMTOM_API_KEY --entrypoint python etl-road-data-tomtom \
-            /app/scripts/test_tomtom_traffic.py
-          test -s "$snapshot" || { echo "::error::TomTom fetch completed without creating $snapshot" >&2; exit 1; }
       - name: Run sequential traffic feature pipeline
         env:
           WAREHOUSE_MIGRATION_TARGET: compose
