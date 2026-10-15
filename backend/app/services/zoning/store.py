@@ -10,6 +10,8 @@ import psycopg
 from psycopg.types.json import Jsonb
 from src.shared.database import connect_to_warehouse, warehouse_configured
 
+from .project import backfill, ensure_schema, project
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,6 +41,9 @@ def database():
                     connection.execute("BEGIN IMMEDIATE")
                 connection.execute("CREATE TABLE IF NOT EXISTS zoning_plans "
                                    "(id TEXT PRIMARY KEY, document " + ("JSONB" if remote else "TEXT") + " NOT NULL)")
+                if remote:
+                    ensure_schema(connection)
+                    backfill(connection)
                 yield connection, remote
         finally:
             connection.close()
@@ -63,6 +68,8 @@ def save_new(document):
         placeholder = "%s" if remote else "?"
         connection.execute(f"INSERT INTO zoning_plans(id,document) VALUES ({placeholder},{placeholder})",
                            (document["id"], encode(document, remote)))
+        if remote:
+            project(connection, document)
     return document
 
 
@@ -94,6 +101,8 @@ def update(identifier, revision, mutate):
         result = mutate(document)
         connection.execute(f"UPDATE zoning_plans SET document={placeholder} WHERE id={placeholder}",
                            (encode(result, remote), str(identifier)))
+        if remote:
+            project(connection, result)
         return result
 
 
