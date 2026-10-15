@@ -28,6 +28,7 @@ LOS_COLORS = {
 }
 SIMULATION_SECONDS = 1800
 SIMULATION_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_SIMULATION_TIMEOUT_SECONDS", "600"))
+NETWORK_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS", "1800"))
 MOTORCYCLE_SHARE = 0.7
 SIMULATION_MODEL = "mesoscopic"
 logger = logging.getLogger(__name__)
@@ -55,6 +56,8 @@ def _run(command: list[str], cwd: Path, timeout: int) -> None:
         item for item in (str(home / "tools"), environment.get("PYTHONPATH", "")) if item
     )
     started = time.monotonic()
+    stage = Path(command[0]).name
+    logger.info("Starting SUMO stage %s (timeout=%ss)", stage, timeout)
     try:
         subprocess.run(
             command,
@@ -71,58 +74,84 @@ def _run(command: list[str], cwd: Path, timeout: int) -> None:
             time.monotonic() - started,
         )
     except subprocess.TimeoutExpired as error:
-        raise RuntimeError("SUMO traffic run exceeded its time limit") from error
+        raise RuntimeError(f"SUMO stage {stage} exceeded its {timeout}s time limit") from error
     except subprocess.CalledProcessError as error:
         detail = (error.stderr or error.stdout or "SUMO command failed")[-1200:]
         raise RuntimeError(detail) from error
 
 
 def _network_file(data: Path, runtime: Path) -> Path:
-    """Build and cache a SUMO network from the committed HCMC OSM PBF if needed."""
+    """Reuse a prepared HCMC network or build it once in the shared runtime volume."""
     network_dir = runtime / "network"
     network_dir.mkdir(parents=True, exist_ok=True)
     source = data / "osm_sumo_hcmc" / "hcmc.osm.pbf"
     prepared = data / "osm_sumo_hcmc" / "hcmc.net.xml"
     if not source.is_file():
         raise FileNotFoundError(f"HCMC OSM input is missing: {source}")
-    if prepared.is_file() and prepared.stat().st_mtime >= source.stat().st_mtime:
+    if (
+        prepared.is_file()
+        and prepared.stat().st_size > 0
+        and prepared.stat().st_mtime >= source.stat().st_mtime
+    ):
         return prepared
     network = network_dir / "hcmc.net.xml"
     with (network_dir / ".build.lock").open("w") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)
-        if network.is_file() and network.stat().st_mtime >= source.stat().st_mtime:
+        if (
+            network.is_file()
+            and network.stat().st_size > 0
+            and network.stat().st_mtime >= source.stat().st_mtime
+        ):
             return network
         home = _sumo_home()
         osmium = os.getenv("OSMIUM_BINARY", "osmium")
         netconvert = home / "bin" / ("netconvert.exe" if os.name == "nt" else "netconvert")
         pbf_xml = network_dir / "hcmc.osm.xml"
-        _run(
-            [osmium, "cat", str(source), "--output", str(pbf_xml), "--overwrite"], network_dir, 300
-        )
-        temporary = network.with_suffix(".building.xml")
+        if (
+            not pbf_xml.is_file()
+            or pbf_xml.stat().st_size == 0
+            or pbf_xml.stat().st_mtime < source.stat().st_mtime
+        ):
+            pbf_temporary = network_dir / "hcmc.osm.building.xml"
+            pbf_temporary.unlink(missing_ok=True)
+            try:
+                _run(
+                    [osmium, "cat", str(source), "--output", str(pbf_temporary), "--overwrite"],
+                    network_dir,
+                    300,
+                )
+                pbf_temporary.replace(pbf_xml)
+            finally:
+                pbf_temporary.unlink(missing_ok=True)
+
+        temporary = network_dir / f"hcmc.net.building-{os.getpid()}.xml"
         type_map = home / "data" / "typemap" / "osmNetconvert.typ.xml"
         if not type_map.is_file():
             raise FileNotFoundError(f"SUMO OSM type map is missing: {type_map}")
-        _run(
-            [
-                str(netconvert),
-                "--osm-files",
-                str(pbf_xml),
-                "--output-file",
-                str(temporary),
-                "--type-files",
-                str(type_map),
-                "--junctions.join",
-                "--tls.guess-signals",
-                "--roundabouts.guess",
-                "--output.street-names",
-                "--proj.utm",
-                "--no-turnarounds",
-            ],
-            network_dir,
-            300,
-        )
-        temporary.replace(network)
+        temporary.unlink(missing_ok=True)
+        try:
+            _run(
+                [
+                    str(netconvert),
+                    "--osm-files",
+                    str(pbf_xml),
+                    "--output-file",
+                    str(temporary),
+                    "--type-files",
+                    str(type_map),
+                    "--junctions.join",
+                    "--tls.guess-signals",
+                    "--roundabouts.guess",
+                    "--output.street-names",
+                    "--proj.utm",
+                    "--no-turnarounds",
+                ],
+                network_dir,
+                NETWORK_BUILD_TIMEOUT_SECONDS,
+            )
+            temporary.replace(network)
+        finally:
+            temporary.unlink(missing_ok=True)
         return network
 
 

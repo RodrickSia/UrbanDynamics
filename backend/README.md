@@ -83,8 +83,12 @@ results compressed in PostGIS. It is resumable: rerunning it skips cached
 scenarios and retries failed or unfinished ones. The map checks this cache
 first; on a cache miss, it queues the selected scenario through the worker and
 that result is added to the same cache for later requests. The precompute workflow
-defaults to four parallel workers and offers 1/2/4/8-worker choices; select a
-count appropriate for the self-hosted VM's available CPU and memory.
+prepares the HCMC SUMO network once in the shared Compose runtime volume before
+starting scenario workers. Network conversion has a 30-minute limit by default
+(`TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS`); once created, workers reuse the
+network instead of rebuilding it per scenario. The workflow defaults to four
+parallel workers and offers 1/2/4/8-worker choices; select a count appropriate
+for the self-hosted VM's available CPU and memory.
 
 ## Configuration and operation
 

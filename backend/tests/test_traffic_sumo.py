@@ -2,6 +2,7 @@ import xml.etree.ElementTree as ET
 from datetime import time
 from gzip import compress
 from json import dumps
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
@@ -229,6 +230,40 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     sumo_command = next(command for command in commands if command[0].endswith("/sumo"))
     assert sumo_command[sumo_command.index("--mesosim") + 1] == "true"
     assert result["metadata"]["simulation_model"] == "mesoscopic"
+
+
+def test_network_file_builds_atomically_then_reuses_runtime_cache(tmp_path, monkeypatch):
+    data = tmp_path / "data"
+    source = data / "osm_sumo_hcmc" / "hcmc.osm.pbf"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"pbf")
+    runtime = tmp_path / "runtime"
+    sumo_home = tmp_path / "sumo"
+    type_map = sumo_home / "data" / "typemap" / "osmNetconvert.typ.xml"
+    type_map.parent.mkdir(parents=True)
+    type_map.touch()
+    (sumo_home / "bin").mkdir()
+    commands = []
+
+    def fake_run(command, _cwd, timeout):
+        commands.append((command, timeout))
+        if command[0] == "osmium":
+            output = Path(command[command.index("--output") + 1])
+        else:
+            output = Path(command[command.index("--output-file") + 1])
+        output.write_text("generated")
+
+    monkeypatch.setattr(traffic_sumo_prediction, "_sumo_home", lambda: sumo_home)
+    monkeypatch.setattr(traffic_sumo_prediction, "_run", fake_run)
+
+    network = traffic_sumo_prediction._network_file(data, runtime)
+    assert network.is_file()
+    assert [Path(call[0][0]).name for call in commands] == ["osmium", "netconvert"]
+    assert commands[-1][1] == traffic_sumo_prediction.NETWORK_BUILD_TIMEOUT_SECONDS
+    assert not list(network.parent.glob("*.building*"))
+
+    assert traffic_sumo_prediction._network_file(data, runtime) == network
+    assert len(commands) == 2
 
 
 def test_feature_output_includes_zero_car_roads_and_sums_full_period_counts():

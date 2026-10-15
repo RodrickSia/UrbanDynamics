@@ -110,6 +110,7 @@ services:
       DATA_DIR: /data
       TRAFFIC_SIMULATION_DIR: /runtime/traffic-prediction
       TRAFFIC_SIMULATION_TIMEOUT_SECONDS: 600
+      TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS: ${TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS:-1800}
     volumes:
       - ${URBANDYNAMICS_DATA_DIR:-./etl/data}:/data:ro
       - simulation_runtime:/runtime

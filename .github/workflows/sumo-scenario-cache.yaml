@@ -47,6 +47,18 @@ jobs:
               echo "::error::SUMO scenario-cache migration is missing. Run the Deploy database workflow first." >&2
               exit 1
             }
+      - name: Prepare the reusable HCMC SUMO network
+        run: |
+          set -eu
+          created_env=false
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            created_env=true
+          fi
+          trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
+          docker compose --env-file .env build traffic-prediction-worker
+          docker compose --env-file .env run --rm --no-deps traffic-prediction-worker \
+            python -m app.services.traffic_sumo_network
       - name: Run or resume all SUMO weekday/time scenarios
         run: |
           set -eu
