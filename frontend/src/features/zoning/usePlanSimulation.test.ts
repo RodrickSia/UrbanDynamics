@@ -7,6 +7,19 @@ import { usePlanSimulation } from './usePlanSimulation';
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
+it('opens saved server output without submitting another simulation', async () => {
+  const plan={id:'plan',revision:2} as Plan;
+  const scenario={id:'scenario'} as Scenario;
+  const job={id:'saved-job',study_id:'study',status:'succeeded',result_id:'saved-result'};
+  const fetch=vi.fn(async (url:string)=>new Response(JSON.stringify(url.endsWith('/simulation/latest')?{job}:url.includes('/runs/')?{id:'saved-result',options:[]}:job)));
+  vi.stubGlobal('fetch',fetch);
+  const {result,unmount}=renderHook(()=>usePlanSimulation(plan,scenario,simulationDefaults,'123'));
+  await act(()=>result.current.loadSaved());
+  expect(result.current.result?.id).toBe('saved-result');
+  expect(fetch.mock.calls.some(([url])=>url.endsWith('/simulation/runs'))).toBe(false);
+  unmount();
+});
+
 it('submits once and keeps a running job visible when more map tiles arrive', async () => {
   const plan = { id: 'plan', revision: 2 } as Plan;
   const scenario = { id: 'scenario' } as Scenario;

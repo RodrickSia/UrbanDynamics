@@ -14,6 +14,7 @@ from ..simulation.engine import polygon_and_area
 from ..simulation.models import PolygonInput
 from ..simulation.planning.models import PlanningStudy
 from ..simulation.integrated.models import MapBuildingCollection
+from . import simulation_context
 
 
 class SimulationInput(Input):
@@ -24,6 +25,8 @@ class SimulationInput(Input):
     work_m2_per_staff: float = Field(default=20, ge=5, le=500)
     visitors_per_100m2_day: float = Field(default=10, ge=0, le=1000)
     green_open_percent: float = Field(default=30, ge=0, le=100)
+    landscape_mode: Literal['preserve', 'redesign'] = 'preserve'
+    traffic_radius_m: int = Field(default=750, ge=500, le=1500)
     rainfall_mm: float = Field(default=60, ge=0, le=300)
     map_buildings: MapBuildingCollection | None = None
 
@@ -34,6 +37,10 @@ class SimulationRunInput(SimulationInput):
 
 
 def polygon(value, label):
+    if value['type'] == 'MultiPolygon':
+        normalized = shape(value)
+        if len(normalized.geoms) == 1:
+            value = mapping(normalized.geoms[0])
     if value["type"] != "Polygon":
         raise ValueError(f"{label} requires one connected polygon for this simulation engine")
     return PolygonInput(**value)
@@ -107,22 +114,48 @@ def study_from_plan(plan, settings):
     # overlap slightly; summing them as independent projects double counts land.
     site = polygon(mapping(shape(plan['parcels'][settings.parcel_id]['geometry']).intersection(shape(plan['study_area']))), 'Selected parcel') if settings.parcel_id else region
     site_area = polygon_and_area(site)[1]
+    surface_document = simulation_context.available_document(shape(site.model_dump()))
+    network_id, network_document = None, None
+    if getattr(settings, 'mode', 'screening') == 'native':
+        network_id, network_document = simulation_context.acquire_network(shape(region.model_dump()), settings.traffic_radius_m)
+        if surface_document is None:
+            surface_document = network_document
+    baseline_design, surface_source = simulation_context.surfaces(site, baseline_blocks, surface_document)
     def design(buildings, green_percent):
         roof = sum(polygon_and_area(PolygonInput(**b['footprint']))[1] for b in buildings)
         open_area = max(0, site_area-roof)
         return {'buildings': buildings, 'green_m2': open_area*green_percent/100,
                 'paved_m2': open_area*(1-green_percent/100)}
+    proposed_design = (simulation_context.surfaces(site, blocks, surface_document)[0]
+                       if settings.landscape_mode == 'preserve' else design(blocks,settings.green_open_percent))
+    prior = simulation_context.traffic_prior()
+    sources = {'surfaces':{**surface_source, 'landscape_mode':settings.landscape_mode,
+                           'scope':'Selected parcel' if settings.parcel_id else 'Whole study area',
+                           'note':surface_source['note'] + (' Landscape is preserved except where roofs change.' if settings.landscape_mode == 'preserve' else ' User explicitly redesigns ALL open ground in this scope.')},
+               'traffic':{'status':prior.source_kind, 'source':prior.source,
+                          'counting_reference_id':prior.counting_reference_id,
+                          'background_vehicles_hour':prior.cars[18]+prior.motorcycles[18],
+                          'network':'osm_local' if network_id else 'prepared_on_detailed_run',
+                          'snapshot_id':network_id, 'radius_m':settings.traffic_radius_m,
+                          'network_source':network_document.get('source') if network_document else None,
+                          'captured_at':network_document.get('captured_at') if network_document else None,
+                          'note':'Same road network, background vehicles and seeds before/after; building trips are added. This is a scenario, not a validated site forecast.'},
+               'inventory':{'status':'estimated' if baseline_blocks else 'unknown',
+                            'source':'Generated buildings and/or supplied Goong map context. Heights, floors and occupancy may be estimated; missing buildings do not prove vacant land.'},
+               'capacity':{'status':'unknown','source':'No verified utility capacities or external utility loads were supplied.'}}
     projects = [{'id':'parcel_0', 'title':f'Parcel {settings.parcel_id}' if settings.parcel_id else 'Whole scenario',
-                 'site':site.model_dump(), 'baseline':design(baseline_blocks,0), 'baseline_kind':'estimated',
+                 'site':site.model_dump(), 'baseline':baseline_design, 'baseline_kind':'estimated',
                  'baseline_occupancy':'estimated' if settings.parcel_id and baseline_blocks else 'unknown',
                  'baseline_source':'Generated buildings / supplied Goong tile context; estimated heights, floors, occupancy and surfaces; inventory may be incomplete',
-                 'development':design(blocks,settings.green_open_percent), 'utility_zone_id':'unknown'}]
+                 'development':proposed_design, 'utility_zone_id':'unknown'}]
     return PlanningStudy(**{
         "title": f"{plan['name']} / {scenario['name']}"[:160], "mode": "cumulative", "planning_catalog":"qcvn_urban_2021",
         "study_area": region.model_dump(), "comparison_policy": "declared_programs",
         "source_note": f"Zoning plan {plan['id']}, revision {plan['revision']}, scenario {scenario['id']}. Source parcels {sorted(grouped)}. Scope {settings.parcel_id or "study area"}. Selected saved buildings or generated current buildings; proposed design replaces the site program. Assumed occupancy/surfaces; baseline inventory and capacity may be incomplete. Commercial uses Other coefficients. Demand includes physical floors excluded from GFA.",
         "conditions": {"rainfall_mm": settings.rainfall_mm}, "background_residents": 0,
-        "background_vehicles_hour": 0, "projects": projects,
+        "background_vehicles_hour": prior.cars[18]+prior.motorcycles[18], "traffic_prior":prior.model_dump(mode='json'),
+        "traffic_network_mode":"osm_snapshot" if network_id else "synthetic_corridor",
+        "traffic_snapshot_id":network_id, "development_context":sources, "projects": projects,
         "options": [{"id": "proposal", "title": scenario["name"], "active_project_ids": [p["id"] for p in projects]}],
         "utility_zones": [{"id": "unknown", "source_kind": "unknown",
                            "source": "No verified infrastructure capacity or background load; proposal-only calculation"}],

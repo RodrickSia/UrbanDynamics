@@ -29,28 +29,24 @@ test('saved per-floor development runs screening and native simulation, restores
   await open();
   const simulation = page.getByRole('region', { name: 'Development simulation', exact: true });
   await simulation.getByRole('button', { name: 'Run simulation' }).click();
-  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toBeVisible({ timeout: 45000 });
-  await expect(simulation).toContainText('screening · assumed occupancy');
-  await simulation.getByText('Change vs Existing', {exact:true}).click();
+  await expect(simulation.getByRole('heading', { name: 'Building impact · before and after' })).toBeVisible({ timeout: 45000 });
   await expect(simulation.getByRole('row').filter({hasText:'Water'}).filter({hasText:'Unknown'}).first()).toBeVisible();
-  await simulation.getByText('Change vs Existing', {exact:true}).click();
   const water = await simulation.getByRole('row', { name: /^Water / }).innerText();
-  expect(water).not.toContain('Unknown');
+  expect(water).toContain('Insufficient data');
   await page.reload(); await open();
-  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toBeVisible();
+  await expect(simulation.getByRole('heading', { name: 'Building impact · before and after' })).toBeVisible();
   await expect(simulation.getByRole('row', { name: /^Water / })).toHaveText(water, { useInnerText: true });
   await simulation.getByRole('combobox', { name: 'Scope', exact: true }).selectOption('parcel');
-  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toHaveCount(0);
+  await expect(simulation.getByRole('heading', { name: 'Building impact · before and after' })).toHaveCount(0);
   await expect(simulation.getByRole('button', { name: 'Run simulation' })).toBeDisabled();
   await simulation.getByRole('combobox', { name: 'Scope', exact: true }).selectOption('scenario');
-  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toBeVisible();
+  await expect(simulation.getByRole('heading', { name: 'Building impact · before and after' })).toBeVisible();
   await simulation.getByRole('combobox', { name: 'Engine', exact: true }).selectOption('native');
   await simulation.getByRole('button', { name: 'Run simulation' }).click();
-  await expect(simulation.getByText('native · assumed occupancy and surfaces', { exact: true })).toBeVisible({ timeout: 60000 });
-  await expect(simulation.getByText('Model traffic', { exact: true })).toBeVisible();
+  await expect(simulation.getByRole('heading', { name: 'Traffic · same background, added building trips' })).toBeVisible({ timeout: 60000 });
   for (const width of [1440,1024,768,320]) {
     await page.setViewportSize({ width, height: 900 });
-    await simulation.getByRole('heading', { name: 'Proposed demand' }).scrollIntoViewIfNeeded();
+    await simulation.getByRole('heading', { name: 'Building impact · before and after' }).scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `../.runtime/development/simulation-${width}.png` });
   }
@@ -59,7 +55,7 @@ test('saved per-floor development runs screening and native simulation, restores
   await expect(simulation).toHaveCount(0);
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await page.getByRole('combobox',{name:'Scope',exact:true}).selectOption('scenario');
-  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toBeVisible();
+  await expect(simulation.getByRole('heading', { name: 'Building impact · before and after' })).toBeVisible();
   const saved = plan.scenarios[1].buildings[0];
   const edited = await request.post(`/api/v1/zoning/plans/${plan.id}/commands`, { data: {
     revision: plan.revision, action: 'save_building', scenario_id: plan.scenarios[1].id,
@@ -68,6 +64,6 @@ test('saved per-floor development runs screening and native simulation, restores
   } });
   expect(edited.ok()).toBe(true);
   await page.reload(); await open();
-  await expect(simulation.getByRole('heading', { name: 'Proposed demand' })).toHaveCount(0);
+  await expect(simulation.getByRole('heading', { name: 'Building impact · before and after' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

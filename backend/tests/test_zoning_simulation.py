@@ -37,6 +37,23 @@ def freeze(client, plan, **settings):
         "revision": plan["revision"], "scenario_id": plan["scenarios"][1]["id"], **settings})
 
 
+def test_saved_run_can_be_opened_without_resubmitting_and_is_bound_to_revision_scope(client,plan,parcel_source,monkeypatch,tmp_path):
+    monkeypatch.setenv('PLANNING_SQLITE_PATH',str(tmp_path/'history.sqlite'))
+    monkeypatch.setenv('SIMULATION_WORK_DIR',str(tmp_path/'solvers'))
+    monkeypatch.setattr(baseline,'buildings',lambda *args:None)
+    plan=command(client,plan,'save_building',building())
+    body={'revision':plan['revision'],'scenario_id':plan['scenarios'][1]['id'],'parcel_id':'3885881'}
+    submitted=client.post(f"/api/v1/zoning/plans/{plan['id']}/simulation/runs",json={**body,'mode':'screening','idempotency_key':'saved-result-test'}).json()
+    assert process_one()['status']=='succeeded'
+    path=f"/api/v1/zoning/plans/{plan['id']}/simulation/latest"
+    saved=client.post(path,json=body)
+    assert saved.status_code==200
+    assert saved.json()['job']['id']==submitted['job']['id']
+    assert client.post(path,json={**body,'parcel_id':None}).json()['job'] is None
+    assert client.post(path,json={**body,'revision':plan['revision']+1}).status_code==409
+    assert process_one() is None
+
+
 def test_development_starts_a_durable_job_in_one_request(client, plan, parcel_source, monkeypatch, tmp_path):
     monkeypatch.setenv('PLANNING_SQLITE_PATH', str(tmp_path / 'atomic.sqlite'))
     monkeypatch.setenv('SIMULATION_WORK_DIR', str(tmp_path / 'solvers'))

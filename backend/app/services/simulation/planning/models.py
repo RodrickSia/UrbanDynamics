@@ -281,6 +281,8 @@ class PlanningStudy(StrictModel):
     system_snapshot_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     system_parcel_bindings: dict[str, str] = Field(default_factory=dict)
     traffic_network_mode: Literal["synthetic_corridor", "osm_snapshot"] = "synthetic_corridor"
+    traffic_snapshot_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    development_context: dict = Field(default_factory=dict)
     source_note: str = Field(min_length=5, max_length=1000)
     conditions: StudyConditions = Field(default_factory=StudyConditions)
     comparison_policy: Literal["equal_program", "declared_programs"] = "equal_program"
@@ -316,8 +318,10 @@ class PlanningStudy(StrictModel):
                 raise ValueError("Grouped projects require at most six disjoint source parcels")
         if self.data_mode == "synthetic" and (self.system_snapshot_id or self.system_parcel_bindings or self.system_parcel_groups):
             raise ValueError("System snapshot references require demo_system mode")
-        if self.traffic_network_mode == "osm_snapshot" and self.data_mode != "demo_system":
+        if self.traffic_network_mode == "osm_snapshot" and self.data_mode != "demo_system" and not self.traffic_snapshot_id:
             raise ValueError("OSM planning network requires an installed demo system snapshot")
+        if self.traffic_snapshot_id and self.traffic_network_mode != "osm_snapshot":
+            raise ValueError("Local traffic snapshot requires OSM network mode")
         if len(set(self.normalization_bases)) != len(self.normalization_bases):
             raise ValueError("Normalization bases must be unique")
         region, area = polygon_and_area(self.study_area, maximum_area_m2=25_000_000)

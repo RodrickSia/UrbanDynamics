@@ -94,5 +94,18 @@ export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: Simu
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Simulation unavailable'); }
     finally { setRequesting(false); }
   };
-  return { ...visible, error: enabled ? error : '', requesting, running: active(visible?.job), run, action };
+  const loadSaved = async () => {
+    if (!enabled || requesting || active(visible?.job)) return;
+    setRequesting(true); setError('');
+    try {
+      const saved=await zoningRequest<{job:SimulationJob | null}>(`/${plan.id}/simulation/latest`,{
+        revision:plan.revision,scenario_id:scenario.id,parcel_id:parcelId,...settings,
+      });
+      if (!saved.job?.result_id) throw new Error('No completed run for this plan revision and scope.');
+      const result=await request<SimulationResult>(`/runs/${saved.job.result_id}`);
+      if (currentKey.current === key) {remember(saved.job);setState({key,job:saved.job,result});}
+    } catch (reason) {if(currentKey.current === key) setError(reason instanceof Error ? reason.message : 'Saved result unavailable');}
+    finally {setRequesting(false);}
+  };
+  return { ...visible, error: enabled ? error : '', requesting, running: active(visible?.job), run, action, loadSaved };
 }

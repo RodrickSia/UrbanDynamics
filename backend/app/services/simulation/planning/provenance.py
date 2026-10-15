@@ -163,6 +163,21 @@ def build(study, inputs, library, model_version, background=None):
                 'note':'Repaired model counts without independent complete crossing labels. Vehicle mix only; amplitude/OD/day shape are scenario assumptions.',
                 'video_sha256':counting['source_sha256'],'tracks_sha256':counting['tracks_sha256']})
             modules['traffic']['source_ids'].append('counting_reference')
+    if study.development_context:
+        source('development_context', inputs['development_context'],
+               'Frozen Development input provenance; unclassified surfaces and traffic OD remain explicit assumptions',
+               inputs['study_area'])
+        sources[-1]['source_kind'] = 'mixed_source_and_assumptions'
+        for module in ('geometry', 'drainage', 'traffic'):
+            modules[module]['source_ids'].append('development_context')
+        for entry in sources:
+            if entry['id'] == 'baseline_inventory':
+                entry.update(source_kind='estimated', note=study.projects[0].baseline_source)
+            if entry['id'] == 'traffic_network' and study.traffic_snapshot_id:
+                entry.update(source_kind='osm_topology', version=study.traffic_snapshot_id,
+                             note='Immutable local OSM extract. Same network for before/after; private accesses, signals and OD are assumed.')
+                modules['traffic'].update(status='sourced_topology_assumed_demand', required_scope='local_osm_area_and_assumed_accesses',
+                    boundary_policy='Bounded local OSM area; boundary OD is a scenario prior, not measured traffic')
     limitations = [
         "Generated traffic/drainage/walking graphs are not surveyed infrastructure; source coverage is not model calibration.",
         "WorldPop is an inclusive bbox prior; unknown parcel occupancy prevents exact deduplication and established baseline changes.",
@@ -172,7 +187,7 @@ def build(study, inputs, library, model_version, background=None):
         "No observation timestamps are fabricated; declared source kinds do not override this study's synthetic mode."]
     if study.background_snapshot and study.background_snapshot.id == "synthetic_capacity_v1":
         limitations[1] = "Explicit synthetic capacity v1 replaces population demand; WorldPop is context only. Occupancy assumptions are hashed and subtracted; this is not a surveyed baseline."
-    manifest = canonical_numbers({"version": model_version, "source_kind": "mixed_demo" if study.data_mode == "demo_system" else "synthetic", "entries": sources,
+    manifest = canonical_numbers({"version": model_version, "source_kind": "mixed_source_and_assumptions" if study.development_context else "mixed_demo" if study.data_mode == "demo_system" else "synthetic", "entries": sources,
                                   "coverage": {"modules": modules}, "limitations": limitations})
     manifest["sha256"] = digest(manifest)
     manifest["id"] = "planning-sources-"+manifest["sha256"]

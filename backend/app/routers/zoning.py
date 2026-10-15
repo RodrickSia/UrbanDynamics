@@ -219,6 +219,21 @@ def simulation_run(identifier: UUID, body: SimulationRunInput):
     return save_simulation(identifier, body)
 
 
+@router.post("/{identifier}/simulation/latest")
+def latest_simulation(identifier: UUID, body: SimulationInput):
+    from app.services.simulation.planning import store as simulations
+    plan=execute(lambda: require_plan(identifier))
+    if plan['revision'] != body.revision:
+        raise HTTPException(409,'Plan changed. Reload before opening a saved run.')
+    try:
+        job=simulations.latest_zoning_job(f'zoning:{identifier}:{body.scenario_id}',
+            f'Zoning plan {identifier}, revision {body.revision}, scenario {body.scenario_id}.',
+            f'Scope {body.parcel_id or "study area"}.')
+    except simulations.StoreError:
+        raise HTTPException(503,'Simulation storage unavailable') from None
+    return {'job':job, 'note':'Saved output uses its captured assumptions, not unsaved control changes.'}
+
+
 def save_simulation(identifier, body):
     from app.services.simulation.planning import store as simulations
     from app.services.simulation.planning.context import canonical_input, preflight

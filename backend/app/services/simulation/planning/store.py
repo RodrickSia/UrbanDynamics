@@ -129,6 +129,21 @@ def start_study(inputs, context_hash, scope, mode, request_key):
     return study, job
 
 
+def latest_zoning_job(scope, source_prefix, scope_note):
+    """Read completed history for the exact plan revision and spatial scope."""
+    with transaction() as session:
+        rows=session.execute('''SELECT j.id,d.payload FROM planning_submissions s
+            JOIN planning_jobs j ON j.id=s.job_id
+            JOIN planning_documents d ON d.id=j.study_id AND d.kind='study'
+            WHERE s.scope=? AND j.status='succeeded'
+            ORDER BY j.created_at DESC LIMIT 50''',(scope,)).fetchall()
+    for identifier,payload in rows:
+        note=json.loads(payload)['inputs'].get('source_note','')
+        if note.startswith(source_prefix) and scope_note in note:
+            return get_job(identifier)
+    return None
+
+
 def enqueue(study_id, mode, idempotency_key):
     with transaction() as session:
         row = session.execute("SELECT payload FROM planning_documents WHERE id=? AND kind='study'", (str(study_id),)).fetchone()

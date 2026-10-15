@@ -23,7 +23,7 @@ class StorageUnavailable(Exception):
 
 @contextmanager
 def database():
-    remote = warehouse_configured()
+    remote = warehouse_configured() and os.getenv('ZONING_STORAGE', 'auto') != 'sqlite'
     try:
         if remote:
             connection = connect_to_warehouse()

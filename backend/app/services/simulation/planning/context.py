@@ -63,6 +63,10 @@ def build_context(study: PlanningStudy):
                                "School access uses a synthetic pedestrian spine; age fraction and places are assumptions, not enrollment forecasts. Healthcare/park capacity allocation is unavailable.",
                                "No legal planning approval, 2D flood depth, thermal comfort or power-flow inference."]}
     context = canonical_numbers(context)
+    if study.development_context:
+        context['development_context'] = study.development_context
+        context['source_kind'] = 'mixed_source_and_assumptions'
+        context['data_coverage']['kind'] = 'mixed_source_and_assumptions'
     if study.planning_catalog == "qcvn_urban_2021":
         from .vietnam_rules import catalog
         context["vietnam_planning_catalog"] = catalog()
@@ -72,6 +76,7 @@ def build_context(study: PlanningStudy):
         from .spatial import fixed_context
         context["fixed_solar_context"] = fixed_context(study)
         context["limitations"][1] = "School access uses OSM foot topology and estimated endpoint connectors; age fraction, capacity and enrollment remain unverified. Healthcare/park capacity allocation is unavailable."
+    context = canonical_numbers(context)
     context["sha256"] = digest(context)
     return deepcopy(context)
 

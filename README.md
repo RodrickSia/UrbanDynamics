@@ -5,6 +5,22 @@ combines a web map, a FastAPI service, a PostGIS warehouse, and ETL pipelines fo
 publishing spatial datasets. Its planning tools support scenario analysis; their
 outputs are modeled results, not forecasts or official determinations.
 
+## Development simulation preview — this branch
+
+`feat/development-simulation-context` extends main's Development workflow with
+preserved/sourced ground cover, cached local OSM road context, explicit background
+traffic assumptions, and Before / After / Change tables with SUMO delay and queue.
+
+The separate server preview is available at **http://127.0.0.1:8192** through the
+workstation SSH tunnel (server 156, loopback port **51875**). Open **Plans →
+Simulation context demo · Thu Duc parcel 1937203 → Development**, then select the
+saved apartment proposal. Production main is not replaced. Plans and simulation
+results use a separate volume; the team warehouse is read-only.
+Use **View last completed run** to open the prepared SUMO/SWMM case immediately.
+
+See [the implementation and usage guide](docs/development-simulation-context.md)
+for data sources, synthetic assumptions, local ports, deployment and verification.
+
 ## What is included
 
 - An interactive React, TypeScript, and MapLibre map with 2D/3D views and
