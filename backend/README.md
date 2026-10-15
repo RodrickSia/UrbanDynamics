@@ -70,15 +70,21 @@ random-trip rate from historical LOS because the current traffic sources do
 not provide vehicle counts or an observed origin-destination matrix. Treat the
 result as an estimated-demand scenario, not a validated forecast. The map
 includes all network road edges and colors them by SUMO-estimated passenger-car
-passages over the simulated 30-minute interval; motorcycle traffic affects the
-simulation but is not included in that car count. Apply
+passages over the simulated 30-minute interval. To keep batch runs fast, this
+scenario simulates passenger cars only; its demand rate preserves the configured
+30% car share but motorcycle interactions are not modeled. It uses SUMO's
+mesoscopic queue model (`--mesosim true`) for throughput; this is less detailed
+than microscopic vehicle-following and lane-changing. Cache lookups are model
+versioned, so previously cached microscopic scenarios are recomputed. Apply
 `11-sumo-congestion-simulation.sql` and `12-sumo-congestion-scenario-cache.sql`
 before using the queue API. The `Precompute SUMO traffic scenarios` workflow
 queues all 336 weekday/half-hour combinations and stores completed GeoJSON
 results compressed in PostGIS. It is resumable: rerunning it skips cached
 scenarios and retries failed or unfinished ones. The map checks this cache
 first; on a cache miss, it queues the selected scenario through the worker and
-that result is added to the same cache for later requests.
+that result is added to the same cache for later requests. The precompute workflow
+defaults to four parallel workers and offers 1/2/4/8-worker choices; select a
+count appropriate for the self-hosted VM's available CPU and memory.
 
 ## Configuration and operation
 

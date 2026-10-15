@@ -58,6 +58,9 @@ class FakeConnection:
     def fetchone(self):
         return self.result
 
+    def fetchall(self):
+        return self.result
+
 
 def test_submit_requires_a_half_hour_time():
     with pytest.raises(HTTPException, match="30-minute boundary") as error:
@@ -103,6 +106,16 @@ def test_scenario_cache_endpoint_returns_cache_miss_as_404(monkeypatch):
     assert error.value.status_code == 404
 
 
+def test_scenario_cache_only_returns_results_from_the_current_model(monkeypatch):
+    connection = FakeConnection(result=("meso-run", {"simulation_model": "mesoscopic"}))
+    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
+
+    cached = traffic_sumo_prediction.cached_scenario(2, "08:00")
+
+    assert cached["run_id"] == "meso-run"
+    assert connection.calls[0][1] == (2, "08:00", "mesoscopic")
+
+
 def test_cached_result_is_decompressed_from_database(monkeypatch):
     result = {"type": "FeatureCollection", "features": [], "metadata": {"engine": "SUMO"}}
     connection = FakeConnection(result=(compress(dumps(result).encode("utf-8")),))
@@ -111,27 +124,69 @@ def test_cached_result_is_decompressed_from_database(monkeypatch):
     assert traffic_sumo_prediction.read_cached_result("cached-run") == result
 
 
+def test_cleanup_removes_only_the_matching_run_scratch_directory(tmp_path, monkeypatch):
+    from uuid import uuid4
+
+    run_id = str(uuid4())
+    other_run = str(uuid4())
+    runtime = tmp_path / "runtime"
+    first = runtime / "runs" / run_id
+    other = runtime / "runs" / other_run
+    first.mkdir(parents=True)
+    other.mkdir(parents=True)
+    monkeypatch.setenv("TRAFFIC_SIMULATION_DIR", str(runtime))
+
+    traffic_sumo_prediction.cleanup_run(run_id)
+
+    assert not first.exists()
+    assert other.is_dir()
+
+
 def test_target_demand_uses_historical_los_as_a_prior_not_a_vehicle_count(monkeypatch):
-    connection = FakeConnection(result=(3.0, 25))
+    traffic_sumo_prediction._demand_profile.cache_clear()
+    connection = FakeConnection(result=[
+        (1, 16, 0, 3.0, 25),
+        (1, None, 1, 2.5, 85),
+        (None, None, 3, 3.5, 500),
+    ])
     monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
 
     period, rows = traffic_sumo_prediction._target_demand(1, "08:00")
 
     assert period == pytest.approx(2.94)
     assert rows == 25
-    assert "avg(CASE los" in connection.calls[0][0]
+    assert "GROUPING SETS" in connection.calls[0][0]
 
 
 def test_target_demand_falls_back_to_weekday_or_network_history(monkeypatch):
-    connection = FakeConnection(result=(2.5, 85))
+    traffic_sumo_prediction._demand_profile.cache_clear()
+    connection = FakeConnection(result=[
+        (7, None, 1, 2.5, 85),
+        (None, None, 3, 3.5, 500),
+    ])
     monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
 
     trip_period, rows = traffic_sumo_prediction._target_demand(7, "23:30")
 
     assert trip_period == pytest.approx(3.25)
     assert rows == 85
-    assert "weekday_periods AS" in connection.calls[0][0]
-    assert "all_periods AS" in connection.calls[0][0]
+    assert "GROUPING SETS" in connection.calls[0][0]
+
+
+def test_target_demand_profile_is_loaded_once_per_worker(monkeypatch):
+    traffic_sumo_prediction._demand_profile.cache_clear()
+    connection = FakeConnection(result=[
+        (1, 16, 0, 3.0, 25),
+        (1, 17, 0, 2.0, 30),
+        (1, None, 1, 2.5, 55),
+        (None, None, 3, 3.0, 400),
+    ])
+    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
+
+    traffic_sumo_prediction._target_demand(1, "08:00")
+    traffic_sumo_prediction._target_demand(1, "08:30")
+
+    assert len(connection.calls) == 1
 
 
 def test_batch_enumerates_every_weekday_and_half_hour():
@@ -140,6 +195,40 @@ def test_batch_enumerates_every_weekday_and_half_hour():
     assert len(WEEKDAYS) * len(PERIODS) == SCENARIO_COUNT == 336
     assert PERIODS[0] == time(0, 0)
     assert PERIODS[-1] == time(23, 30)
+
+
+def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
+    network = tmp_path / "hcmc.net.xml"
+    network.touch()
+    sumo_home = tmp_path / "sumo"
+    random_trips = sumo_home / "tools" / "randomTrips.py"
+    random_trips.parent.mkdir(parents=True)
+    random_trips.touch()
+    commands = []
+    monkeypatch.setattr(
+        traffic_sumo_prediction,
+        "_directories",
+        lambda: (tmp_path / "data", tmp_path / "runtime"),
+    )
+    monkeypatch.setattr(traffic_sumo_prediction, "_network_file", lambda *_args: network)
+    monkeypatch.setattr(traffic_sumo_prediction, "_target_demand", lambda *_args: (3.0, 85))
+    monkeypatch.setattr(traffic_sumo_prediction, "_sumo_home", lambda: sumo_home)
+    monkeypatch.setattr(
+        traffic_sumo_prediction,
+        "_run",
+        lambda command, *_args: commands.append(command),
+    )
+    monkeypatch.setattr(
+        traffic_sumo_prediction,
+        "_features",
+        lambda *_args: {"metadata": {"simulation_model": "mesoscopic"}},
+    )
+
+    result = traffic_sumo_prediction.run_prediction(1, "08:00", "scenario-test")
+
+    sumo_command = next(command for command in commands if command[0].endswith("/sumo"))
+    assert sumo_command[sumo_command.index("--mesosim") + 1] == "true"
+    assert result["metadata"]["simulation_model"] == "mesoscopic"
 
 
 def test_feature_output_includes_zero_car_roads_and_sums_full_period_counts():
@@ -165,4 +254,5 @@ def test_feature_output_includes_zero_car_roads_and_sums_full_period_counts():
     assert empty["properties"]["estimated_cars_30min"] == 0
     assert empty["properties"]["simulated_speed_kmh"] == 54.0
     assert result["metadata"]["max_estimated_cars_30min"] == 5
+    assert result["metadata"]["simulation_model"] == "mesoscopic"
     assert result["metadata"]["simulation_interval_seconds"] == 600

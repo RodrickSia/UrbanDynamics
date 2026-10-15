@@ -5,11 +5,15 @@ from __future__ import annotations
 import fcntl
 import gzip
 import json
+import logging
 import os
 import subprocess
 import sys
+import time
 import xml.etree.ElementTree as ET
+from functools import lru_cache
 from pathlib import Path
+from shutil import rmtree
 from uuid import UUID, uuid4
 
 from src.shared.database import connect_to_warehouse
@@ -25,6 +29,8 @@ LOS_COLORS = {
 SIMULATION_SECONDS = 1800
 SIMULATION_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_SIMULATION_TIMEOUT_SECONDS", "600"))
 MOTORCYCLE_SHARE = 0.7
+SIMULATION_MODEL = "mesoscopic"
+logger = logging.getLogger(__name__)
 
 
 def _directories() -> tuple[Path, Path]:
@@ -48,6 +54,7 @@ def _run(command: list[str], cwd: Path, timeout: int) -> None:
     environment["PYTHONPATH"] = os.pathsep.join(
         item for item in (str(home / "tools"), environment.get("PYTHONPATH", "")) if item
     )
+    started = time.monotonic()
     try:
         subprocess.run(
             command,
@@ -57,6 +64,11 @@ def _run(command: list[str], cwd: Path, timeout: int) -> None:
             timeout=timeout,
             capture_output=True,
             text=True,
+        )
+        logger.info(
+            "SUMO stage %s finished in %.1fs",
+            Path(command[0]).name,
+            time.monotonic() - started,
         )
     except subprocess.TimeoutExpired as error:
         raise RuntimeError("SUMO traffic run exceeded its time limit") from error
@@ -114,44 +126,51 @@ def _network_file(data: Path, runtime: Path) -> Path:
         return network
 
 
+@lru_cache(maxsize=1)
+def _demand_profile() -> tuple[
+    dict[tuple[int, int], tuple[float, int]],
+    dict[int, tuple[float, int]],
+    tuple[float, int] | None,
+]:
+    """Aggregate historical LOS once per worker, not once for each scenario."""
+    with connect_to_warehouse() as connection:
+        rows = connection.execute(
+            """
+            WITH matched AS (
+                SELECT extract(isodow FROM observed_at)::integer AS weekday,
+                       extract(hour FROM observed_at)::integer * 2
+                           + extract(minute FROM observed_at)::integer / 30 AS slot,
+                       CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
+                                WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END AS los_score
+                FROM transport.traffic_observation
+                WHERE sumo_edge_id IS NOT NULL
+            )
+            SELECT weekday, slot, GROUPING(weekday, slot) AS grouping_level,
+                   avg(los_score) AS mean_los, count(*) AS sample_rows
+            FROM matched
+            GROUP BY GROUPING SETS ((weekday, slot), (weekday), ())
+            """
+        ).fetchall()
+    slots: dict[tuple[int, int], tuple[float, int]] = {}
+    weekdays: dict[int, tuple[float, int]] = {}
+    overall = None
+    for weekday, slot, grouping_level, mean_los, sample_rows in rows:
+        value = (float(mean_los), int(sample_rows))
+        if grouping_level == 0:
+            slots[(int(weekday), int(slot))] = value
+        elif grouping_level == 1:
+            weekdays[int(weekday)] = value
+        else:
+            overall = value
+    return slots, weekdays, overall
+
+
 def _target_demand(weekday: int, period: str) -> tuple[float, int]:
     """Translate observed LOS into a documented global demand prior, never counts."""
     hour_text, minute_text = period.split(":", 1)
     slot = int(hour_text) * 2 + int(minute_text) // 30
-    with connect_to_warehouse() as connection:
-        row = connection.execute(
-            """
-            WITH target_period AS (
-                SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
-                                    WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los,
-                       count(*) AS sample_rows
-                FROM transport.traffic_observation
-                WHERE sumo_edge_id IS NOT NULL
-                  AND extract(isodow FROM observed_at)::integer = %s
-                  AND (extract(hour FROM observed_at)::integer * 2
-                       + extract(minute FROM observed_at)::integer / 30) = %s
-            ), weekday_periods AS (
-                SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
-                                    WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los,
-                       count(*) AS sample_rows
-                FROM transport.traffic_observation
-                WHERE sumo_edge_id IS NOT NULL
-                  AND extract(isodow FROM observed_at)::integer = %s
-            ), all_periods AS (
-                SELECT avg(CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
-                                    WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END) AS mean_los,
-                       count(*) AS sample_rows
-                FROM transport.traffic_observation
-                WHERE sumo_edge_id IS NOT NULL
-            )
-            SELECT coalesce(target_period.mean_los, weekday_periods.mean_los, all_periods.mean_los),
-                   coalesce(nullif(target_period.sample_rows, 0),
-                            nullif(weekday_periods.sample_rows, 0),
-                            all_periods.sample_rows, 0)
-            FROM target_period CROSS JOIN weekday_periods CROSS JOIN all_periods
-        """,
-            (weekday, slot, weekday),
-        ).fetchone()
+    slots, weekdays, overall = _demand_profile()
+    row = slots.get((weekday, slot)) or weekdays.get(weekday) or overall
     if not row or row[1] == 0:
         raise ValueError("No matched historical LOS observations exist in the traffic history")
     mean_los = float(row[0])
@@ -169,6 +188,7 @@ def _features_from_intervals(
     period: str,
     trip_period: float,
     observation_rows: int,
+    road_edges: tuple[tuple[str, list[list[float]], float], ...] | None = None,
 ) -> dict:
     if not intervals:
         raise RuntimeError("SUMO completed without edge-level output")
@@ -195,14 +215,17 @@ def _features_from_intervals(
                 )
 
     features = []
-    for edge in network.getEdges():
-        edge_id = edge.getID()
-        if edge_id.startswith(":"):
-            continue
-        coordinates = [network.convertXY2LonLat(x, y) for x, y in edge.getShape()]
-        if len(coordinates) < 2:
-            continue
-        free_speed = float(edge.getSpeed())
+    if road_edges is None:
+        road_edges = tuple(
+            (
+                edge.getID(),
+                [network.convertXY2LonLat(x, y) for x, y in edge.getShape()],
+                float(edge.getSpeed()),
+            )
+            for edge in network.getEdges()
+            if not edge.getID().startswith(":") and len(edge.getShape()) >= 2
+        )
+    for edge_id, coordinates, free_speed in road_edges:
         sampled = sampled_seconds_by_edge.get(edge_id, 0)
         # SUMO reports no measured speed when an edge has no sampled car. Use
         # free-flow speed for that zero-volume edge rather than painting it as jammed.
@@ -249,6 +272,7 @@ def _features_from_intervals(
         "metadata": {
             "run_id": run_id,
             "engine": "SUMO",
+            "simulation_model": SIMULATION_MODEL,
             "weekday": weekday,
             "period": period,
             "timezone": "Asia/Ho_Chi_Minh",
@@ -257,27 +281,46 @@ def _features_from_intervals(
             ),
             "vehicle_count_period_seconds": SIMULATION_SECONDS,
             "vehicle_count_period_label": "simulated 30-minute period",
-            "vehicle_count_type": "passenger cars; motorcycles excluded from the count",
+            "vehicle_count_type": "passenger cars only; motorcycles are not simulated",
             "max_estimated_cars_30min": max(
                 (feature["properties"]["estimated_cars_30min"] for feature in features),
                 default=0,
             ),
             "estimated_trip_period_seconds": trip_period,
+            "historical_global_trip_period_prior_seconds": trip_period,
+            "estimated_car_trip_period_seconds": round(
+                trip_period / (1 - MOTORCYCLE_SHARE), 3
+            ),
             "historical_observation_rows_used": observation_rows,
             "demand_method": (
                 "Global randomTrips rate estimated from mean historical LOS class; "
                 "not observed vehicle counts or an OD matrix"
             ),
-            "mode_split_assumption": {
-                "motorcycle_share": MOTORCYCLE_SHARE,
-                "car_share": 1 - MOTORCYCLE_SHARE,
-            },
+            "simulated_modes": ["passenger_car"],
+            "motorcycles_simulated": False,
             "interpretation": (
                 "Standalone SUMO scenario output, not live traffic or a validated future forecast."
             ),
             "features": len(features),
         },
     }
+
+
+@lru_cache(maxsize=2)
+def _cached_road_edges(network_path: str) -> tuple[tuple[str, list[list[float]], float], ...]:
+    """Load/transform the static road graph once per worker process."""
+    import sumolib
+
+    network = sumolib.net.readNet(network_path)
+    return tuple(
+        (
+            edge.getID(),
+            [list(network.convertXY2LonLat(x, y)) for x, y in edge.getShape()],
+            float(edge.getSpeed()),
+        )
+        for edge in network.getEdges()
+        if not edge.getID().startswith(":") and len(edge.getShape()) >= 2
+    )
 
 
 def _features(
@@ -289,18 +332,17 @@ def _features(
     trip_period: float,
     observation_rows: int,
 ) -> dict:
-    import sumolib
-
-    network = sumolib.net.readNet(str(network_path))
+    road_edges = _cached_road_edges(str(network_path.resolve()))
     root = ET.parse(output_path / "edge-data.xml").getroot()
     return _features_from_intervals(
-        network,
+        None,
         root.findall("interval"),
         run_id,
         weekday,
         period,
         trip_period,
         observation_rows,
+        road_edges,
     )
 
 
@@ -332,65 +374,48 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         length="4.5",
         minGap="2.5",
     )
-    ET.SubElement(
-        vehicle_types,
-        "vType",
-        id="motorcycle",
-        vClass="motorcycle",
-        accel="3.0",
-        decel="5.0",
-        sigma="0.5",
-        length="2.0",
-        width="0.8",
-        minGap="0.8",
-        maxSpeed="16.7",
-        speedFactor="1.1",
-        latAlignment="arbitrary",
-    )
     ET.ElementTree(vehicle_types).write(
         directory / "vehicle-types.xml", encoding="utf-8", xml_declaration=True
     )
-    for kind, share, vehicle_class in (
-        ("car", 1 - MOTORCYCLE_SHARE, "passenger"),
-        ("motorcycle", MOTORCYCLE_SHARE, "motorcycle"),
-    ):
-        _run(
-            [
-                sys.executable,
-                str(random_trips),
-                "--net-file",
-                str(network_path),
-                "--output-trip-file",
-                f"{kind}-trips.xml",
-                "--begin",
-                "0",
-                "--end",
-                str(SIMULATION_SECONDS),
-                "--period",
-                str(trip_period / share),
-                "--seed",
-                "17",
-                "--prefix",
-                kind,
-                "--fringe-factor",
-                "5",
-                "--vehicle-class",
-                vehicle_class,
-                "--edge-permission",
-                vehicle_class,
-                "--trip-attributes",
-                f'type="{kind}"',
-            ],
-            directory,
-            180,
-        )
+    _run(
+        [
+            sys.executable,
+            str(random_trips),
+            "--net-file",
+            str(network_path),
+            "--output-trip-file",
+            "car-trips.xml",
+            "--begin",
+            "0",
+            "--end",
+            str(SIMULATION_SECONDS),
+            # Preserve the previous 30% car share, but omit motorcycles from
+            # the simulation because the result and edgeData output are car-only.
+            "--period",
+            str(trip_period / (1 - MOTORCYCLE_SHARE)),
+            "--seed",
+            "17",
+            "--prefix",
+            "car",
+            "--fringe-factor",
+            "5",
+            "--vehicle-class",
+            "passenger",
+            "--edge-permission",
+            "passenger",
+            "--trip-attributes",
+            'type="car"',
+        ],
+        directory,
+        180,
+    )
     _run(
         [
             str(binaries / ("duarouter" + suffix)),
             "--net-file",
             str(network_path),
             "--route-files",
-            "car-trips.xml,motorcycle-trips.xml",
+            "car-trips.xml",
             "--additional-files",
             "vehicle-types.xml",
             "--output-file",
@@ -407,7 +432,9 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         "edgeData",
         id="traffic",
         file="edge-data.xml",
-        period="300",
+        # One aggregate interval is enough: only the full 30-minute count and
+        # weighted speed/occupancy are exposed by this scenario layer.
+        period=str(SIMULATION_SECONDS),
         begin="0",
         end=str(SIMULATION_SECONDS),
         excludeEmpty="false",
@@ -435,16 +462,13 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
             "true",
             "--time-to-teleport",
             "-1",
+            "--mesosim",
+            "true",
         ],
         directory,
         SIMULATION_TIMEOUT_SECONDS,
     )
-    result = _features(network_path, directory, run_id, weekday, period, trip_period, observations)
-    result_path = run_root / "result.geojson"
-    temporary = result_path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(result, separators=(",", ":")), encoding="utf-8")
-    temporary.replace(result_path)
-    return result
+    return _features(network_path, directory, run_id, weekday, period, trip_period, observations)
 
 
 def read_result(run_id: str) -> dict | None:
@@ -457,6 +481,16 @@ def read_result(run_id: str) -> dict | None:
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def cleanup_run(run_id: str) -> None:
+    """Remove per-run SUMO scratch files after the result is stored in PostGIS."""
+    try:
+        canonical = str(UUID(run_id))
+    except ValueError:
+        return
+    _, runtime = _directories()
+    rmtree(runtime / "runs" / canonical, ignore_errors=True)
 
 
 def read_cached_result(run_id: str) -> dict | None:
@@ -483,8 +517,9 @@ def cached_scenario(weekday: int, period: str) -> dict | None:
             SELECT run_id, metadata
             FROM transport.sumo_congestion_scenario_cache
             WHERE weekday = %s AND period = %s
+              AND metadata->>'simulation_model' = %s
             """,
-            (weekday, period),
+            (weekday, period, SIMULATION_MODEL),
         ).fetchone()
     if row is None:
         return None

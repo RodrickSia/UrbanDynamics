@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from src.shared.database import connect_to_warehouse
 
-from app.services.traffic_sumo_prediction import catalog
+from app.services.traffic_sumo_prediction import SIMULATION_MODEL, catalog
 
 WEEKDAYS = range(1, 8)
 PERIODS = tuple(clock_time(hour, minute) for hour in range(24) for minute in (0, 30))
@@ -36,7 +36,11 @@ def queue_missing_scenarios() -> tuple[int, int]:
         cached = {
             (int(weekday), period)
             for weekday, period in connection.execute(
-                "SELECT weekday, period FROM transport.sumo_congestion_scenario_cache"
+                """
+                SELECT weekday, period FROM transport.sumo_congestion_scenario_cache
+                WHERE metadata->>'simulation_model' = %s
+                """,
+                (SIMULATION_MODEL,),
             ).fetchall()
         }
         for weekday in WEEKDAYS:
@@ -68,7 +72,11 @@ def run_batch(poll_seconds: float = 15, timeout_minutes: float = 350) -> None:
     while True:
         with connect_to_warehouse() as connection:
             cached_count = connection.execute(
-                "SELECT count(*) FROM transport.sumo_congestion_scenario_cache"
+                """
+                SELECT count(*) FROM transport.sumo_congestion_scenario_cache
+                WHERE metadata->>'simulation_model' = %s
+                """,
+                (SIMULATION_MODEL,),
             ).fetchone()[0]
             active_count = connection.execute("""
                 SELECT count(*) FROM transport.sumo_congestion_run
@@ -86,9 +94,10 @@ def run_batch(poll_seconds: float = 15, timeout_minutes: float = 350) -> None:
                   AND NOT EXISTS (
                       SELECT 1 FROM transport.sumo_congestion_scenario_cache AS cached
                       WHERE cached.weekday = latest.weekday AND cached.period = latest.period
+                        AND cached.metadata->>'simulation_model' = %s
                   )
                 ORDER BY weekday, period
-            """).fetchall()
+            """, (SIMULATION_MODEL,)).fetchall()
 
         logger.info("SUMO scenario batch progress: %d/%d cached; %d queued/running",
                     cached_count, SCENARIO_COUNT, active_count)

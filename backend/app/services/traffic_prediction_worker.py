@@ -9,7 +9,7 @@ import time
 from psycopg.types.json import Jsonb
 from src.shared.database import connect_to_warehouse
 
-from app.services.traffic_sumo_prediction import run_prediction
+from app.services.traffic_sumo_prediction import cleanup_run, run_prediction
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ def process_one() -> bool:
             )
 
     try:
+        started = time.monotonic()
+        logger.info("Starting SUMO scenario %s (weekday=%s period=%s)", run_id, weekday, period)
         result = run_prediction(int(weekday), period.strftime("%H:%M"), str(run_id))
         with connect_to_warehouse() as connection:
             with connection.transaction():
@@ -68,6 +70,7 @@ def process_one() -> bool:
                     """,
                     (Jsonb(result["metadata"]), run_id),
                 )
+        logger.info("Cached SUMO scenario %s in %.1fs", run_id, time.monotonic() - started)
     except Exception as error:
         logger.exception("Standalone SUMO run %s failed", run_id)
         with connect_to_warehouse() as connection:
@@ -79,6 +82,8 @@ def process_one() -> bool:
             """,
                 (str(error)[:2000], run_id),
             )
+    finally:
+        cleanup_run(str(run_id))
     return True
 
 
