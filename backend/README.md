@@ -28,8 +28,8 @@ order. Spatial query bboxes use `west,south,east,north`.
 | Population point sample | `/api/v1/population/{year}/value?lng=106.7&lat=10.8` |
 | Population viewport statistics | `/api/v1/population/{year}/stats?bbox=west,south,east,north` |
 | Historical weekday/time traffic congestion layer | `/api/v1/traffic/prediction` |
+| Latest precomputed SUMO congestion layer | `/api/v1/traffic/sumo-simulations/latest` |
 | Cached SUMO weekday/time scenario | `/api/v1/traffic/sumo-simulations/scenarios/{weekday}/{period}` |
-| Standalone SUMO congestion runs | `POST /api/v1/traffic/sumo-simulations/runs` |
 | SUMO run status and map GeoJSON | `/api/v1/traffic/sumo-simulations/runs/{run_id}` and `/features` |
 
 The vector catalog exposes layer availability, geometry types, fields, source
@@ -63,32 +63,35 @@ Population PNG rendering is done in the API process from resampled pixel
 values, so it does not require enabling GDAL output drivers in PostGIS.
 
 The standalone SUMO traffic predictor is separate from development/zoning
-simulation. It queues a weekday/30-minute run to the `traffic-prediction-worker`
-Compose service, builds/caches a SUMO road network from the HCMC OSM PBF, and
-returns edge-level simulated speeds and LOS for the map. It derives one global
-random-trip rate from historical LOS because the current traffic sources do
-not provide vehicle counts or an observed origin-destination matrix. Treat the
-result as an estimated-demand scenario, not a validated forecast. The map
-includes all network road edges and colors them by SUMO-estimated passenger-car
-passages over the simulated 30-minute interval. To keep batch runs fast, this
-scenario simulates passenger cars only; its demand rate preserves the configured
-30% car share but motorcycle interactions are not modeled. It uses SUMO's
-mesoscopic queue model (`--mesosim true`) for throughput; this is less detailed
-than microscopic vehicle-following and lane-changing. Cache lookups are model
-versioned, so previously cached microscopic scenarios are recomputed. Apply
+simulation. Each request runs exactly one selected weekday/start-time scenario
+for six simulated hours on the `traffic-prediction-worker` Compose service,
+builds/caches a SUMO road network from the HCMC OSM PBF, and returns one
+aggregate set of edge-level speeds, LOS, and estimated car passages for that
+six-hour window. For the fast layer, demand is deliberately fixed at one
+passenger-car trip attempt per minute (360 attempts total), independent of the
+selected start time. This is a minimum-load synthetic scenario, not a useful
+estimate of real city demand: it will generally understate traffic and
+congestion. The map displays only the
+currently selected run's result, with roads colored by estimated passenger-car
+passages over that six-hour run. This scenario simulates passenger cars only;
+motorcycle interactions are not modeled. It uses SUMO's mesoscopic queue model
+(`--mesosim true`) for throughput; this is less detailed than microscopic
+vehicle-following and lane-changing, and allows a stuck vehicle to be teleported
+after 300 seconds rather than disabling stuck-vehicle recovery. Cache lookups are model-versioned, so
+previously cached 30-minute results are not shown as six-hour data. Apply
 `11-sumo-congestion-simulation.sql` and `12-sumo-congestion-scenario-cache.sql`
-before using the queue API. The `Precompute SUMO traffic scenarios` workflow
-queues all 336 weekday/half-hour combinations and stores completed GeoJSON
-results compressed in PostGIS. It is resumable: rerunning it skips cached
-scenarios and retries failed or unfinished ones. The map checks this cache
-first; on a cache miss, it queues the selected scenario through the worker and
-that result is added to the same cache for later requests. The precompute workflow
+before using the cached data API. The `Run one six-hour SUMO traffic scenario`
+workflow accepts one weekday and HCMC start time, queues only that scenario,
+and uses one worker. It is resumable: rerunning it skips a matching cached
+scenario and retries failed or unfinished runs. The map only reads the latest
+cached result and never enqueues or starts a run. The workflow
 prepares the HCMC SUMO network once in the shared Compose runtime volume before
-starting scenario workers. Network conversion has a 30-minute limit by default
-(`TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS`); once created, workers reuse the
-network instead of rebuilding it per scenario. The workflow defaults to four
-parallel workers and offers 1/2/4/8-worker choices; select a count appropriate
-for the self-hosted VM's available CPU and memory.
+starting the worker. Network conversion has a 30-minute limit by default
+(`TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS`); once created, the worker reuses the
+network instead of rebuilding it. Trip generation, routing, and simulation
+timeouts default to 60, 30, and 210 minutes respectively and can be adjusted via
+`TRAFFIC_TRIP_GENERATION_TIMEOUT_SECONDS`, `TRAFFIC_ROUTE_BUILD_TIMEOUT_SECONDS`,
+and `TRAFFIC_SIMULATION_TIMEOUT_SECONDS`.
 
 ## Configuration and operation
 

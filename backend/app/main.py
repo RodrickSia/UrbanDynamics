@@ -114,6 +114,6 @@ def api_index():
             "land_prices": "/api/v1/land-prices",
             "traffic_prediction": "/api/v1/traffic/prediction?weekday=1&period=08:00",
             "sumo_network": "/api/v1/traffic/network",
-            "sumo_congestion_simulations": "/api/v1/traffic/sumo-simulations/runs",
+            "sumo_congestion_layer": "/api/v1/traffic/sumo-simulations/latest",
         },
     }

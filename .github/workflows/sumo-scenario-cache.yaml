@@ -1,14 +1,19 @@
-name: Precompute SUMO traffic scenarios
+name: Run one six-hour SUMO traffic scenario
 
 on:
   workflow_dispatch:
     inputs:
-      worker_count:
-        description: Parallel SUMO workers (choose based on VM CPU/RAM)
+      weekday:
+        description: Scenario weekday (Monday=1, Sunday=7)
         required: true
         type: choice
-        default: '4'
-        options: ['1', '2', '4', '8']
+        default: '1'
+        options: ['1', '2', '3', '4', '5', '6', '7']
+      start_time:
+        description: Scenario start time in HCMC (half-hour boundary)
+        required: true
+        type: string
+        default: '08:00'
 
 permissions:
   contents: read
@@ -19,7 +24,7 @@ concurrency:
 
 jobs:
   precompute:
-    name: Run and cache all 336 weekday/time scenarios
+    name: Run and cache one six-hour scenario
     runs-on: [self-hosted, linux]
     timeout-minutes: 360
     environment: production
@@ -27,7 +32,8 @@ jobs:
       WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}
       WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
       WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
-      SUMO_WORKERS: ${{ inputs.worker_count || '4' }}
+      SUMO_WEEKDAY: ${{ inputs.weekday || '1' }}
+      SUMO_START_TIME: ${{ inputs.start_time || '08:00' }}
     steps:
       - uses: actions/checkout@v5
       - name: Start database and check cache migration
@@ -59,7 +65,7 @@ jobs:
           docker compose --env-file .env build traffic-prediction-worker
           docker compose --env-file .env run --rm --no-deps traffic-prediction-worker \
             python -m app.services.traffic_sumo_network
-      - name: Run or resume all SUMO weekday/time scenarios
+      - name: Run or resume the selected six-hour scenario
         run: |
           set -eu
           created_env=false
@@ -68,13 +74,11 @@ jobs:
             created_env=true
           fi
           trap 'if [ "$created_env" = true ]; then rm -f .env; fi' EXIT
-          case "$SUMO_WORKERS" in 1|2|4|8) ;; *) echo "Invalid SUMO worker count: $SUMO_WORKERS" >&2; exit 1 ;; esac
-          docker compose --env-file .env up -d --build --scale "traffic-prediction-worker=$SUMO_WORKERS" --wait --wait-timeout 180 traffic-prediction-worker
+          docker compose --env-file .env up -d --build --scale traffic-prediction-worker=1 --wait --wait-timeout 180 traffic-prediction-worker
           docker compose --env-file .env ps --status running --services | grep -Fxq traffic-prediction-worker || {
             echo "::error::Could not start the traffic-prediction-worker." >&2
             exit 1
           }
-          echo "Running $SUMO_WORKERS SUMO workers in parallel."
           docker compose --env-file .env exec -T traffic-prediction-worker \
-            python -m app.services.traffic_sumo_batch --poll-seconds 15 --timeout-minutes 350
+            python -m app.services.traffic_sumo_batch --weekday "$SUMO_WEEKDAY" --period "$SUMO_START_TIME" --poll-seconds 15 --timeout-minutes 320
           docker compose --env-file .env up -d --scale traffic-prediction-worker=1 traffic-prediction-worker

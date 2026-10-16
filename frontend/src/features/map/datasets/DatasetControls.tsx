@@ -9,13 +9,9 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
   const report = data.reports[id];
   const [trafficWeekday, setTrafficWeekday] = useState(data.trafficSchedule.weekday);
   const [trafficPeriod, setTrafficPeriod] = useState(data.trafficSchedule.period);
-  const [sumoWeekday, setSumoWeekday] = useState(data.trafficSchedule.weekday);
-  const [sumoPeriod, setSumoPeriod] = useState(data.trafficSchedule.period);
-  const [sumoSubmitting, setSumoSubmitting] = useState(false);
-  const [sumoSubmitError, setSumoSubmitError] = useState('');
   const sumoVolumeMax = Math.max(
     0,
-    Math.floor(Number(data.sumoRunMetadata?.max_estimated_cars_30min ?? 0)),
+    Math.floor(Number(data.sumoRunMetadata?.max_estimated_cars_6h ?? 0)),
   );
   const sumoVolumeTicks = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round(sumoVolumeMax * fraction)))];
   const StatusIcon =
@@ -198,63 +194,23 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
       )}
       {id === 'sumo-simulation' && (
         <>
-          <form
-            className="dataset-dates"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setSumoSubmitting(true);
-              setSumoSubmitError('');
-              try {
-                await data.runSumo({ weekday: sumoWeekday, period: sumoPeriod });
-              } catch (error) {
-                setSumoSubmitError(error instanceof Error ? error.message : 'Could not queue SUMO run');
-              } finally {
-                setSumoSubmitting(false);
-              }
-            }}
-          >
-            <strong>Run SUMO congestion scenario</strong>
-            <div className="dataset-fields">
-              <label>
-                Historical weekday
-                <select
-                  aria-label="SUMO prediction day of week"
-                  value={sumoWeekday}
-                  onChange={(event) => setSumoWeekday(Number(event.target.value))}
-                >
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => (
-                    <option key={day} value={index + 1}>{day}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Time of day (HCMC)
-                <input
-                  type="time"
-                  step={1800}
-                  aria-label="SUMO prediction time of day"
-                  value={sumoPeriod}
-                  onChange={(event) => setSumoPeriod(event.target.value)}
-                />
-              </label>
-            </div>
-            <button type="submit" disabled={sumoSubmitting || data.sumoRunStatus === 'queued' || data.sumoRunStatus === 'running'}>
-              {sumoSubmitting || data.sumoRunStatus === 'queued' || data.sumoRunStatus === 'running'
-                ? `SUMO ${data.sumoRunStatus ?? 'queueing'}…`
-                : 'Run separate SUMO simulation'}
-            </button>
-          </form>
-          {data.sumoRunStatus === 'failed' && (
-            <p className="dataset-status" role="alert">SUMO run failed: {data.sumoRunError ?? 'unknown error'}</p>
+          {data.sumoRunStatus === 'loading' && (
+            <p className="dataset-status" role="status">Loading the latest precomputed SUMO layer…</p>
+          )}
+          {data.sumoRunStatus === 'empty' && (
+            <p className="dataset-status" role="status">No precomputed six-hour SUMO layer is available.</p>
+          )}
+          {data.sumoRunStatus === 'error' && (
+            <p className="dataset-status" role="alert">SUMO layer unavailable: {data.sumoRunError ?? 'unknown error'}</p>
           )}
           {data.sumoRunStatus === 'completed' && (
             <p className="dataset-status" role="status">
-              SUMO simulation complete · {String(data.sumoRunMetadata?.features ?? 0)} road edges
+              Latest precomputed scenario · weekday {String(data.sumoRunMetadata?.weekday ?? '')},
+              {' '}start {String(data.sumoRunMetadata?.period ?? '')} HCMC · six hours
             </p>
           )}
-          {sumoSubmitError && <p className="dataset-status" role="alert">{sumoSubmitError}</p>}
-          <div className="sumo-volume-legend" role="group" aria-label="Estimated car passages per road over 30 minutes">
-            <small>Estimated car passages · simulated 30 minutes</small>
+          <div className="sumo-volume-legend" role="group" aria-label="Estimated car passages per road over six hours">
+            <small>Estimated car passages · simulated six hours</small>
             <div className="sumo-volume-ramp" aria-hidden="true" />
             {data.sumoRunStatus === 'completed' ? (
               <div className="sumo-volume-ticks">
@@ -263,15 +219,16 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
                 ))}
               </div>
             ) : (
-              <small>Run a scenario to calculate the road-volume scale.</small>
+              <small>Scale appears when a cached scenario is available.</small>
             )}
           </div>
           <DatasetNote>
-            This is a separate SUMO run. Demand is estimated from historical LOS, not measured
-            vehicle counts or an observed origin–destination matrix. Results are modeled scenarios,
-            not live traffic or a validated forecast. Road colors show estimated passenger-car
-            passages on each road over the simulated 30-minute period; zero-volume roads remain
-            visible at the low end of the scale.
+            This is a precomputed data layer; enabling it never starts a simulation. The fast
+            synthetic run uses only 360 planned car trips over six hours, so it is not representative
+            of real city demand and will generally understate congestion. The latest
+            workflow-published scenario is shown as a six-hour aggregate, not live traffic or a
+            validated forecast. Road colors show estimated passenger-car passages on each road in
+            that run; zero-volume roads remain visible at the low end of the scale.
           </DatasetNote>
         </>
       )}

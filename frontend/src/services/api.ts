@@ -27,6 +27,13 @@ export interface SumoSimulationCatalog {
   network_edges: number;
   matched_observations: number;
 }
+export interface CachedSumoScenario {
+  runId: string;
+  weekday: number;
+  period: string;
+  generatedAt?: string;
+  metadata?: Record<string, unknown>;
+}
 export interface CatalogLayer {
   id: string;
   available: boolean;
@@ -56,40 +63,25 @@ export async function getSumoSimulationCatalog(signal?: AbortSignal): Promise<Su
     matched_observations: Number(result.matched_observations ?? 0),
   };
 }
-export async function runSumoSimulation(period: TrafficPeriod, signal?: AbortSignal) {
-  const scenarioPath = `/api/v1/traffic/sumo-simulations/scenarios/${period.weekday}/${encodeURIComponent(period.period)}`;
+export async function getLatestSumoScenario(signal?: AbortSignal): Promise<CachedSumoScenario | null> {
   try {
-    const cached = await requestJson(scenarioPath, signal);
-    requireShape(typeof cached.run_id === 'string');
+    const cached = await requestJson('/api/v1/traffic/sumo-simulations/latest', signal);
+    requireShape(
+      typeof cached.run_id === 'string' &&
+        typeof cached.weekday === 'number' &&
+        typeof cached.period === 'string',
+    );
     return {
       runId: cached.run_id as string,
-      status: 'completed' as const,
+      weekday: cached.weekday as number,
+      period: cached.period as string,
+      generatedAt: typeof cached.generated_at === 'string' ? cached.generated_at : undefined,
       metadata: cached.metadata && typeof cached.metadata === 'object' ? object(cached.metadata) : undefined,
-      cached: true,
     };
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
   }
-  const response = await fetch(`${API_BASE_URL}/api/v1/traffic/sumo-simulations/runs`, {
-    method: 'POST',
-    signal,
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(period),
-  });
-  if (!response.ok) {
-    const failure = await response.json().catch(() => ({}));
-    throw new Error(
-      typeof failure.detail === 'string' ? failure.detail : `SUMO request failed (${response.status})`,
-    );
-  }
-  const result = object(await response.json());
-  requireShape(typeof result.run_id === 'string');
-  return {
-    runId: result.run_id as string,
-    status: String(result.status ?? 'queued') as 'queued' | 'running' | 'completed',
-    metadata: result.metadata && typeof result.metadata === 'object' ? object(result.metadata) : undefined,
-    cached: result.cached === true,
-  };
 }
 export async function getSumoSimulationRun(runId: string, signal?: AbortSignal) {
   const result = await requestJson(`/api/v1/traffic/sumo-simulations/runs/${runId}`, signal);

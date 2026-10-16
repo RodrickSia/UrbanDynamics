@@ -21,8 +21,8 @@ describe('map domain', () => {
       'synthetic-buildings',
       'population',
       'public-facilities',
+      'sumo-network',
       'traffic',
-      'flood',
     ]);
   });
 

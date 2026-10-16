@@ -24,10 +24,7 @@ function mockCatalog() {
   vi.stubGlobal(
     'fetch',
     vi.fn(
-      async (input: string, init?: RequestInit) => {
-        if (input.includes('/traffic/sumo-simulations/scenarios/')) {
-          return new Response(JSON.stringify({ detail: 'not precomputed' }), { status: 404 });
-        }
+      async (input: string) => {
         return new Response(
           JSON.stringify(
             input.endsWith('/population')
@@ -37,10 +34,15 @@ function mockCatalog() {
                 }
               : input.endsWith('/traffic/sumo-simulations/catalog')
                 ? { available: true, network_input: true, network_edges: 1200, matched_observations: 4500 }
-              : input.endsWith('/traffic/sumo-simulations/runs') && init?.method === 'POST'
-                ? { run_id: 'a4b0baab-5b88-42e3-932d-72a8103fe870', status: 'queued' }
+              : input.endsWith('/traffic/sumo-simulations/latest')
+                ? {
+                    run_id: 'a4b0baab-5b88-42e3-932d-72a8103fe870',
+                    weekday: 1,
+                    period: '08:00',
+                    metadata: { features: 420, max_estimated_cars_6h: 120 },
+                  }
               : input.includes('/traffic/sumo-simulations/runs/')
-                ? { status: 'completed', metadata: { features: 420, max_estimated_cars_30min: 120 } }
+                ? { status: 'completed', metadata: { features: 420, max_estimated_cars_6h: 120 } }
               : input.endsWith('/traffic/catalog')
                 ? { available: true, network_available: true }
               : {
@@ -98,16 +100,16 @@ it('lets users display historical traffic and the SUMO road graph when the API r
   expect(sumo).toBeChecked();
   expect(screen.getByText('SUMO network edge')).toBeInTheDocument();
 });
-it('runs SUMO separately from planning and exposes its simulation layer controls', async () => {
+it('shows the latest cached SUMO result as a data layer without submitting a run', async () => {
   mockCatalog();
   render(<Panel />);
   const simulation = await screen.findByRole('checkbox', { name: 'SUMO congestion simulation' });
   await waitFor(() => expect(simulation).toBeEnabled());
   await userEvent.click(simulation);
-  expect(screen.getByText('Run SUMO congestion scenario')).toBeInTheDocument();
-  await userEvent.click(screen.getByRole('button', { name: 'Run separate SUMO simulation' }));
-  await waitFor(() => expect(screen.getByText(/SUMO simulation complete/)).toBeInTheDocument());
-  expect(screen.getByRole('group', { name: 'Estimated car passages per road over 30 minutes' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText(/Latest precomputed scenario/)).toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: /run .*SUMO/i })).not.toBeInTheDocument();
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  expect(screen.getByRole('group', { name: 'Estimated car passages per road over six hours' })).toBeInTheDocument();
   expect(screen.getByText('120')).toBeInTheDocument();
 });
 it('reveals compact controls only for active layers and supports keyboard toggling', async () => {

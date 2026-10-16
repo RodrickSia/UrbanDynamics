@@ -26,11 +26,16 @@ LOS_COLORS = {
     "E": "#d9583c",
     "F": "#8c3047",
 }
-SIMULATION_SECONDS = 1800
-SIMULATION_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_SIMULATION_TIMEOUT_SECONDS", "600"))
+SIMULATION_SECONDS = 6 * 60 * 60
+CAR_TRIP_PERIOD_SECONDS = 60.0
+PLANNED_CAR_TRIPS_6H = int(SIMULATION_SECONDS / CAR_TRIP_PERIOD_SECONDS)
+SIMULATION_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_SIMULATION_TIMEOUT_SECONDS", "12600"))
+TRIP_GENERATION_TIMEOUT_SECONDS = int(
+    os.getenv("TRAFFIC_TRIP_GENERATION_TIMEOUT_SECONDS", "3600")
+)
+ROUTE_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_ROUTE_BUILD_TIMEOUT_SECONDS", "1800"))
 NETWORK_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS", "1800"))
-MOTORCYCLE_SHARE = 0.7
-SIMULATION_MODEL = "mesoscopic"
+SIMULATION_MODEL = "mesoscopic-6h-min-demand-v1"
 logger = logging.getLogger(__name__)
 
 
@@ -74,7 +79,20 @@ def _run(command: list[str], cwd: Path, timeout: int) -> None:
             time.monotonic() - started,
         )
     except subprocess.TimeoutExpired as error:
-        raise RuntimeError(f"SUMO stage {stage} exceeded its {timeout}s time limit") from error
+        stderr = error.stderr or b""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        stderr_tail = stderr[-1400:]
+        logger.error(
+            "SUMO stage %s timed out after %.1fs; stderr tail: %s",
+            stage,
+            time.monotonic() - started,
+            stderr_tail or "(empty)",
+        )
+        detail = f"; stderr tail: {stderr_tail}" if stderr_tail else ""
+        raise RuntimeError(
+            f"SUMO stage {stage} exceeded its {timeout}s time limit{detail}"
+        ) from error
     except subprocess.CalledProcessError as error:
         detail = (error.stderr or error.stdout or "SUMO command failed")[-1200:]
         raise RuntimeError(detail) from error
@@ -155,58 +173,10 @@ def _network_file(data: Path, runtime: Path) -> Path:
         return network
 
 
-@lru_cache(maxsize=1)
-def _demand_profile() -> tuple[
-    dict[tuple[int, int], tuple[float, int]],
-    dict[int, tuple[float, int]],
-    tuple[float, int] | None,
-]:
-    """Aggregate historical LOS once per worker, not once for each scenario."""
-    with connect_to_warehouse() as connection:
-        rows = connection.execute(
-            """
-            WITH matched AS (
-                SELECT extract(isodow FROM observed_at)::integer AS weekday,
-                       extract(hour FROM observed_at)::integer * 2
-                           + extract(minute FROM observed_at)::integer / 30 AS slot,
-                       CASE los WHEN 'A' THEN 0 WHEN 'B' THEN 1 WHEN 'C' THEN 2
-                                WHEN 'D' THEN 3 WHEN 'E' THEN 4 ELSE 5 END AS los_score
-                FROM transport.traffic_observation
-                WHERE sumo_edge_id IS NOT NULL
-            )
-            SELECT weekday, slot, GROUPING(weekday, slot) AS grouping_level,
-                   avg(los_score) AS mean_los, count(*) AS sample_rows
-            FROM matched
-            GROUP BY GROUPING SETS ((weekday, slot), (weekday), ())
-            """
-        ).fetchall()
-    slots: dict[tuple[int, int], tuple[float, int]] = {}
-    weekdays: dict[int, tuple[float, int]] = {}
-    overall = None
-    for weekday, slot, grouping_level, mean_los, sample_rows in rows:
-        value = (float(mean_los), int(sample_rows))
-        if grouping_level == 0:
-            slots[(int(weekday), int(slot))] = value
-        elif grouping_level == 1:
-            weekdays[int(weekday)] = value
-        else:
-            overall = value
-    return slots, weekdays, overall
-
-
 def _target_demand(weekday: int, period: str) -> tuple[float, int]:
-    """Translate observed LOS into a documented global demand prior, never counts."""
-    hour_text, minute_text = period.split(":", 1)
-    slot = int(hour_text) * 2 + int(minute_text) // 30
-    slots, weekdays, overall = _demand_profile()
-    row = slots.get((weekday, slot)) or weekdays.get(weekday) or overall
-    if not row or row[1] == 0:
-        raise ValueError("No matched historical LOS observations exist in the traffic history")
-    mean_los = float(row[0])
-    # Higher observed LOS grades imply a denser estimated trip stream. This is a
-    # scenario prior, not a measured vehicle count or a fitted OD matrix.
-    trip_period_seconds = max(1.5, min(5.0, 4.8 - mean_los * 0.62))
-    return trip_period_seconds, int(row[1])
+    """Use a fixed, deliberately low synthetic demand for the fast six-hour layer."""
+    del weekday, period  # Scenario identity does not alter this minimal test demand.
+    return CAR_TRIP_PERIOD_SECONDS, 0
 
 
 def _features_from_intervals(
@@ -286,7 +256,7 @@ def _features_from_intervals(
                     "free_flow_speed_kmh": round(free_speed * 3.6, 1),
                     "speed_ratio": round(ratio, 3),
                     "congestion_score": round((1 - min(1, ratio)) * 100, 1),
-                    "estimated_cars_30min": entered_by_edge.get(edge_id, 0),
+                    "estimated_cars_6h": entered_by_edge.get(edge_id, 0),
                     "occupancy_percent": round(
                         occupancy_seconds_by_edge.get(edge_id, 0) / sampled if sampled else 0, 1
                     ),
@@ -305,30 +275,31 @@ def _features_from_intervals(
             "weekday": weekday,
             "period": period,
             "timezone": "Asia/Ho_Chi_Minh",
+            "simulation_duration_hours": SIMULATION_SECONDS / 3600,
             "simulation_interval_seconds": (
                 float(intervals[-1].get("end", "0")) - float(intervals[0].get("begin", "0"))
             ),
             "vehicle_count_period_seconds": SIMULATION_SECONDS,
-            "vehicle_count_period_label": "simulated 30-minute period",
+            "vehicle_count_period_label": "simulated 6-hour period",
             "vehicle_count_type": "passenger cars only; motorcycles are not simulated",
-            "max_estimated_cars_30min": max(
-                (feature["properties"]["estimated_cars_30min"] for feature in features),
+            "max_estimated_cars_6h": max(
+                (feature["properties"]["estimated_cars_6h"] for feature in features),
                 default=0,
             ),
             "estimated_trip_period_seconds": trip_period,
-            "historical_global_trip_period_prior_seconds": trip_period,
-            "estimated_car_trip_period_seconds": round(
-                trip_period / (1 - MOTORCYCLE_SHARE), 3
-            ),
+            "planned_car_trips_6h": PLANNED_CAR_TRIPS_6H,
             "historical_observation_rows_used": observation_rows,
             "demand_method": (
-                "Global randomTrips rate estimated from mean historical LOS class; "
-                "not observed vehicle counts or an OD matrix"
+                "Fixed low-load synthetic rate: one passenger car per minute, "
+                "360 planned trip attempts across six hours; not observed demand, "
+                "vehicle counts, or an origin-destination matrix"
             ),
             "simulated_modes": ["passenger_car"],
             "motorcycles_simulated": False,
+            "stuck_vehicle_teleport_after_seconds": 300,
             "interpretation": (
-                "Standalone SUMO scenario output, not live traffic or a validated future forecast."
+                "Standalone six-hour, minimum-demand SUMO scenario output; not live traffic, "
+                "observed congestion, or a validated forecast."
             ),
             "features": len(features),
         },
@@ -418,10 +389,8 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
             "0",
             "--end",
             str(SIMULATION_SECONDS),
-            # Preserve the previous 30% car share, but omit motorcycles from
-            # the simulation because the result and edgeData output are car-only.
             "--period",
-            str(trip_period / (1 - MOTORCYCLE_SHARE)),
+            str(trip_period),
             "--seed",
             "17",
             "--prefix",
@@ -436,7 +405,7 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
             'type="car"',
         ],
         directory,
-        180,
+        TRIP_GENERATION_TIMEOUT_SECONDS,
     )
     _run(
         [
@@ -453,7 +422,7 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
             "true",
         ],
         directory,
-        180,
+        ROUTE_BUILD_TIMEOUT_SECONDS,
     )
     root = ET.Element("additional")
     ET.SubElement(
@@ -461,8 +430,8 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         "edgeData",
         id="traffic",
         file="edge-data.xml",
-        # One aggregate interval is enough: only the full 30-minute count and
-        # weighted speed/occupancy are exposed by this scenario layer.
+        # One aggregate interval exposes only the full six-hour count and
+        # weighted speed/occupancy in the scenario data layer.
         period=str(SIMULATION_SECONDS),
         begin="0",
         end=str(SIMULATION_SECONDS),
@@ -490,7 +459,7 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
             "--duration-log.disable",
             "true",
             "--time-to-teleport",
-            "-1",
+            "300",
             "--mesosim",
             "true",
         ],
@@ -555,6 +524,30 @@ def cached_scenario(weekday: int, period: str) -> dict | None:
     return {"run_id": str(row[0]), "metadata": row[1]}
 
 
+def latest_cached_scenario() -> dict | None:
+    """Return the newest six-hour scenario published by the offline workflow."""
+    with connect_to_warehouse() as connection:
+        row = connection.execute(
+            """
+            SELECT run_id, weekday, period, metadata, generated_at
+            FROM transport.sumo_congestion_scenario_cache
+            WHERE metadata->>'simulation_model' = %s
+            ORDER BY generated_at DESC, run_id DESC
+            LIMIT 1
+            """,
+            (SIMULATION_MODEL,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "run_id": str(row[0]),
+        "weekday": int(row[1]),
+        "period": row[2].strftime("%H:%M"),
+        "metadata": row[3],
+        "generated_at": row[4],
+    }
+
+
 def catalog() -> dict:
     data, _ = _directories()
     has_network_input = (data / "osm_sumo_hcmc" / "hcmc.osm.pbf").is_file()
@@ -577,7 +570,7 @@ def catalog() -> dict:
             "queue_ready": False,
         }
     return {
-        "available": has_network_input and edges > 0 and observations > 0 and queue_ready,
+        "available": has_network_input and edges > 0 and queue_ready,
         "network_input": has_network_input,
         "network_edges": edges,
         "matched_observations": observations,

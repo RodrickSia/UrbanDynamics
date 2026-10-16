@@ -3,6 +3,7 @@ from datetime import time
 from gzip import compress
 from json import dumps
 from pathlib import Path
+from subprocess import TimeoutExpired
 
 import pytest
 from fastapi import HTTPException
@@ -63,39 +64,41 @@ class FakeConnection:
         return self.result
 
 
-def test_submit_requires_a_half_hour_time():
-    with pytest.raises(HTTPException, match="30-minute boundary") as error:
-        traffic_sumo.create_run(traffic_sumo.RunRequest(weekday=1, period=time(8, 15)))
-    assert error.value.status_code == 422
-
-
-def test_submit_queues_a_separate_sumo_run(monkeypatch):
-    connection = FakeConnection()
-    monkeypatch.setattr(traffic_sumo.prediction, "catalog", lambda: {"available": True})
-    monkeypatch.setattr(traffic_sumo, "connect_to_warehouse", lambda: connection)
-    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
-
-    response = traffic_sumo.create_run(traffic_sumo.RunRequest(weekday=2, period=time(8, 30)))
-
-    assert response["status"] == "queued"
-    insert = next(
-        call for call in connection.calls if "INSERT INTO transport.sumo_congestion_run" in call[0]
-    )
-    assert insert[1][1:] == (2, time(8, 30))
-
-
-def test_precomputed_scenario_is_returned_without_queueing(monkeypatch):
+def test_latest_endpoint_returns_the_newest_precomputed_run(monkeypatch):
+    scenario = {
+        "run_id": "cached-run",
+        "weekday": 1,
+        "period": "08:00",
+        "metadata": {"simulation_model": "mesoscopic-6h-min-demand-v1"},
+        "generated_at": "2026-10-15T12:00:00Z",
+    }
     monkeypatch.setattr(
-        traffic_sumo.prediction,
-        "cached_scenario",
-        lambda _weekday, _period: {"run_id": "cached-run", "metadata": {"features": 20}},
+        traffic_sumo.prediction, "latest_cached_scenario", lambda: scenario
     )
 
-    response = traffic_sumo.create_run(traffic_sumo.RunRequest(weekday=5, period=time(17, 0)))
+    response = traffic_sumo.get_latest_scenario()
 
     assert response["status"] == "completed"
     assert response["cached"] is True
     assert response["run_id"] == "cached-run"
+    assert response["weekday"] == 1
+    assert response["period"] == "08:00"
+
+
+def test_latest_endpoint_returns_404_when_no_precomputed_run_exists(monkeypatch):
+    monkeypatch.setattr(traffic_sumo.prediction, "latest_cached_scenario", lambda: None)
+
+    with pytest.raises(HTTPException) as error:
+        traffic_sumo.get_latest_scenario()
+
+    assert error.value.status_code == 404
+
+
+def test_sumo_run_submission_endpoint_is_not_exposed():
+    assert not any(
+        route.path.endswith("/runs") and "POST" in route.methods
+        for route in traffic_sumo.router.routes
+    )
 
 
 def test_scenario_cache_endpoint_returns_cache_miss_as_404(monkeypatch):
@@ -108,13 +111,42 @@ def test_scenario_cache_endpoint_returns_cache_miss_as_404(monkeypatch):
 
 
 def test_scenario_cache_only_returns_results_from_the_current_model(monkeypatch):
-    connection = FakeConnection(result=("meso-run", {"simulation_model": "mesoscopic"}))
+    connection = FakeConnection(result=("meso-run", {"simulation_model": "mesoscopic-6h-min-demand-v1"}))
     monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
 
     cached = traffic_sumo_prediction.cached_scenario(2, "08:00")
 
     assert cached["run_id"] == "meso-run"
-    assert connection.calls[0][1] == (2, "08:00", "mesoscopic")
+    assert connection.calls[0][1] == (2, "08:00", "mesoscopic-6h-min-demand-v1")
+
+
+def test_latest_cached_scenario_selects_only_the_current_six_hour_model(monkeypatch):
+    metadata = {"simulation_model": "mesoscopic-6h-min-demand-v1"}
+    connection = FakeConnection(result=("run-id", 1, time(8, 0), metadata, "generated"))
+    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
+
+    scenario = traffic_sumo_prediction.latest_cached_scenario()
+
+    assert scenario == {
+        "run_id": "run-id",
+        "weekday": 1,
+        "period": "08:00",
+        "metadata": metadata,
+        "generated_at": "generated",
+    }
+    assert connection.calls[0][1] == ("mesoscopic-6h-min-demand-v1",)
+
+
+def test_timed_out_sumo_stage_preserves_stderr_for_diagnosis(tmp_path, monkeypatch):
+    monkeypatch.setattr(traffic_sumo_prediction, "_sumo_home", lambda: tmp_path)
+
+    def timeout(*_args, **_kwargs):
+        raise TimeoutExpired("sumo", 60, stderr=b"network loading diagnostic")
+
+    monkeypatch.setattr(traffic_sumo_prediction.subprocess, "run", timeout)
+
+    with pytest.raises(RuntimeError, match="network loading diagnostic"):
+        traffic_sumo_prediction._run(["sumo"], tmp_path, 60)
 
 
 def test_cached_result_is_decompressed_from_database(monkeypatch):
@@ -143,59 +175,20 @@ def test_cleanup_removes_only_the_matching_run_scratch_directory(tmp_path, monke
     assert other.is_dir()
 
 
-def test_target_demand_uses_historical_los_as_a_prior_not_a_vehicle_count(monkeypatch):
-    traffic_sumo_prediction._demand_profile.cache_clear()
-    connection = FakeConnection(result=[
-        (1, 16, 0, 3.0, 25),
-        (1, None, 1, 2.5, 85),
-        (None, None, 3, 3.5, 500),
-    ])
-    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
-
-    period, rows = traffic_sumo_prediction._target_demand(1, "08:00")
-
-    assert period == pytest.approx(2.94)
-    assert rows == 25
-    assert "GROUPING SETS" in connection.calls[0][0]
+def test_target_demand_is_fixed_minimum_and_independent_of_scenario():
+    assert traffic_sumo_prediction._target_demand(1, "08:00") == (60.0, 0)
+    assert traffic_sumo_prediction._target_demand(7, "23:30") == (60.0, 0)
+    assert traffic_sumo_prediction.PLANNED_CAR_TRIPS_6H == 360
 
 
-def test_target_demand_falls_back_to_weekday_or_network_history(monkeypatch):
-    traffic_sumo_prediction._demand_profile.cache_clear()
-    connection = FakeConnection(result=[
-        (7, None, 1, 2.5, 85),
-        (None, None, 3, 3.5, 500),
-    ])
-    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
+def test_batch_accepts_exactly_one_weekday_and_start_time():
+    from app.services.traffic_sumo_batch import _validate_scenario
 
-    trip_period, rows = traffic_sumo_prediction._target_demand(7, "23:30")
-
-    assert trip_period == pytest.approx(3.25)
-    assert rows == 85
-    assert "GROUPING SETS" in connection.calls[0][0]
-
-
-def test_target_demand_profile_is_loaded_once_per_worker(monkeypatch):
-    traffic_sumo_prediction._demand_profile.cache_clear()
-    connection = FakeConnection(result=[
-        (1, 16, 0, 3.0, 25),
-        (1, 17, 0, 2.0, 30),
-        (1, None, 1, 2.5, 55),
-        (None, None, 3, 3.0, 400),
-    ])
-    monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
-
-    traffic_sumo_prediction._target_demand(1, "08:00")
-    traffic_sumo_prediction._target_demand(1, "08:30")
-
-    assert len(connection.calls) == 1
-
-
-def test_batch_enumerates_every_weekday_and_half_hour():
-    from app.services.traffic_sumo_batch import PERIODS, SCENARIO_COUNT, WEEKDAYS
-
-    assert len(WEEKDAYS) * len(PERIODS) == SCENARIO_COUNT == 336
-    assert PERIODS[0] == time(0, 0)
-    assert PERIODS[-1] == time(23, 30)
+    assert _validate_scenario(3, "08:30") == time(8, 30)
+    with pytest.raises(ValueError, match="weekday"):
+        _validate_scenario(8, "08:30")
+    with pytest.raises(ValueError, match="30-minute boundary"):
+        _validate_scenario(3, "08:15")
 
 
 def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
@@ -212,7 +205,7 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
         lambda: (tmp_path / "data", tmp_path / "runtime"),
     )
     monkeypatch.setattr(traffic_sumo_prediction, "_network_file", lambda *_args: network)
-    monkeypatch.setattr(traffic_sumo_prediction, "_target_demand", lambda *_args: (3.0, 85))
+    monkeypatch.setattr(traffic_sumo_prediction, "_target_demand", lambda *_args: (60.0, 0))
     monkeypatch.setattr(traffic_sumo_prediction, "_sumo_home", lambda: sumo_home)
     monkeypatch.setattr(
         traffic_sumo_prediction,
@@ -222,14 +215,19 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     monkeypatch.setattr(
         traffic_sumo_prediction,
         "_features",
-        lambda *_args: {"metadata": {"simulation_model": "mesoscopic"}},
+        lambda *_args: {"metadata": {"simulation_model": "mesoscopic-6h-min-demand-v1"}},
     )
 
     result = traffic_sumo_prediction.run_prediction(1, "08:00", "scenario-test")
 
     sumo_command = next(command for command in commands if command[0].endswith("/sumo"))
     assert sumo_command[sumo_command.index("--mesosim") + 1] == "true"
-    assert result["metadata"]["simulation_model"] == "mesoscopic"
+    assert sumo_command[sumo_command.index("--end") + 1] == "21600"
+    assert sumo_command[sumo_command.index("--time-to-teleport") + 1] == "300"
+    trips_command = next(command for command in commands if command[1].endswith("randomTrips.py"))
+    assert trips_command[trips_command.index("--end") + 1] == "21600"
+    assert trips_command[trips_command.index("--period") + 1] == "60.0"
+    assert result["metadata"]["simulation_model"] == "mesoscopic-6h-min-demand-v1"
 
 
 def test_network_file_builds_atomically_then_reuses_runtime_cache(tmp_path, monkeypatch):
@@ -284,10 +282,13 @@ def test_feature_output_includes_zero_car_roads_and_sums_full_period_counts():
 
     assert len(result["features"]) == 2
     busy, empty = result["features"]
-    assert busy["properties"]["estimated_cars_30min"] == 5
+    assert busy["properties"]["estimated_cars_6h"] == 5
     assert busy["properties"]["simulated_speed_kmh"] == 48.0
-    assert empty["properties"]["estimated_cars_30min"] == 0
+    assert empty["properties"]["estimated_cars_6h"] == 0
     assert empty["properties"]["simulated_speed_kmh"] == 54.0
-    assert result["metadata"]["max_estimated_cars_30min"] == 5
-    assert result["metadata"]["simulation_model"] == "mesoscopic"
+    assert result["metadata"]["max_estimated_cars_6h"] == 5
+    assert result["metadata"]["simulation_model"] == "mesoscopic-6h-min-demand-v1"
+    assert result["metadata"]["simulation_duration_hours"] == 6
+    assert result["metadata"]["vehicle_count_period_seconds"] == 21600
+    assert result["metadata"]["vehicle_count_period_label"] == "simulated 6-hour period"
     assert result["metadata"]["simulation_interval_seconds"] == 600
