@@ -221,6 +221,11 @@ def traffic_prior():
     from ..simulation.planning.models import TrafficPrior
     identifier = counting_reference.default_identifier()
     if identifier:
-        return counting_reference.prior(identifier)
+        try:
+            return counting_reference.prior(identifier)
+        except (OSError, ValueError):
+            # The optional demo reference may be installed while demo mode is
+            # disabled. It must not prevent an ordinary plan simulation.
+            pass
     return TrafficPrior(cars=[100]*24, motorcycles=[300]*24, source_kind='synthetic',
                         source='Fallback scenario: 400 vehicles/hour (100 cars + 300 motorcycles), constant daily profile. Not observed traffic at the selected site; no calibrated OD.')

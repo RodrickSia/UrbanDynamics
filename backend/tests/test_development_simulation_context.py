@@ -35,6 +35,22 @@ def existing():
     return [{**building(),'name':'Existing','height_m':6.4}]
 
 
+def test_unavailable_optional_counting_reference_keeps_plan_simulation_available(monkeypatch):
+    from app.services.simulation.planning import counting_reference
+    monkeypatch.setattr(counting_reference, 'default_identifier', lambda: 'f' * 64)
+    def unavailable(_):
+        raise ValueError('Demo disabled')
+    monkeypatch.setattr(counting_reference, 'prior', unavailable)
+    prior = context.traffic_prior()
+    assert prior.cars[18] + prior.motorcycles[18] == 400
+    assert prior.source_kind == 'synthetic'
+    assert prior.counting_reference_id is None
+    with patch('app.services.zoning.baseline.buildings', return_value=existing()):
+        study = study_from_plan(plan(), SimulationInput(revision=1, scenario_id=SID, parcel_id='3885881'))
+    assert study.traffic_prior.counting_reference_id is None
+    assert run_screening(study)['options']
+
+
 def test_unchanged_building_preserves_surfaces_and_all_demand():
     with patch('app.services.zoning.baseline.buildings',return_value=existing()):
         study=study_from_plan(plan(),SimulationInput(revision=1,scenario_id=SID,parcel_id='3885881'))
