@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { CircleAlert, Info, LoaderCircle, MapPinOff } from 'lucide-react';
+import { CircleAlert, Clock3, Info, LoaderCircle, MapPinOff } from 'lucide-react';
 import { dateQuery, type Palette } from '../../../services/api';
 import type { BackendLayers } from './useBackendLayers';
 import { type DataLayerId, PALETTE_STOPS, RISK_COLORS } from './datasets';
@@ -132,16 +132,19 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
       {id === 'traffic' && (
         <>
           <form
-            className="dataset-dates"
+            className="traffic-schedule"
             onSubmit={(event) => {
               event.preventDefault();
               data.setTrafficSchedule({ weekday: trafficWeekday, period: trafficPeriod });
             }}
           >
-            <strong>Typical conditions <small>30-minute historical slot</small></strong>
+            <div className="traffic-schedule-heading">
+              <span aria-hidden="true"><Clock3 size={16} strokeWidth={1.8} /></span>
+              <strong>Typical conditions <small>30-minute historical slot</small></strong>
+            </div>
             <div className="dataset-fields">
               <label>
-                Day of week
+                Weekday
                 <select
                   aria-label="Traffic prediction day of week"
                   value={trafficWeekday}
@@ -153,7 +156,7 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
                 </select>
               </label>
               <label>
-                Time of day (HCMC)
+                Time · HCMC
                 <input
                   type="time"
                   step={1800}
@@ -163,7 +166,7 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
                 />
               </label>
             </div>
-            <button type="submit">Apply</button>
+            <button type="submit" className="traffic-apply">Apply</button>
           </form>
           <div className="traffic-score-legend" role="group" aria-label="Historical congestion score from 0 to 100">
             <small>Estimated congestion score · low to high</small>
@@ -176,8 +179,8 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
             Colors cover the loaded road network. Directly matched roads use historical
             observations; uncovered roads are estimated from a nearby observed road, then the
             same road type or network average for the selected time/day. If that half-hour has
-            no data, the estimate falls back to other observations from that weekday. Select a
-            road to see its estimate basis and confidence. Not live traffic or a SUMO
+            no data, the estimate falls back to other observations from that weekday.
+            Hover over a road to see its estimate basis and confidence. Not live traffic or a SUMO
             vehicle-count simulation.
           </DatasetNote>
         </>
