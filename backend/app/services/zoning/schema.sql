@@ -1,4 +1,5 @@
 -- Workspace projection of zoning plans. Footprints and masks are 2D; no mesh is stored.
+CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE SCHEMA IF NOT EXISTS plans;
 
 CREATE TABLE IF NOT EXISTS plans.zone_type_catalog (

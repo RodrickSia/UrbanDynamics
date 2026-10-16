@@ -23,7 +23,11 @@ def load_catalog():
 
 
 def execute_script(connection, sql):
-    for statement in sql.split(";"):
+    # Strip line comments before splitting statements: a semicolon in a
+    # comment must never become an executable SQL fragment.
+    executable = "\n".join(line for line in sql.splitlines()
+                           if not line.lstrip().startswith("--"))
+    for statement in executable.split(";"):
         if statement.strip():
             connection.execute(statement)
 

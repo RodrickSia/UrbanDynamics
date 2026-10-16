@@ -5,7 +5,7 @@ from copy import deepcopy
 import psycopg
 import pytest
 
-from app.services.zoning.project import project_rows
+from app.services.zoning.project import _SCRIPT, execute_script, project_rows
 
 POLY = {"type": "Polygon", "coordinates": [
     [[106.76, 10.82], [106.761, 10.82], [106.761, 10.821], [106.76, 10.821], [106.76, 10.82]]]}
@@ -58,6 +58,62 @@ def test_projection_is_one_to_many_and_skips_undo_history():
     assert [item["catalog_code"] for item in rows["types"]] == ["RES", None]
     assert "ghost-building" not in json.dumps(rows)
     assert "ghost-zone" not in json.dumps(rows)
+
+
+def test_schema_script_ignores_semicolons_in_comments():
+    class Connection:
+        statements = []
+
+        def execute(self, statement):
+            self.statements.append(statement.strip())
+
+    connection = Connection()
+    execute_script(connection, _SCRIPT)
+    assert connection.statements[0] == "CREATE EXTENSION IF NOT EXISTS postgis"
+    assert connection.statements[1] == "CREATE SCHEMA IF NOT EXISTS plans"
+    assert len(connection.statements) == 15
+    assert all(not statement.startswith("no mesh") for statement in connection.statements)
+
+
+def test_postgis_schema_bootstraps_once_after_a_committed_transaction(monkeypatch):
+    from app.services.zoning import store
+
+    connections = []
+    calls = []
+
+    class Connection:
+        def __init__(self):
+            self.statements = []
+            connections.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def execute(self, statement):
+            self.statements.append(statement)
+
+        def close(self):
+            pass
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://projection-test")
+    monkeypatch.delenv("ZONING_STORAGE", raising=False)
+    monkeypatch.setattr(store, "_initialized_databases", set())
+    monkeypatch.setattr(store, "connect_to_warehouse", Connection)
+    monkeypatch.setattr(store, "ensure_schema", lambda _: calls.append("schema"))
+    monkeypatch.setattr(store, "backfill", lambda _: calls.append("backfill"))
+    with pytest.raises(ValueError):
+        with store.database():
+            raise ValueError("rollback")
+    assert store._initialized_databases == set()
+    with store.database():
+        pass
+    with store.database():
+        pass
+    assert calls == ["schema", "backfill"] * 2
+    assert len(connections[2].statements) == 0
 
 
 @pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="Requires real PostGIS")
