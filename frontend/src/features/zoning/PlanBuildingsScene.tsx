@@ -1,14 +1,24 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { union, type MultiPolygon } from 'polygon-clipping';
 import type { GeoJSONSource, Map as MapLibreMap, MapSourceDataEvent, TransitionSpecification } from 'maplibre-gl';
 import { planBuildings } from './planBuildingGeometry';
 import { watchBuildingUpdates } from '../map/layers/buildingUpdates';
-import type { ZoningBridge } from './types';
+import type { PolygonGeometry, ZoningBridge } from './types';
+
+function displayedStudyAreas(scenes: NonNullable<ZoningBridge['displayedPlanScenes']>): PolygonGeometry | undefined {
+  const areas = scenes.map(({ plan }) => plan.study_area);
+  if (!areas.length) return undefined;
+  const coordinates = areas.map(area => area.type === 'Polygon' ? [area.coordinates] : area.coordinates) as MultiPolygon[];
+  return { type: 'MultiPolygon', coordinates: coordinates.slice(1).reduce((shape, next) => union(shape, next), coordinates[0]) };
+}
 
 /** Display-only clipping. Provider source geometry and paints remain unchanged. */
 export function PlanBuildingsScene({ map, bridge, mode }: {
   map: MapLibreMap | null; bridge: ZoningBridge; mode: '2d' | '3d';
 }) {
-  const study = bridge.active ? (bridge.analysis?.active ? bridge.analysis.geometry ?? undefined : bridge.plan?.study_area) : undefined;
+  const study = useMemo(() => bridge.active ? (bridge.analysis?.active ? bridge.analysis.geometry ?? undefined
+    : bridge.plan?.study_area ?? displayedStudyAreas(bridge.displayedPlanScenes ?? [])) : undefined,
+  [bridge.active, bridge.analysis?.active, bridge.analysis?.geometry, bridge.plan?.study_area, bridge.displayedPlanScenes]);
   const masks = bridge.scenario?.demolition_masks;
   const enabled = !!study;
   const current = useRef({ study, masks, mode });

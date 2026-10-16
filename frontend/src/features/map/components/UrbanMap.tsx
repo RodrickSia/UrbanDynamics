@@ -24,6 +24,7 @@ import { createPoiVisibility } from '../layers/poi';
 import { mapPoiSnapshot } from '../../agent/mapPoi';
 import { BackendDataScene } from '../datasets/BackendDataScene';
 import { ZoningScene } from '../../zoning/ZoningScene';
+import { DisplayedPlanParcelsScene } from '../../zoning/DisplayedPlanParcelsScene';
 import { DevelopmentScene } from '../../zoning/DevelopmentScene';
 import { PlanBuildingsScene } from '../../zoning/PlanBuildingsScene';
 import { IndicatorChartScene } from '../../zoning/IndicatorChartScene';
@@ -313,6 +314,7 @@ export function UrbanMap(props: UrbanMapProps) {
           !(props.zoning?.active && selection.id === 'parcels')) }}
         interactive={!props.zoning?.active && measurement.status!=='active' && (!props.viewshed || props.viewshed.state.phase==='idle')}/>}
       {props.zoning && <ZoningScene map={mapRef.current} bridge={props.zoning}/>}
+      {props.zoning && <DisplayedPlanParcelsScene map={mapRef.current} bridge={props.zoning}/>}
       {props.zoning && <DevelopmentScene map={mapRef.current} bridge={props.zoning} mode={mode}/>}
       {props.zoning && <PlanBuildingsScene map={mapRef.current} bridge={props.zoning} mode={mode}/>}
       {props.zoning && <IndicatorChartScene map={mapRef.current} bridge={props.zoning} mode={mode}/>}

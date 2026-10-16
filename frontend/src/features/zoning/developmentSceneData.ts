@@ -23,6 +23,11 @@ export function developmentData(b: ZoningBridge): FeatureCollection {
   const features: Feature[] = [];
   if (!b.active) return { type: 'FeatureCollection', features };
   const preview = b.development?.preview;
+  if (!b.plan) for (const { plan, scenario } of b.displayedPlanScenes ?? []) {
+    for (const building of scenario.buildings ?? []) {
+      features.push(...planBuildings(buildingFeatures(building, false), plan.study_area, []).features);
+    }
+  }
   for (const building of b.scenario?.buildings ?? []) {
     if (preview?.id === building.id) continue;
     features.push(...buildingFeatures(building, building.id === b.development?.selectedBuilding));

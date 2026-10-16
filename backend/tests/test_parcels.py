@@ -1,4 +1,5 @@
 import os
+from collections import Counter
 from contextlib import contextmanager
 
 import pytest
@@ -34,7 +35,7 @@ def test_unique_spatial_match_can_estimate_mapped_residential_area():
     ('C.hang', 'commercial_vnd_m2', 147_400_000),
     ('Tr.học', 'other_nonagricultural_vnd_m2', 126_400_000),
 ])
-def test_citywide_automatic_prices_are_visible_as_unit_references(distance, code, field, expected):
+def test_citywide_automatic_prices_calculate_indicative_total(distance, code, field, expected):
     # Current citywide publication: real Trần Quốc Thảo price triple, previously rejected.
     candidate = road(road='Trần Quốc Thảo', source_road='TRẦN QUỐC THẢO',
         match_confidence='automatic_reference', publication_match_mode='automatic',
@@ -47,18 +48,19 @@ def test_citywide_automatic_prices_are_visible_as_unit_references(distance, code
     assert result['status'] == 'provisional'
     assert result['unit_price_vnd_m2'] == candidate['properties'][field] == expected
     assert result['valuation_confidence'] == 'low'
-    assert result['estimated_land_total_vnd'] is None
+    assert result['estimated_land_total_vnd'] == round(317.505 * expected)
 
 
-def test_automatic_references_still_require_valid_publication_and_unique_road():
+def test_unverified_automatic_metadata_or_competing_roads_remain_provisional():
     parcel = {'uniq_id': 'known', 'mdsdd': 'ODT', 'area_m2': 100}
     automatic = road(match_confidence='automatic_reference', publication_match_mode='automatic',
                      price_kind='table_reference', geometry_coverage='actual_road_piece_reference')
     assert parcels.price_reference(parcel, [automatic])['unit_price_vnd_m2'] == 10_000_000
     for field in ['publication_match_mode', 'price_kind', 'geometry_coverage']:
         bad = {**automatic, 'properties': {**automatic['properties'], field: None}}
-        assert parcels.price_reference(parcel, [bad])['unit_price_vnd_m2'] is None
-    assert parcels.price_reference(parcel, [automatic, road(road='Other road')])['status'] == 'ambiguous'
+        assert parcels.price_reference(parcel, [bad])['status'] == 'provisional'
+        assert parcels.price_reference(parcel, [bad])['estimated_land_total_vnd'] == 1_000_000_000
+    assert parcels.price_reference(parcel, [automatic, road(road='Other road')])['status'] == 'provisional'
 
 
 def test_detail_preserves_automatic_price_provenance_through_api(monkeypatch):
@@ -86,7 +88,7 @@ def test_detail_preserves_automatic_price_provenance_through_api(monkeypatch):
     price = response.json()['price']
     assert price['status'] == 'provisional'
     assert price['unit_price_vnd_m2'] == 210_600_000
-    assert price['estimated_land_total_vnd'] is None
+    assert price['estimated_land_total_vnd'] == round(317.505 * 210_600_000)
     props = price['selected']['properties']
     assert props['source_road'] == 'TRẦN QUỐC THẢO'
     assert props['match_method'] == 'same_ward_road_name'
@@ -100,7 +102,8 @@ def test_detail_preserves_automatic_price_provenance_through_api(monkeypatch):
     ('Xg.dầu', 'Commercial', 'commercial_vnd_m2', 'Fuel retail'),
     ('B.viện', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'Hospital'),
     ('Tr.học', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'School'),
-    ('C.ty', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'Company'),
+    ('DSK', 'Other non-agricultural', 'other_nonagricultural_vnd_m2', 'Public facility'),
+    ('T', 'Residential', 'residential_vnd_m2', 'Residential land'),
 ])
 def test_observed_codes_use_their_road_category_price(source, category, field, family):
     prices = {'residential_vnd_m2': 163_000_000, 'commercial_vnd_m2': 97_800_000,
@@ -113,8 +116,8 @@ def test_observed_codes_use_their_road_category_price(source, category, field, f
     assert result['estimated_land_total_vnd'] == 100 * prices[field]
 
 
-@pytest.mark.parametrize('source', ['DSK', 'CDG', 'Khác', 'R/p', 'Kh.sách', 'Dầu khí',
-                                    'Tr.tâm', 'TL', '12345', None])
+@pytest.mark.parametrize('source', ['C.ty', 'CDG', 'Khác', 'R/p', 'Kh.sách',
+                                    'Tr.tâm', 'Kho', 'CLB', 'XD', '12345', None])
 def test_unclear_source_codes_keep_null_price(source):
     result = parcels.price_reference({'uniq_id': 'parcel', 'mdsdd': source, 'area_m2': 100},
                                      [road(commercial_vnd_m2=97_800_000)])
@@ -139,17 +142,17 @@ def test_imperfect_source_variant_retains_family_with_low_confidence():
     assert result['valuation_confidence'] == 'low'
 
 
-@pytest.mark.parametrize('attributes,candidates,status', [
-    ({'mdsdd': 'ODT', 'area_m2': 100}, [], 'unavailable'),
-    ({'mdsdd': 'ODT', 'area_m2': 100}, [road(), {**road(road='Other road'), 'feature_id': '2'}], 'ambiguous'),
-    ({'mdsdd': 'null', 'area_m2': 100}, [road()], 'unsupported_land_use'),
-    ({'mdsdd': 'ODT', 'area_m2': 100}, [road(geometry_coverage='whole_named_road_proxy')], 'unverified'),
-    ({'mdsdd': 'ODT', 'area_m2': 100, 'conflicting_land_use': True}, [road()], 'unsupported_land_use'),
+@pytest.mark.parametrize('attributes,candidates,status,total', [
+    ({'mdsdd': 'ODT', 'area_m2': 100}, [], 'unavailable', None),
+    ({'mdsdd': 'ODT', 'area_m2': 100}, [road(), {**road(road='Other road'), 'feature_id': '2'}], 'provisional', 1_000_000_000),
+    ({'mdsdd': 'null', 'area_m2': 100}, [road()], 'unsupported_land_use', None),
+    ({'mdsdd': 'ODT', 'area_m2': 100}, [road(geometry_coverage='whole_named_road_proxy')], 'provisional', 1_000_000_000),
+    ({'mdsdd': 'ODT', 'area_m2': 100, 'conflicting_land_use': True}, [road()], 'unsupported_land_use', None),
 ])
-def test_uncertain_associations_never_produce_a_total(attributes, candidates, status):
+def test_total_requires_category_and_price_but_allows_provisional_road(attributes, candidates, status, total):
     result = parcels.price_reference(attributes, candidates)
     assert result['status'] == status
-    assert result['estimated_land_total_vnd'] is None
+    assert result['estimated_land_total_vnd'] == total
 
 
 def test_zero_or_nonfinite_prices_are_unavailable():
@@ -158,10 +161,70 @@ def test_zero_or_nonfinite_prices_are_unavailable():
         assert result['estimated_land_total_vnd'] is None
 
 
-def test_same_road_different_segment_prices_remain_ambiguous():
+@pytest.mark.parametrize('area', [None, 0, -1, float('nan'), float('inf')])
+def test_missing_or_nonpositive_area_does_not_fabricate_a_total(area):
+    result = parcels.price_reference({'mdsdd': 'ODT', 'area_m2': area}, [road()])
+    assert result['unit_price_vnd_m2'] == 10_000_000
+    assert result['estimated_land_total_vnd'] is None
+
+
+def test_land_value_rounds_exact_product_to_nearest_dong():
+    result = parcels.price_reference({'mdsdd': 'ODT', 'area_m2': 1.25},
+                                     [road(residential_vnd_m2=10_000_002)])
+    assert result['estimated_land_total_vnd'] == 12_500_003
+
+
+def test_nearest_priced_road_is_provisional_when_other_segments_compete():
     result = parcels.price_reference({'mdsdd': 'ODT', 'area_m2': 100},
-                                     [road(), road(residential_vnd_m2=20_000_000)])
-    assert result['status'] == 'ambiguous'
+                                     [road(), {**road(residential_vnd_m2=20_000_000), 'distance_m': 9}])
+    assert result['status'] == 'provisional'
+    assert result['unit_price_vnd_m2'] == 10_000_000
+    assert result['selected']['distance_m'] == 5
+    assert result['estimated_land_total_vnd'] == 1_000_000_000
+
+
+def test_nearest_available_price_skips_unpriced_road_and_reaches_across_street():
+    candidates = [road(residential_vnd_m2=None),
+                  {**road(road='Priced road', residential_vnd_m2=12_000_000), 'distance_m': 72}]
+    result = parcels.price_reference({'uniq_id': 'known', 'mdsdd': 'OTC', 'area_m2': 100}, candidates)
+    assert result['unit_price_vnd_m2'] == 12_000_000
+    assert result['status'] == 'provisional'
+    assert result['estimated_land_total_vnd'] == 1_200_000_000
+
+
+def test_unpriced_competing_frontage_calculates_indicative_total():
+    result = parcels.price_reference({'uniq_id': 'known', 'mdsdd': 'ODT', 'area_m2': 100}, [
+        road(road='Unpriced road', residential_vnd_m2=None),
+        {**road(road='Priced road', residential_vnd_m2=12_000_000), 'distance_m': 8},
+    ])
+    assert result['unit_price_vnd_m2'] == 12_000_000
+    assert result['status'] == 'provisional'
+    assert result['estimated_land_total_vnd'] == 1_200_000_000
+
+
+def test_distant_price_is_not_assigned_to_parcel():
+    result = parcels.price_reference({'mdsdd': 'ODT', 'area_m2': 100},
+                                     [{**road(), 'distance_m': 151}])
+    assert result['unit_price_vnd_m2'] is None
+
+
+@pytest.mark.parametrize('code,category', [
+    ('Cho', 'Other non-agricultural'), ('Rap', None), ('Sân', None),
+    ('NĐ', 'Other non-agricultural'), ('TL', 'Other non-agricultural'),
+    ('DDT', 'Other non-agricultural'), ('C.L.B', None), ('Dầu khí', 'Other non-agricultural'),
+])
+def test_user_supplied_category_boundaries(code, category):
+    assert parcels.classify(code)['price_category'] == category
+
+
+def test_all_observed_source_codes_follow_supplied_price_groups():
+    groups = Counter(parcels.classify(code)['price_category'] for code in parcels.PALETTE['entries'])
+    assert groups == {'Residential': 3, 'Commercial': 6, 'Other non-agricultural': 58, None: 29}
+    assert {code for code in parcels.PALETTE['entries'] if parcels.classify(code)['price_category'] is None} == {
+        'Ao(Hồ).c', 'B.thÕ', 'B.thọ', 'C. ty', 'C.L.B', 'C.ty', 'CD', 'CDG', 'CDK', 'CLB',
+        'Cty', 'H.D.thuật', 'IIa^', 'K.s/n', 'Kh.sách', 'Kho', 'Kh¸c', 'Khác', 'L', 'L.sự',
+        'Nh.khách', 'Nhà khách', 'R/p', 'Rap', 'Sân', 'Tr.tâm', 'Vườn', 'XD', 'sân',
+    }
 
 
 @pytest.mark.parametrize('road_distance_m', [5, 26])
@@ -194,15 +257,15 @@ def test_opposite_side_road_price_is_provisional_only_when_unique_and_checked():
     result = parcels.price_reference(parcel, [{**road(), 'distance_m': 28}])
     assert result['status'] == 'provisional'
     assert result['unit_price_vnd_m2'] == 10_000_000
-    assert result['estimated_land_total_vnd'] is None
+    assert result['estimated_land_total_vnd'] == 1_000_000_000
     assert result['valuation_confidence'] == 'low'
     ambiguous = parcels.price_reference(parcel, [
         {**road(), 'distance_m': 28},
         {**road(road='Another road'), 'feature_id': 'road-2', 'distance_m': 32},
     ])
-    assert ambiguous['status'] == 'ambiguous'
-    assert ambiguous['unit_price_vnd_m2'] is None
-    assert parcels.price_reference(parcel, [{**road(), 'distance_m': 41}])['unit_price_vnd_m2'] is None
+    assert ambiguous['status'] == 'provisional'
+    assert ambiguous['unit_price_vnd_m2'] == 10_000_000
+    assert parcels.price_reference(parcel, [{**road(), 'distance_m': 41}])['unit_price_vnd_m2'] == 10_000_000
 
 
 def test_planning_breakdown_keeps_source_areas_without_fabricating_percentages():
@@ -211,12 +274,12 @@ def test_planning_breakdown_keeps_source_areas_without_fabricating_percentages()
 
 
 def test_palette_uses_land_use_groups_and_normalizes_unknown():
-    assert parcels.land_use('OTC')['color'] == '#D79B8C'
-    assert parcels.land_use('OTC')['color_source'] == 'category_palette'
-    assert parcels.land_use('Tr.học')['color'] == '#86A5C5'
-    assert parcels.land_use('GT')['color'] == '#A8AFB9'
-    assert parcels.land_use('DSK')['color'] == '#94a3b8'
-    assert parcels.land_use('DSK')['color_source'] == 'unknown'
+    colors = [entry['color'] for entry in parcels.PALETTE['entries'].values()]
+    assert len(colors) == len(set(colors))
+    assert parcels.land_use('OTC')['color'] != parcels.land_use('ODT')['color']
+    assert parcels.land_use('Tr.học')['color'] != parcels.land_use('GT')['color']
+    assert parcels.land_use('DSK')['color'] != '#94a3b8'
+    assert parcels.land_use('DSK')['color_source'] == 'parcel_type_palette'
     assert parcels.land_use('null')['code'] is None
     assert parcels.land_use('unrecognized')['color'] == '#94a3b8'
 
@@ -270,13 +333,13 @@ def test_canonical_geometry_tile_colors_and_price_api(monkeypatch):
             decoded = mapbox_vector_tile.decode(parcels.vector_tile(zoom, tile.x, tile.y))
             matches = [f for f in decoded['features']['features'] if f['properties']['parcel_id'] == str(row[0])]
             assert len(matches) == 1
-            assert matches[0]['properties']['color'] == '#D79B8C'
+            assert matches[0]['properties']['color'] == parcels.COLORS['ODT']
             study = {'type': 'Polygon', 'coordinates': [[[106.6995,10.7995], [106.7005,10.7995],
                       [106.7005,10.8005], [106.6995,10.8005], [106.6995,10.7995]]]}
             clipped = mapbox_vector_tile.decode(parcels.plan_vector_tile(study, zoom, tile.x, tile.y))
             plots = [f for f in clipped['features']['features'] if f['properties']['parcel_id'] == str(row[0])]
             assert len(plots) == 1
-            assert plots[0]['properties']['color'] == '#D79B8C'
+            assert plots[0]['properties']['color'] == parcels.COLORS['ODT']
             assert plots[0]['properties']['mdsdd'] == 'ODT'
         assert parcels.vector_tile(11, 0, 0) == b''
         response = TestClient(app).get(f'/api/v1/parcels/{row[0]}')

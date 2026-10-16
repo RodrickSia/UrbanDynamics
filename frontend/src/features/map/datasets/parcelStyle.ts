@@ -9,7 +9,7 @@ export function parcelFill(): FillLayerSpecification {
   return {
     id: 'dataset-parcels', source: 'dataset-parcels', 'source-layer': 'features',
     type: 'fill', minzoom: PARCEL_MIN_ZOOM,
-    paint: { 'fill-color': color, 'fill-opacity': 0.3, 'fill-antialias': false },
+    paint: { 'fill-color': color, 'fill-opacity': 0.44, 'fill-antialias': false },
   };
 }
 

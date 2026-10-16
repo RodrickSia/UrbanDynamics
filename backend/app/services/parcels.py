@@ -2,6 +2,7 @@
 import json
 import math
 import re
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 from psycopg.rows import dict_row
@@ -15,6 +16,7 @@ COLORS = {code: entry['color'] for code, entry in PALETTE['entries'].items()}
 MIN_ZOOM = 12
 MAX_NATIVE_ZOOM = 16
 UNKNOWN = {'', 'null', 'none', 'nan'}
+MAX_PRICE_DISTANCE_M = 150
 
 
 def land_use(raw):
@@ -24,7 +26,7 @@ def land_use(raw):
     entry = PALETTE['entries'].get(code, {})
     return {'code': code, 'label': entry.get('label'),
             'color': entry.get('color', PALETTE['fallback_color']),
-            'color_source': 'category_palette' if entry and entry.get('category') else 'unknown'}
+            'color_source': 'parcel_type_palette' if entry else 'unknown'}
 
 
 def planning_breakdown(text):
@@ -76,22 +78,16 @@ def price_reference(parcel, candidates):
     if not classification['price_category']:
         result['status'] = 'unsupported_land_use'
         return result
-    # Boundaries near a road are evidence of proximity, not legal frontage.
-    nearby = [item for item in candidates if item['distance_m'] <= 15]
-    if not nearby:
-        # A centerline across a road can be farther than 15 m from the plot.
-        # Keep this wider association provisional and require one unique road.
-        nearby = [item for item in candidates if item['distance_m'] <= 40]
-    if not nearby:
+    field = PRICE_CATEGORIES[classification['price_category']]
+    # A road centerline can be across a wide street. Use the closest priced
+    # segment as a unit-price reference, never infer legal frontage from it.
+    priced = sorted((item for item in candidates
+                     if item['distance_m'] <= MAX_PRICE_DISTANCE_M
+                     and positive(item['properties'].get(field))),
+                    key=lambda item: (item['distance_m'], str(item['feature_id'])))
+    if not priced:
         return result
-    identities = {(item['properties'].get('road'), item['properties'].get('start'),
-                   item['properties'].get('end'),
-                   tuple(str(item['properties'].get(field)) for field in sorted(PRICE_CATEGORIES.values())))
-                  for item in nearby}
-    if len(identities) != 1 or len(candidates) >= 9:
-        result['status'] = 'ambiguous'
-        return result
-    selected = nearby[0]
+    selected = priced[0]
     props = selected['properties']
     result['selected'] = selected
     result['road_match_status'] = str(props.get('match_confidence') or 'unknown')
@@ -102,17 +98,18 @@ def price_reference(parcel, candidates):
         and props.get('price_kind') == 'table_reference'
         and props.get('geometry_coverage') in {'citywide_road_reference', 'actual_road_piece_reference'}
     )
-    if (props.get('geometry_coverage') == 'whole_named_road_proxy' or
-        not (automatic_reference or props.get('geometry_reviewed') is True or props.get('match_confidence') == 'spatially_checked')):
-        result['status'] = 'unverified'
-        return result
-    field = PRICE_CATEGORIES[classification['price_category']]
     unit_price = positive(props.get(field))
-    if not unit_price:
-        return result
-    # Citywide allocation can borrow a ward-table row. Show the published unit
-    # reference without presenting that assignment as a verified parcel valuation.
-    provisional = automatic_reference or classification['classification_basis'] == 'planning' or selected['distance_m'] > 15
+    close_candidates = [item for item in candidates if item['distance_m'] <= 15]
+    identities = {(item['properties'].get('road'), item['properties'].get('start'),
+                   item['properties'].get('end'), positive(item['properties'].get(field)))
+                  for item in close_candidates}
+    verified_geometry = (props.get('geometry_reviewed') is True or
+                         props.get('match_confidence') == 'spatially_checked')
+    provisional = (not verified_geometry or automatic_reference or
+                   props.get('geometry_coverage') == 'whole_named_road_proxy' or
+                   classification['classification_basis'] == 'planning' or
+                   classification['classification_confidence'] != 'high' or
+                   selected['distance_m'] > 15 or len(identities) != 1)
     result.update(status='provisional' if provisional else 'reference',
                   unit_price_vnd_m2=unit_price)
     result['valuation_confidence'] = (
@@ -120,9 +117,12 @@ def price_reference(parcel, candidates):
         'high' if result['geometry_review_status'] == 'reviewed' and
                   classification['classification_confidence'] == 'high' else 'medium')
     area = positive(parcel.get('area_m2'))
-    identity = str(parcel.get('uniq_id') or '').strip().lower()
-    if not provisional and area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
-        result['estimated_land_total_vnd'] = round(unit_price * area)
+    # The total is an indicative arithmetic estimate, even for provisional
+    # road associations. Planning-only category inference cannot value the
+    # whole parcel because its planned uses may cover different subareas.
+    if area and classification['classification_basis'] == 'source_land_use':
+        total = Decimal(str(area)) * Decimal(str(unit_price))
+        result['estimated_land_total_vnd'] = int(total.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     return result
 
 
@@ -143,11 +143,11 @@ def detail(parcel_id):
                        ST_Distance(f.geom::geography,p.geom::geography) AS distance_m
                 FROM parcels.plot p JOIN public.layer_features f
                   ON f.layer='land_price'
-                 AND f.geom && ST_Expand(p.geom,0.0005)
-                 AND ST_DWithin(f.geom::geography,p.geom::geography,40)
+                 AND f.geom && ST_Expand(p.geom,0.0015)
+                 AND ST_DWithin(f.geom::geography,p.geom::geography,%s)
                 WHERE p.id=%s
-                ORDER BY distance_m, f.feature_id LIMIT 9
-            """, (parcel_id,))
+                ORDER BY distance_m, f.feature_id LIMIT 64
+            """, (MAX_PRICE_DISTANCE_M, parcel_id))
             candidates = cursor.fetchall()
     # Expose only public price provenance, not arbitrary source metadata.
     allowed = {'road', 'start', 'end', 'ward', 'source_url', 'pdf_page', 'effective_from',

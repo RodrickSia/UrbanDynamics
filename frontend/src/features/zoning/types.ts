@@ -57,6 +57,7 @@ export interface Sketch { tool: Tool; points: Position[]; geometry: SketchGeomet
 export interface ZoningBridge {
   active: boolean; plan: Plan | null; scenario: Scenario | null; selected: string[];
   displayedPlans?: Record<string, PolygonGeometry>;
+  displayedPlanScenes?: { plan: Plan; scenario: Scenario }[];
   sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; showParcels: boolean;
   parcelAvailable: boolean; busy: boolean;
   development?: DevelopmentBridge;

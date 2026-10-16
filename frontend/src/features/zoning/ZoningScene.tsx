@@ -1,13 +1,14 @@
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
-import type { Feature, FeatureCollection, Geometry, Position } from 'geojson';
+import type { FeatureCollection, Position } from 'geojson';
 import { useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../services/api';
 import { PARCEL_MAX_NATIVE_ZOOM, PARCEL_MIN_ZOOM, parcelOutline } from '../map/datasets/parcelStyle';
-import { editVertex, rings, sketchGeometry } from './geometry';
+import { editVertex, rings } from './geometry';
 import { nearestSnap, snapSource, type SnapGeometry } from './snapping';
 import type { PolygonGeometry, ZoningBridge } from './types';
 import { BUILDING_LAYER, BUILDING_EXCLUDED_LAYER, BUILDING_FOOTPRINT_LAYER } from './DevelopmentScene';
 import { useMappedBaseline } from './useMappedBaseline';
+import { zoningData } from './zoningSceneData';
 
 const SOURCE = 'zoning-editor';
 const FILL = 'zoning-fill', LINE = 'zoning-outline', VERTEX = 'zoning-vertices';
@@ -18,41 +19,6 @@ const PARCEL_FILL = 'zoning-plan-parcels-fill';
 const SNAP_SOURCE = 'zoning-snap-point', SNAP_LAYER = 'zoning-snap-indicator';
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const DRAW_COLOR = '#FF6D00';
-const AREA_COLOR = '#2877dc';
-function feature(geometry: Geometry, properties: Record<string, unknown>): Feature { return { type: 'Feature', geometry, properties }; }
-
-function data(bridge: ZoningBridge): FeatureCollection {
-  if (!bridge.active) return EMPTY;
-  const features: Feature[] = [];
-  if (!bridge.plan) for (const [id, geometry] of Object.entries(bridge.displayedPlans ?? {})) {
-    features.push(feature(geometry, { kind: 'plan-preview', id, color: AREA_COLOR, alpha: .07, width: 2.5 }));
-  }
-  if (bridge.plan) features.push(feature(bridge.plan.study_area, { kind: 'study', color: AREA_COLOR, alpha: 0, width: 3 }));
-  if (bridge.analysis?.active && bridge.analysis.geometry) features.push(feature(bridge.analysis.geometry,
-    { kind: 'analysis', color: AREA_COLOR, alpha: .06, width: 3 }));
-  if (bridge.visible) for (const zone of bridge.scenario?.zones ?? []) {
-    const type = bridge.plan?.types.find(t => t.id === zone.type_id);
-    features.push(feature(zone.geometry, { kind: 'zone', id: zone.id, label: type?.code ?? 'Unknown',
-      color: type?.color ?? '#6d8588', alpha: bridge.sketch.tool ? 0 : bridge.opacity,
-      width: bridge.selected.includes(zone.id) ? 4 : 1.5 }));
-  }
-  const draft = sketchGeometry(bridge.sketch);
-  if (draft) features.push(feature(draft, { kind: 'draft', color: DRAW_COLOR, alpha: 0, width: 3 }));
-  else if (bridge.sketch.points.length > 1) features.push(feature({ type: 'LineString', coordinates: bridge.sketch.points },
-    { kind: 'draft', color: DRAW_COLOR, alpha: 0, width: 3 }));
-  const editableRings = bridge.sketch.geometry && bridge.sketch.geometry.type !== 'LineString'
-    ? rings(bridge.sketch.geometry).map(r => r.slice(0, -1)) : [bridge.sketch.points];
-  editableRings.forEach((ring, r) => ring.forEach((point, i) => {
-    features.push(feature({ type: 'Point', coordinates: point }, { kind: 'vertex', ring: r, index: i, color: DRAW_COLOR }));
-    if (bridge.sketch.geometry && bridge.sketch.geometry.type !== 'LineString') {
-      const next = ring[(i + 1) % ring.length];
-      features.push(feature({ type: 'Point', coordinates: [(point[0] + next[0]) / 2, (point[1] + next[1]) / 2] },
-        { kind: 'midpoint', ring: r, index: i, color: '#ffffff' }));
-    }
-  }));
-  return { type: 'FeatureCollection', features };
-}
-
 export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: ZoningBridge }) {
   useMappedBaseline(map, bridge);
   const current = useRef(bridge);
@@ -72,7 +38,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
     map.doubleClickZoom.disable();
     map.boxZoom.disable(); // Shift-click belongs to multi-selection while the editor owns input.
     const attach = () => {
-      if (!map.getSource(SOURCE)) map.addSource(SOURCE, { type: 'geojson', data: data(current.current) });
+      if (!map.getSource(SOURCE)) map.addSource(SOURCE, { type: 'geojson', data: zoningData(current.current) });
       if (!map.getLayer(FILL)) map.addLayer({ id: FILL, source: SOURCE, type: 'fill', filter: ['==', '$type', 'Polygon'],
         paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['get', 'alpha'] } });
       if (!map.getLayer(LINE)) map.addLayer({ id: LINE, source: SOURCE, type: 'line', filter: ['!=', '$type', 'Point'],
@@ -109,7 +75,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
       if (!source) return;
       const candidate = current.current.sketch.tool ? snapCandidate(e) : null;
       source.setData(candidate ? { type: 'FeatureCollection',
-        features: [feature({ type: 'Point', coordinates: candidate.coordinate }, {})] } : EMPTY);
+        features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: candidate.coordinate }, properties: {} }] } : EMPTY);
     };
     const click = (e: MapMouseEvent) => {
       const b = current.current;
@@ -219,7 +185,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         type: 'fill', paint: { 'fill-opacity': 0 } }, PARCEL_LINE);
       if (current.current.plan && !map.getLayer(PARCEL_FILL)) map.addLayer({ id: PARCEL_FILL,
         source: PARCEL_SOURCE, 'source-layer': 'features', type: 'fill', minzoom: PARCEL_MIN_ZOOM,
-        paint: { 'fill-color': ['to-color', ['get', 'color'], '#94a3b8'], 'fill-opacity': .35,
+        paint: { 'fill-color': ['to-color', ['get', 'color'], '#94a3b8'], 'fill-opacity': .44,
           'fill-antialias': false } }, map.getLayer(FILL) ? FILL : PARCEL_LINE);
     };
     if (map.isStyleLoaded()) attach();
@@ -242,7 +208,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
 
   useEffect(() => {
     if (!map) return;
-    (map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData(data(bridge));
+    (map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData(zoningData(bridge));
     if (!bridge.sketch.tool) (map.getSource(SNAP_SOURCE) as GeoJSONSource | undefined)?.setData(EMPTY);
     if (bridge.active) map.getCanvas().style.cursor = bridge.sketch.tool ? 'crosshair' : '';
   }, [map, bridge]);

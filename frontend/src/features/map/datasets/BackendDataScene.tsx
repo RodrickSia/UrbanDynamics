@@ -16,7 +16,7 @@ import { floodLocationDetails } from './floodLocation';
 import { populationRasterSource, viewportProbeDelayAfterMove } from './populationRaster';
 import { PARCEL_MIN_ZOOM, PARCEL_MAX_NATIVE_ZOOM, PARCEL_OUTLINE, parcelOutline } from './parcelStyle';
 import { ParcelDetails } from '../parcels/ParcelDetails';
-import { LAND_PRICE_LAYER } from '../layers/landPrice';
+import { LAND_PRICE_LAYER, priceText } from '../layers/landPrice';
 import { nearestDatasetLine } from './datasetLineHover';
 import './data.css';
 
@@ -538,7 +538,7 @@ function previewValue(value: unknown): string | null {
   return String(value).replaceAll('_', ' ');
 }
 
-function DatasetLinePreview({ map, hover }: {
+export function DatasetLinePreview({ map, hover }: {
   map: MapLibreMap;
   hover: { layer: string; properties: Record<string, unknown>; x: number; y: number };
 }) {
@@ -561,8 +561,9 @@ function DatasetLinePreview({ map, hover }: {
     ['Road type', properties.road_type],
     ['Lanes', properties.lane_count],
   ] : [
-    ['Residential', properties.residential_vnd_m2 == null ? null : `${new Intl.NumberFormat('vi-VN').format(Number(properties.residential_vnd_m2))} ₫/m²`],
-    ['Commercial', properties.commercial_vnd_m2 == null ? null : `${new Intl.NumberFormat('vi-VN').format(Number(properties.commercial_vnd_m2))} ₫/m²`],
+    ['Residential', priceText(properties.residential_vnd_m2)],
+    ['Commercial', priceText(properties.commercial_vnd_m2)],
+    ['Other non-agricultural', priceText(properties.other_nonagricultural_vnd_m2)],
   ];
   const road = previewValue(properties.road ?? properties.name ?? properties.edge_id) ?? 'Unnamed road';
   const visibleRows = rows.flatMap(([label, value]) => {
@@ -571,8 +572,8 @@ function DatasetLinePreview({ map, hover }: {
   });
   const width = map.getContainer().clientWidth;
   const height = map.getContainer().clientHeight;
-  const cardLeft = Math.max(12, Math.min(hover.x + 18, width - 262));
-  const cardTop = Math.max(12, Math.min(hover.y + 18, height - 180));
+  const cardLeft = Math.max(12, Math.min(hover.x + 18, width - 306));
+  const cardTop = Math.max(12, Math.min(hover.y + 18, height - 205));
   return <>
     <span className="dataset-line-anchor" style={{ left: hover.x, top: hover.y }} aria-hidden="true" />
     <aside className="dataset-line-preview solid-panel" role="tooltip" aria-label={`${title} road details`}
