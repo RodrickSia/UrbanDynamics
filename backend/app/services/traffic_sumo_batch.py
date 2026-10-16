@@ -67,6 +67,19 @@ def queue_missing_scenario(weekday: int, period: str) -> tuple[int, bool]:
         return result.rowcount, False
 
 
+def enqueue_scenario(weekday: int, period: str) -> str:
+    """Queue a scenario, or report that it is already active or cached."""
+    queued, cached = queue_missing_scenario(weekday, period)
+    outcome = "cached" if cached else "queued" if queued else "already_active"
+    logger.info(
+        "SUMO six-hour scenario enqueue result: weekday=%d start=%s outcome=%s",
+        weekday,
+        _validate_scenario(weekday, period).strftime("%H:%M"),
+        outcome,
+    )
+    return outcome
+
+
 def run_batch(
     weekday: int = DEFAULT_WEEKDAY,
     period: str = DEFAULT_PERIOD,
@@ -145,16 +158,24 @@ def main() -> None:
     )
     parser.add_argument("--poll-seconds", type=float, default=15)
     parser.add_argument("--timeout-minutes", type=float, default=320)
+    parser.add_argument(
+        "--enqueue-only",
+        action="store_true",
+        help="queue the scenario and exit without waiting for simulation completion",
+    )
     args = parser.parse_args()
     try:
         _validate_scenario(args.weekday, args.period)
     except ValueError as error:
         parser.error(str(error))
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.enqueue_only:
+        enqueue_scenario(args.weekday, args.period)
+        return
     if not 1 <= args.poll_seconds <= 120:
         parser.error("Poll interval must be between 1 and 120 seconds")
     if not 1 <= args.timeout_minutes <= 320:
         parser.error("Timeout must be between 1 and 320 minutes")
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     run_batch(args.weekday, args.period, args.poll_seconds, args.timeout_minutes)
 
 

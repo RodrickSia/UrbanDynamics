@@ -193,6 +193,43 @@ def test_batch_accepts_exactly_one_weekday_and_start_time():
         _validate_scenario(3, "08:15")
 
 
+@pytest.mark.parametrize(
+    ("queue_result", "expected"),
+    [((1, False), "queued"), ((0, False), "already_active"), ((0, True), "cached")],
+)
+def test_enqueue_reports_queue_state(monkeypatch, queue_result, expected):
+    from app.services import traffic_sumo_batch
+
+    monkeypatch.setattr(
+        traffic_sumo_batch, "queue_missing_scenario", lambda *_args: queue_result
+    )
+
+    assert traffic_sumo_batch.enqueue_scenario(1, "08:00") == expected
+
+
+def test_enqueue_only_cli_does_not_enter_batch_polling(monkeypatch):
+    import sys
+
+    from app.services import traffic_sumo_batch
+
+    outcomes = []
+    monkeypatch.setattr(
+        sys, "argv", ["traffic_sumo_batch", "--weekday", "1", "--period", "08:00", "--enqueue-only"]
+    )
+    monkeypatch.setattr(
+        traffic_sumo_batch, "enqueue_scenario", lambda *args: outcomes.append(args)
+    )
+    monkeypatch.setattr(
+        traffic_sumo_batch,
+        "run_batch",
+        lambda *_args: pytest.fail("enqueue-only must not poll for completion"),
+    )
+
+    traffic_sumo_batch.main()
+
+    assert outcomes == [(1, "08:00")]
+
+
 def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     network = tmp_path / "hcmc.net.xml"
     network.touch()
