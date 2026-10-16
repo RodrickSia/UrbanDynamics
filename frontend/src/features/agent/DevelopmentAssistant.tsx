@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Send, X, RefreshCw } from 'lucide-react';
+import { GripVertical, Send, X, RefreshCw } from 'lucide-react';
+import { PixelRobot } from './PixelRobot';
+import { AssistantReply, AssistantText } from './AssistantReply';
+import { useDraggableChat } from './useDraggableChat';
 import { API_BASE_URL } from '../../services/api';
 import type { ZoningWorkspace } from '../zoning/useZoning';
 import type { SimulationJob, SimulationResult } from '../zoning/simulationTypes';
@@ -32,10 +35,6 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   return data;
 }
 
-function AssistantText({text}:{text:string}) {
-  return <p>{text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part,i)=>part.startsWith('**')?<strong key={i}>{part.slice(2,-2)}</strong>:part.startsWith('`')?<code key={i}>{part.slice(1,-1)}</code>:part)}</p>;
-}
-
 export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,viewport,mapPois,onCandidates,selectedPlace}: {
   workspace: ZoningWorkspace; onClose:()=>void; onBusy:(busy:boolean)=>void;
   viewport?:number[];mapPois?:import('./mapPoi').MapPoiSnapshot;onCandidates?:(features:import('geojson').FeatureCollection)=>void;
@@ -50,6 +49,8 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
   const [jobs,setJobs]=useState<Record<string,SimulationJob>>({}), [jobId,setJobId]=useState('');
   const [result,setResult]=useState<SimulationResult>();
   const [pollEpoch,setPollEpoch]=useState(0);
+  const [replyStart, setReplyStart] = useState(Infinity);
+  const chat = useDraggableChat();
   const draft = useRef<{message:string;id:string}|null>(null);
   const end=useRef<HTMLDivElement>(null);
   const binding:Binding={plan_id:w.plan?.id,revision:w.plan?.revision,scenario_id:w.scenario?.id,
@@ -83,6 +84,7 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
     return()=>{alive=false;};
   },[jobId,currentJob?.status,currentJob?.result_id]);
   const accept=async(next:Session)=>{
+    setReplyStart(session?.messages.length ?? 0);
     setPendingMessage(null);
     setSession(next);localStorage.setItem('development-assistant-session',next.session_id);
     if(next.workspace_changed&&next.workspace)await w.acceptAssistant(next.workspace);
@@ -109,8 +111,9 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
     finally{setBusy(false);onBusy(false);}
   };
   const refresh=async()=>{if(session)try{setSession(await api<Session>(`/api/v1/agent/sessions/${session.session_id}`));setPollEpoch(n=>n+1);}catch(e){setError(String(e));}};
-  return <aside className="development-assistant solid-panel zoning-ui" aria-label="Planning assistant">
-    <header><div><span className="eyebrow">AI WORKSPACE</span><h2><Bot size={18}/>Planning assistant</h2></div>
+  return <aside ref={chat.panel} className="development-assistant solid-panel zoning-ui" aria-label="Planning assistant">
+    <header><button type="button" className="assistant-drag-handle" aria-label="Move chat" title="Drag to move · Arrow keys to move · Home to reset" {...chat.handle}>
+      <GripVertical size={17}/><span>Planning assistant</span></button>
       <button aria-label="Close assistant" disabled={busy} onClick={onClose}><X size={17}/></button></header>
     {(w.plan || session?.analysis_area || binding.parcel_id || binding.dirty) && <div className="assistant-context">
       {w.plan && <><strong>{w.plan.name}</strong><span>{w.scenario?.name} · revision {w.plan.revision}</span></>}
@@ -123,9 +126,11 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
       {!session?.messages.length&&!pendingMessage&&<div className="assistant-welcome"><h3>Explore, compare and plan</h3>
         <p>Ask about an area, find sites, compare tradeoffs, review a plan or simulate a building. You can start from the visible map. Missing data stays unknown.</p>
         <div className="assistant-prompts">{['Analyze the visible map: population, buildings, roads, flooding and available sources.','Find 3 sites between 2,000 and 10,000 m² in the visible area. Explain what is still unknown.','Explain the current plan and its data gaps.','Read the latest completed simulation and explain the results.'].map(text=><button disabled={busy||!config?.model_configured} key={text} onClick={()=>void send(text)}>{text}</button>)}</div></div>}
-      <div aria-live="polite" className="assistant-messages">{session?.messages.map((m,i)=><article key={i} data-role={m.role}><strong>{m.role==='user'?'You':'Assistant'}</strong><AssistantText text={m.content}/></article>)}
+      <div aria-live="polite" className="assistant-messages">{session?.messages.map((m,i)=>m.role === 'assistant'
+        ? <AssistantReply key={`${session.session_id}-${i}`} text={m.content} animate={i >= replyStart}/>
+        : <article key={`${session.session_id}-${i}`} data-role={m.role}><strong>You</strong><AssistantText text={m.content}/></article>)}
         {pendingMessage&&!(pendingMessage.failed&&session?.messages.at(-1)?.role==='user'&&session.messages.at(-1)?.content===pendingMessage.content)&&<article data-role="user" data-pending="true"><strong>You</strong><AssistantText text={pendingMessage.content}/>{pendingMessage.failed&&<small>No response received. Retry this message or refresh.</small>}</article>}
-        {busy&&<p role="status" className="assistant-thinking"><span aria-hidden="true">●</span> Model is thinking…</p>}
+        {busy&&pendingMessage&&!pendingMessage.failed&&<div role="status" className="assistant-thinking"><PixelRobot state="thinking"/><span>Thinking…</span></div>}
         <div ref={end}/>
       </div>
       {!!session?.trace?.length&&<details><summary>Actions taken</summary><ul>{session.trace.map((t,i)=><li key={i}>{t.tool.replaceAll('_',' ')} · {t.status}{t.reason?` · ${t.reason}`:''}</li>)}</ul></details>}
