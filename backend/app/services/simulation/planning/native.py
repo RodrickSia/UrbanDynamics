@@ -27,6 +27,7 @@ def _pair_traffic(before, after, context_hash):
                            "limitations": result["limitations"]+(["Incomplete planned-trip population: completed-trip delay cannot establish a whole-network improvement."] if not comparable else []),
                            "comparability": "insufficient_data" if before["baseline_occupancy_unknown"] or not comparable else "scenario_only",
                            "comparability_reason": "unknown_baseline_occupancy" if before["baseline_occupancy_unknown"] else "incomplete_trip_bias" if not comparable else None})
+            output[-1]['trip_population_complete'] = baseline['completed_fraction'] == 1 and result['completed_fraction'] == 1
             if unknown:
                 output[-1]["scenario_values"] = {"before": b, "after": a, "delta": a-b if a is not None and b is not None else None,
                                                   "basis": "Unverified occupancy/OD assumptions; not an observed or established impact"}

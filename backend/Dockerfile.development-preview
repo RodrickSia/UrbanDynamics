@@ -1,0 +1,5 @@
+# Reuse an installed runtime with the same dependencies; replace preview code only.
+ARG BACKEND_BASE_IMAGE=urbandynamics-agent-preview-backend:local
+FROM ${BACKEND_BASE_IMAGE}
+COPY --chown=app:app backend/app/ /app/app/
+COPY --chown=app:app etl/src/ /app/etl/src/

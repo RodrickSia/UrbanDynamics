@@ -57,7 +57,7 @@ export function PlaceDetailsPanel(props: PlaceDetailsPanelProps) {
         </header>
         <div className="place-weather-row">
           <CloudSun aria-hidden="true" size={22} />
-          <div><strong>{props.place.temperatureC}°C</strong><span>{props.place.weatherLabel}</span></div>
+          <div><strong>{props.place.temperatureC==null?'—':`${props.place.temperatureC}°C`}</strong><span>{props.place.weatherLabel}</span></div>
         </div>
         <dl className="place-coordinate-list">
           <div><dt>Latitude</dt><dd>{props.place.latitude.toFixed(5)}</dd></div>

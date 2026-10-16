@@ -5,7 +5,7 @@ from psycopg.rows import dict_row
 from src.shared.database import connect_to_warehouse, warehouse_configured
 
 
-def population(geometry):
+def population(geometry, year=None):
     if not warehouse_configured():
         return None
     with connect_to_warehouse() as connection:
@@ -13,7 +13,7 @@ def population(geometry):
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute("""
                 WITH a AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(%s),4326) AS geom),
-                latest AS (SELECT max(year) AS year FROM population.population_raster),
+                latest AS (SELECT max(year) AS year FROM population.population_raster WHERE %s::int IS NULL OR year=%s),
                 cells AS (
                     SELECT DISTINCT ON (ST_AsEWKB(p.geom)) p.geom, p.val, r.year, r.source_file
                     FROM population.population_raster r, latest, a,
@@ -31,7 +31,7 @@ def population(geometry):
                 ) SELECT max(year) AS year, sum(val*area/NULLIF(cell_area,0)) AS value,
                          sum(area) AS covered_m2, array_agg(DISTINCT source_file) AS files
                   FROM parts WHERE area > 0
-            """, (json.dumps(geometry),))
+            """, (json.dumps(geometry),year,year))
             row = cursor.fetchone()
     return dict(row) if row and row['value'] is not None else None
 

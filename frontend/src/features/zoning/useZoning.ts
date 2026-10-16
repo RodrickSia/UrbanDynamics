@@ -7,7 +7,7 @@ import type { Command, Plan, PlanSummary, PolygonGeometry, Preview, Sketch, Tool
 
 const EMPTY_SKETCH: Sketch = { tool: null, points: [], geometry: null };
 
-export function useZoning(parcelAvailable = false) {
+export function useZoning(parcelAvailable = false, assistantBusy = false) {
   const [panel, setPanel] = useState<'plans' | 'indicators' | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -163,12 +163,21 @@ export function useZoning(parcelAvailable = false) {
     setSelected(ids => !id ? [] : multiple ? ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id] : [id]);
   };
   const close = (after?: () => void) => leave(() => { setPanel(null); cancel(); after?.(); });
+  const acceptAssistant = async (binding: {plan_id?: string; scenario_id?: string; parcel_id?: string; building_id?: string}) => {
+    if (!binding.plan_id || development.dirty) return;
+    const next = await zoningRequest<Plan>(`/${encodeURIComponent(binding.plan_id)}`);
+    setPlan(next); setScenarioId(binding.scenario_id ?? next.scenarios[1]?.id ?? next.scenarios[0].id);
+    setPanel('plans'); setSectionState('development'); setSelected([]); cancel();
+    development.adoptAssistantSelection(next.id,binding.scenario_id ?? next.scenarios[1]?.id ?? next.scenarios[0].id,binding.parcel_id,binding.building_id);
+    if (binding.plan_id !== plan?.id) zoomTo(next.study_area);
+    await refresh();
+  };
   return { panel, setPanel, active, close, plan, plans, scenario, chosenType, typeId, setTypeId, selected, pick,
     analyzing, analysisArea, includeScenario, setIncludeScenario, useStudyArea,
     indicatorScope, setIndicatorChart, indicatorChart: analyzing && indicatorChart?.scope === indicatorScope ? indicatorChart : null,
     sketch, setSketch, begin, cancel: development.dirty ? development.cancel : cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
-    section, setSection, development, leaving, resolveLeave, leave,
-    visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy: busy || development.working, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,
+    section, setSection, development, leaving, resolveLeave, leave, acceptAssistant,
+    visible, setVisible, showParcels, setShowParcels, parcelAvailable, busy: busy || development.working || assistantBusy, loading, error, setError, focus, zoomTo, openPlan, execute, create, deletePlan, refresh, selectScenario,
     back: (after?: () => void) => leave(() => { setPlan(null); setSelected([]); cancel(); void refresh(); after?.(); }),
   };
 }

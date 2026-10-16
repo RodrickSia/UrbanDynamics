@@ -14,6 +14,9 @@ import type {
 } from '../types/map';
 
 export interface UrbanMapProps {
+  onPoiSnapshot?: (snapshot:import('../../agent/mapPoi').MapPoiSnapshot)=>void;
+  onViewportChange?: (bounds: number[]) => void;
+  agentCandidates?: import('geojson').FeatureCollection;
   zoning?: ZoningBridge;
   backend?: BackendBridge;
   poiEnabled?: boolean;

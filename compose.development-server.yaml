@@ -1,0 +1,12 @@
+# Read team map data; save plans, jobs and OSM context in this preview's own volume.
+services:
+  backend:
+    environment:
+      PGOPTIONS: "-c default_transaction_read_only=on"
+  worker:
+    environment:
+      PGOPTIONS: "-c default_transaction_read_only=on"
+networks:
+  default:
+    external: true
+    name: urbandynamics-development-preview-data

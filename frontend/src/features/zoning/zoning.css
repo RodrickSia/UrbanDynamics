@@ -202,3 +202,13 @@
   @keyframes zoning-tab-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @keyframes zoning-dialog-enter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 }
+.simulation-comparison { font-variant-numeric: tabular-nums; }
+.zoning-ui .simulation-comparison { table-layout: fixed; width: 100%; }
+.zoning-ui .simulation-comparison th, .zoning-ui .simulation-comparison td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; padding-left: .2rem; padding-right: .2rem; }
+.zoning-ui .simulation-comparison th:first-child { width: 40%; }
+.simulation-comparison th small, .simulation-sources small { display: block; font-weight: 400; color: var(--text-secondary, #64748b); margin-top: 3px; }
+.simulation-comparison td { white-space: nowrap; text-align: right; }
+.simulation-comparison thead th:not(:first-child) { text-align: right; }
+.simulation-sources dl { margin: 12px 0; font-size: 12px; line-height: 1.55; }
+.simulation-sources dt { font-weight: 600; margin-top: 12px; }
+.simulation-sources dd { margin: 3px 0 0; overflow-wrap: anywhere; }

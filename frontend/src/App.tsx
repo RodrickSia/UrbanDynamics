@@ -12,6 +12,7 @@ import { ViewshedPanel } from './features/map/viewshed/ViewshedPanel';
 import { useBackendLayers } from './features/map/datasets/useBackendLayers';
 import { useZoning } from './features/zoning/useZoning';
 import { ZoningWorkspace } from './features/zoning/ZoningWorkspace';
+import { DevelopmentAssistant } from './features/agent/DevelopmentAssistant';
 
 export default function App() {
   const configuration = useMemo(
@@ -20,7 +21,11 @@ export default function App() {
   );
   const workspace = useMapWorkspace();
   const backend = useBackendLayers(workspace.layers, workspace.mode);
-  const zoning = useZoning(backend.catalog.parcels?.available === true);
+  const [assistantOpen,setAssistantOpen]=useState(false),[assistantBusy,setAssistantBusy]=useState(false);
+  const [agentViewport,setAgentViewport]=useState<number[]>();
+  const [agentPois,setAgentPois]=useState<import('./features/agent/mapPoi').MapPoiSnapshot>();
+  const [agentCandidates,setAgentCandidates]=useState<import('geojson').FeatureCollection>({type:'FeatureCollection',features:[]});
+  const zoning = useZoning(backend.catalog.parcels?.available === true,assistantBusy);
   const [searchPanelHeight, setSearchPanelHeight] = useState(0);
   const activateZoning = () => {
     workspace.cancelMeasurement();
@@ -42,6 +47,7 @@ export default function App() {
         onPointerDownCapture={workspace.handleMapPointerDown}
       >
         <UrbanMap
+          onViewportChange={setAgentViewport} onPoiSnapshot={assistantOpen?setAgentPois:undefined} agentCandidates={assistantOpen?agentCandidates:undefined}
           zoning={{ active: zoning.active, plan: zoning.plan,
             scenario: zoning.analyzing && !zoning.includeScenario ? zoning.plan?.scenarios[0] ?? null : zoning.scenario,
             analysis: { active: zoning.analyzing, geometry: zoning.analysisArea, chart: zoning.indicatorChart },
@@ -111,6 +117,8 @@ export default function App() {
         )}
 
         <MapNavigationControls
+          assistantOpen={assistantOpen}
+          onToggleAssistant={()=>{if(!assistantBusy){setAssistantOpen(!assistantOpen);workspace.closeRightPanel();}}}
           mode={workspace.mode}
           rightPanelOpen={workspace.rightPanel === 'layers'}
           layersOpen={workspace.rightPanel === 'layers'}
@@ -118,6 +126,19 @@ export default function App() {
           onToggleLayers={() => zoning.close(workspace.toggleLayers)}
           onCommand={workspace.handleMapCommand}
         />
+
+        {assistantOpen&&<DevelopmentAssistant workspace={zoning} onBusy={setAssistantBusy} onClose={()=>setAssistantOpen(false)}
+          viewport={agentViewport} mapPois={agentPois} onCandidates={setAgentCandidates} selectedPlace={workspace.selectedPlace}
+          onMapAction={action=>{
+            const notes:string[]=[];
+            if(action.type==='focus'&&action.bbox)workspace.focusBounds(action.bbox);
+            if(action.type==='layers')for(const id of action.layer_ids??[]){
+              const layer=backend.definitions.find(l=>l.id===id);
+              if(!layer||layer.status!=='available'){notes.push(`${layer?.label??id}: source unavailable; layer was not enabled.`);continue;}
+              if(!workspace.layers[layer.id])workspace.handleLayerToggle(layer);
+            }
+            return notes;
+          }}/ >}
 
         <MapControls
           viewshedActive={workspace.viewsheds.phase !== 'idle'}

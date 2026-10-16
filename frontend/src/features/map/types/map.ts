@@ -64,7 +64,7 @@ export interface PlaceDetails {
   context: string;
   longitude: number;
   latitude: number;
-  temperatureC: number;
+  temperatureC: number|null;
   weatherLabel: string;
 }
 

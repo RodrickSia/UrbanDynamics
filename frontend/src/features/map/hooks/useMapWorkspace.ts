@@ -236,6 +236,9 @@ export function useMapWorkspace() {
   );
 
   return {
+    focusBounds: (bounds: number[]) => setMapFocusRequest(current => ({id:(current?.id ?? 0)+1,
+      center:[(bounds[0]+bounds[2])/2,(bounds[1]+bounds[3])/2],
+      zoom:Math.min(18,Math.max(9,Math.log2(360/Math.max(bounds[2]-bounds[0],bounds[3]-bounds[1],.001))-1))})),
     mode,
     mapStyle,
     timeRange,

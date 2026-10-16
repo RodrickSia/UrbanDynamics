@@ -1,0 +1,64 @@
+name: urbandynamics-development-preview
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.development-preview
+      args:
+        BACKEND_BASE_IMAGE: ${DEV_BACKEND_BASE_IMAGE:-urbandynamics-agent-preview-backend:local}
+    image: urbandynamics-development-preview-backend:local
+    restart: unless-stopped
+    env_file:
+      - .env.development.local
+      - path: .env.development-agent.local
+        required: false
+    environment: &runtime
+      PGOPTIONS: "-c default_transaction_read_only=on"
+      ZONING_STORAGE: sqlite
+      ZONING_DATA_DIR: /runtime/zoning
+      PLANNING_SQLITE_PATH: /runtime/studies.sqlite
+      SIMULATION_WORK_DIR: /runtime/solvers
+      DEVELOPMENT_CONTEXT_DIR: /runtime/road-context
+      AGENT_SQLITE_PATH: /runtime/agent.sqlite
+      PLANNING_SYSTEM_DEMO_ENABLED: "1"
+      PLANNING_SYSTEM_SNAPSHOT_DIR: /snapshots
+      PLANNING_COUNTING_REFERENCE_DIR: /counting
+      PLANNING_SOLVER_TIMEOUT_SECONDS: "600"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "127.0.0.1:${DEV_API_PORT:-8022}:8000"
+    volumes: &volumes
+      - development-preview-runtime:/runtime
+      - ${DEV_SNAPSHOT_DIR:-../UrbanDynamics/.runtime/planning-system/snapshots}:/snapshots:ro
+      - ${DEV_COUNTING_DIR:-../UrbanDynamics/.runtime/planning-system/snapshots/counting}:/counting:ro
+      - ${DEV_DATA_DIR:-../UrbanDynamics/etl/data}:/data:ro
+  worker:
+    image: urbandynamics-development-preview-backend:local
+    restart: unless-stopped
+    env_file: .env.development.local
+    environment: *runtime
+    volumes: *volumes
+    command: ["python", "-m", "app.services.simulation.planning.worker"]
+    depends_on:
+      backend:
+        condition: service_healthy
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_GOONG_MAPTILES_KEY: ${VITE_GOONG_MAPTILES_KEY:-}
+        VITE_API_BASE_URL: ""
+    image: urbandynamics-development-preview-frontend:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DEV_WEB_PORT:-8092}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  development-preview-runtime:

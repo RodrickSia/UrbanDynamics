@@ -116,6 +116,8 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
     return true;
   };
   return { parcel, parcelId, selectedBuilding, data, error, loading: !!parcelId && !data && !error,
+    adoptAssistantSelection: (planId: string, scenarioId: string, parcelId = '', buildingId = '') =>
+      setSelection({scope:`${planId}/${scenarioId}`,parcelId,buildingId}),
     mapBuildings, onBaseline: (id: string, buildings: FeatureCollection) => {
       if (id === parcelId) setMapped(previous => previous?.scope === scope && previous.parcelId === id
         && JSON.stringify(previous.buildings) === JSON.stringify(buildings) ? previous : { scope, parcelId: id, buildings });

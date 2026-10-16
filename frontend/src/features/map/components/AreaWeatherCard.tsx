@@ -17,7 +17,7 @@ export function AreaWeatherCard({ place, onSelect }: AreaWeatherCardProps) {
       </span>
       <span className="weather-reading">
         <CloudSun aria-hidden="true" size={20} />
-        <strong>{place.temperatureC}°C</strong>
+        <strong>{place.temperatureC==null?'—':`${place.temperatureC}°C`}</strong>
       </span>
     </button>
   );

@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 from xml.etree import ElementTree as ET
 
-from shapely.geometry import LineString, mapping, shape
+from shapely.geometry import LineString, mapping, shape, box
 
 from ..integrated.road_network import write_osm, route_between
 from .parcels import registry
@@ -14,10 +14,20 @@ from .runner import execute
 from .system_demo import load
 
 
+def network_document(study):
+    if study.traffic_snapshot_id:
+        from ...zoning.simulation_context import load_network
+        document = load_network(study.traffic_snapshot_id)
+        if not box(*document['bbox']).covers(shape(study.study_area.model_dump())):
+            raise ValueError('Local road extract does not cover the study area')
+        return document
+    return load(study.system_snapshot_id)
+
+
 def source_specification(study):
-    document=load(study.system_snapshot_id)
+    document=network_document(study)
     features=[]
-    region=shape(study.study_area.model_dump())
+    region=box(*document['bbox']) if study.traffic_snapshot_id else shape(study.study_area.model_dump())
     for way in document.get('osm',{}).get('elements',[]):
         if way.get('type')!='way' or not way.get('tags',{}).get('highway') or len(way.get('geometry',[]))<2:
             continue
@@ -25,11 +35,13 @@ def source_specification(study):
         if line.is_empty:
             continue
         features.append({'type':'Feature','geometry':mapping(line),
-            'properties':{'osm_way_id':way['id'],'source_kind':'osm_topology','tags':way['tags']}})
+            'properties':{'osm_way_id':None if document.get('network_kind') == 'warehouse_osm_reconstruction' else way['id'],
+                          'source_edge_id':way['tags'].get('urbandynamics:source_edge'),
+                          'source_kind':document.get('network_kind','osm_topology'),'tags':way['tags']}})
     if not features:
         raise ValueError('Installed snapshot has no OSM roads for planning traffic')
     return {'nodes':[], 'edges':features, 'map':{'type':'FeatureCollection','features':features},
-        'source_snapshot_id':study.system_snapshot_id,
+        'source_snapshot_id':study.traffic_snapshot_id or study.system_snapshot_id,
         'provenance':{'kind':'osm_topology_with_estimated_demand',
             'edge_count_basis':'source OSM ways, not imported directed SUMO edges',
             'access_method':'nearest connected public junction, within 500 m, hypothetical',
@@ -47,9 +59,9 @@ def build(study,directory,checkpoint=None):
     binaries=Path(sumo.SUMO_HOME)/'bin';netconvert=str(binaries/('netconvert'+suffix))
     def run(args):
         execute(args,directory,checkpoint)
-    document=load(study.system_snapshot_id)
+    document=network_document(study)
     write_osm(document['osm'],directory/'source.osm.xml')
-    bbox=shape(study.study_area.model_dump()).bounds
+    bbox=document['bbox'] if study.traffic_snapshot_id else shape(study.study_area.model_dump()).bounds
     run([netconvert,'--osm-files','source.osm.xml','--output-file','public.xml',
          '--keep-edges.by-vclass','passenger,motorcycle','--keep-edges.in-geo-boundary',','.join(map(str,bbox)),
          '--geometry.remove','true','--no-turnarounds','true'])
@@ -151,7 +163,7 @@ def build(study,directory,checkpoint=None):
         'map':{'type':'FeatureCollection','features':features},'background_routes':background_routes,'project_routes':project_routes,
         'project_to_physical_parcel':physical,'project_to_solver_parcel':solver_ids,
         'project_random_keys':{p.id:hashlib.sha256(geometry_keys[p.id].encode()).hexdigest() for p in projects},
-        'provenance':{'kind':'osm_topology_with_estimated_demand','source_snapshot_id':study.system_snapshot_id,
+        'provenance':{'kind':'osm_topology_with_estimated_demand','source_snapshot_id':study.traffic_snapshot_id or study.system_snapshot_id,
             'directed_edges':len(features),'accesses':accesses,'background_can_use_private_access':False,
             'od_method':'equal allocation across reachable outer-approach routes; not observed OD',
             'signal_method':'OSM signal tags where present; netconvert generated phase timings',
