@@ -11,7 +11,7 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
   const [trafficPeriod, setTrafficPeriod] = useState(data.trafficSchedule.period);
   const sumoVolumeMax = Math.max(
     0,
-    Math.floor(Number(data.sumoRunMetadata?.max_estimated_cars_6h ?? 0)),
+    Math.floor(Number(data.sumoRunMetadata?.max_simulated_vehicles_6h ?? 0)),
   );
   const sumoVolumeTicks = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round(sumoVolumeMax * fraction)))];
   const StatusIcon =
@@ -209,8 +209,8 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
               {' '}start {String(data.sumoRunMetadata?.period ?? '')} HCMC · six hours
             </p>
           )}
-          <div className="sumo-volume-legend" role="group" aria-label="Estimated car passages per road over six hours">
-            <small>Estimated car passages · simulated six hours</small>
+          <div className="sumo-volume-legend" role="group" aria-label="Simulated vehicle passages, including motorcycles, per road over six hours">
+            <small>Simulated vehicle passages · six hours</small>
             <div className="sumo-volume-ramp" aria-hidden="true" />
             {data.sumoRunStatus === 'completed' ? (
               <div className="sumo-volume-ticks">
@@ -224,11 +224,11 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           </div>
           <DatasetNote>
             This is a precomputed data layer; enabling it never starts a simulation. The fast
-            synthetic run uses only 360 planned car trips over six hours, so it is not representative
-            of real city demand and will generally understate congestion. The latest
-            workflow-published scenario is shown as a six-hour aggregate, not live traffic or a
-            validated forecast. Road colors show estimated passenger-car passages on each road in
-            that run; zero-volume roads remain visible at the low end of the scale.
+            synthetic run uses 360 planned trips over six hours (252 motorcycles and 108 cars),
+            so it is not representative of real city demand and will generally understate
+            congestion. The latest workflow-published scenario is shown as a six-hour aggregate,
+            not live traffic or a validated forecast. Road colors show total simulated vehicle
+            passages, including motorcycles; the feature details separate cars from motorcycles.
           </DatasetNote>
         </>
       )}

@@ -69,7 +69,7 @@ def test_latest_endpoint_returns_the_newest_precomputed_run(monkeypatch):
         "run_id": "cached-run",
         "weekday": 1,
         "period": "08:00",
-        "metadata": {"simulation_model": "mesoscopic-6h-min-demand-v1"},
+        "metadata": {"simulation_model": "mesoscopic-6h-mixed-motorcycle-v1"},
         "generated_at": "2026-10-15T12:00:00Z",
     }
     monkeypatch.setattr(
@@ -111,17 +111,17 @@ def test_scenario_cache_endpoint_returns_cache_miss_as_404(monkeypatch):
 
 
 def test_scenario_cache_only_returns_results_from_the_current_model(monkeypatch):
-    connection = FakeConnection(result=("meso-run", {"simulation_model": "mesoscopic-6h-min-demand-v1"}))
+    connection = FakeConnection(result=("meso-run", {"simulation_model": "mesoscopic-6h-mixed-motorcycle-v1"}))
     monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
 
     cached = traffic_sumo_prediction.cached_scenario(2, "08:00")
 
     assert cached["run_id"] == "meso-run"
-    assert connection.calls[0][1] == (2, "08:00", "mesoscopic-6h-min-demand-v1")
+    assert connection.calls[0][1] == (2, "08:00", "mesoscopic-6h-mixed-motorcycle-v1")
 
 
 def test_latest_cached_scenario_selects_only_the_current_six_hour_model(monkeypatch):
-    metadata = {"simulation_model": "mesoscopic-6h-min-demand-v1"}
+    metadata = {"simulation_model": "mesoscopic-6h-mixed-motorcycle-v1"}
     connection = FakeConnection(result=("run-id", 1, time(8, 0), metadata, "generated"))
     monkeypatch.setattr(traffic_sumo_prediction, "connect_to_warehouse", lambda: connection)
 
@@ -134,7 +134,7 @@ def test_latest_cached_scenario_selects_only_the_current_six_hour_model(monkeypa
         "metadata": metadata,
         "generated_at": "generated",
     }
-    assert connection.calls[0][1] == ("mesoscopic-6h-min-demand-v1",)
+    assert connection.calls[0][1] == ("mesoscopic-6h-mixed-motorcycle-v1",)
 
 
 def test_timed_out_sumo_stage_preserves_stderr_for_diagnosis(tmp_path, monkeypatch):
@@ -178,7 +178,9 @@ def test_cleanup_removes_only_the_matching_run_scratch_directory(tmp_path, monke
 def test_target_demand_is_fixed_minimum_and_independent_of_scenario():
     assert traffic_sumo_prediction._target_demand(1, "08:00") == (60.0, 0)
     assert traffic_sumo_prediction._target_demand(7, "23:30") == (60.0, 0)
-    assert traffic_sumo_prediction.PLANNED_CAR_TRIPS_6H == 360
+    assert traffic_sumo_prediction.PLANNED_TOTAL_TRIPS_6H == 360
+    assert traffic_sumo_prediction.PLANNED_CAR_TRIPS_6H == 108
+    assert traffic_sumo_prediction.PLANNED_MOTORCYCLE_TRIPS_6H == 252
 
 
 def test_batch_accepts_exactly_one_weekday_and_start_time():
@@ -215,7 +217,7 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     monkeypatch.setattr(
         traffic_sumo_prediction,
         "_features",
-        lambda *_args: {"metadata": {"simulation_model": "mesoscopic-6h-min-demand-v1"}},
+        lambda *_args: {"metadata": {"simulation_model": "mesoscopic-6h-mixed-motorcycle-v1"}},
     )
 
     result = traffic_sumo_prediction.run_prediction(1, "08:00", "scenario-test")
@@ -224,14 +226,33 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     assert sumo_command[sumo_command.index("--mesosim") + 1] == "true"
     assert sumo_command[sumo_command.index("--end") + 1] == "21600"
     assert sumo_command[sumo_command.index("--time-to-teleport") + 1] == "300"
-    trips_command = next(command for command in commands if command[1].endswith("randomTrips.py"))
-    assert trips_command[trips_command.index("--end") + 1] == "21600"
-    assert trips_command[trips_command.index("--period") + 1] == "60.0"
-    assert trips_command[trips_command.index("--additional-file") + 1] == "vehicle-types.xml"
-    assert trips_command[trips_command.index("--edge-permission") + 1] == "passenger"
-    assert trips_command[trips_command.index("--trip-attributes") + 1] == 'type="car"'
-    assert "--vehicle-class" not in trips_command
-    assert result["metadata"]["simulation_model"] == "mesoscopic-6h-min-demand-v1"
+    trip_commands = [command for command in commands if command[1].endswith("randomTrips.py")]
+    assert len(trip_commands) == 2
+    trip_commands_by_mode = {command[command.index("--prefix") + 1]: command for command in trip_commands}
+    assert set(trip_commands_by_mode) == {"car", "motorcycle"}
+    for mode, expected_period, permission in (
+        ("car", "200.0", "passenger"),
+        ("motorcycle", str(21600 / 252), "motorcycle"),
+    ):
+        trips_command = trip_commands_by_mode[mode]
+        assert trips_command[trips_command.index("--end") + 1] == "21600"
+        assert trips_command[trips_command.index("--period") + 1] == expected_period
+        assert trips_command[trips_command.index("--additional-file") + 1] == "vehicle-types.xml"
+        assert trips_command[trips_command.index("--edge-permission") + 1] == permission
+        assert trips_command[trips_command.index("--trip-attributes") + 1] == f'type="{mode}"'
+        assert "--vehicle-class" not in trips_command
+    duarouter_command = next(command for command in commands if command[0].endswith("/duarouter"))
+    assert duarouter_command[duarouter_command.index("--route-files") + 1] == "car-trips.xml,motorcycle-trips.xml"
+    vehicle_types_path = next((tmp_path / "runtime" / "runs" / "scenario-test").glob("attempt-*/vehicle-types.xml"))
+    configured_types = ET.parse(vehicle_types_path).getroot().findall("vType")
+    assert {item.get("id"): item.get("vClass") for item in configured_types} == {
+        "car": "passenger",
+        "motorcycle": "motorcycle",
+    }
+    additional_path = vehicle_types_path.parent / "additional.xml"
+    detectors = ET.parse(additional_path).getroot().findall("edgeData")
+    assert {item.get("vTypes") for item in detectors} == {"car motorcycle", "car", "motorcycle"}
+    assert result["metadata"]["simulation_model"] == "mesoscopic-6h-mixed-motorcycle-v1"
 
 
 def test_network_file_builds_atomically_then_reuses_runtime_cache(tmp_path, monkeypatch):
@@ -268,7 +289,7 @@ def test_network_file_builds_atomically_then_reuses_runtime_cache(tmp_path, monk
     assert len(commands) == 2
 
 
-def test_feature_output_includes_zero_car_roads_and_sums_full_period_counts():
+def test_feature_output_includes_zero_volume_roads_and_sums_full_period_counts():
     intervals = [
         ET.fromstring(
             '<interval begin="0" end="300"><edge id="busy" entered="2" speed="10" '
@@ -279,19 +300,38 @@ def test_feature_output_includes_zero_car_roads_and_sums_full_period_counts():
             'sampledSeconds="10" occupancy="30"/></interval>'
         ),
     ]
+    car_intervals = [
+        ET.fromstring('<interval begin="0" end="600"><edge id="busy" entered="2"/></interval>')
+    ]
+    motorcycle_intervals = [
+        ET.fromstring('<interval begin="0" end="600"><edge id="busy" entered="3"/></interval>')
+    ]
 
     result = traffic_sumo_prediction._features_from_intervals(
-        FakeNetwork(), intervals, "run-id", 1, "08:00", 3.0, 25
+        FakeNetwork(),
+        intervals,
+        "run-id",
+        1,
+        "08:00",
+        60.0,
+        0,
+        car_intervals=car_intervals,
+        motorcycle_intervals=motorcycle_intervals,
     )
 
     assert len(result["features"]) == 2
     busy, empty = result["features"]
-    assert busy["properties"]["estimated_cars_6h"] == 5
+    assert busy["properties"]["simulated_vehicles_6h"] == 5
+    assert busy["properties"]["simulated_cars_6h"] == 2
+    assert busy["properties"]["simulated_motorcycles_6h"] == 3
     assert busy["properties"]["simulated_speed_kmh"] == 48.0
-    assert empty["properties"]["estimated_cars_6h"] == 0
+    assert empty["properties"]["simulated_vehicles_6h"] == 0
     assert empty["properties"]["simulated_speed_kmh"] == 54.0
-    assert result["metadata"]["max_estimated_cars_6h"] == 5
-    assert result["metadata"]["simulation_model"] == "mesoscopic-6h-min-demand-v1"
+    assert result["metadata"]["max_simulated_vehicles_6h"] == 5
+    assert result["metadata"]["simulation_model"] == "mesoscopic-6h-mixed-motorcycle-v1"
+    assert result["metadata"]["planned_motorcycle_trips_6h"] == 252
+    assert result["metadata"]["planned_car_trips_6h"] == 108
+    assert result["metadata"]["planned_total_trips_6h"] == 360
     assert result["metadata"]["simulation_duration_hours"] == 6
     assert result["metadata"]["vehicle_count_period_seconds"] == 21600
     assert result["metadata"]["vehicle_count_period_label"] == "simulated 6-hour period"

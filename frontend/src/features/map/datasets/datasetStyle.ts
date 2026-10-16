@@ -125,7 +125,7 @@ export function datasetStyle(selection: DataSelection): LayerSpecification {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': [
-            'interpolate', ['linear'], ['to-number', ['get', 'estimated_cars_6h'], 0],
+            'interpolate', ['linear'], ['to-number', ['get', 'simulated_vehicles_6h'], 0],
             0, '#277da1',
             volumeMax * 0.25, '#50b5b0',
             volumeMax * 0.5, '#b8d76b',

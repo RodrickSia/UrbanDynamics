@@ -197,7 +197,7 @@ export function useBackendLayers(layers: LayerState, mode: MapMode = '3d') {
         if (!isDataLayer(layer.id) || !layers[layer.id] || layer.status !== 'available') return [];
         const dataset = DATASETS[layer.id];
         if (dataset === 'sumo_simulation' && (!sumoRunId || sumoRunStatus !== 'completed')) return [];
-        const sumoVolumeMax = Number(sumoRunMetadata?.max_estimated_cars_6h ?? 0);
+        const sumoVolumeMax = Number(sumoRunMetadata?.max_simulated_vehicles_6h ?? 0);
         return [
           { id: layer.id, dataset, url: tileUrl(dataset, dates, year, palette,
             dataset === 'traffic' ? trafficSchedule : undefined, dataset === 'sumo_simulation' ? sumoRunId ?? undefined : undefined), year, dates,

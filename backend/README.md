@@ -66,15 +66,15 @@ The standalone SUMO traffic predictor is separate from development/zoning
 simulation. Each request runs exactly one selected weekday/start-time scenario
 for six simulated hours on the `traffic-prediction-worker` Compose service,
 builds/caches a SUMO road network from the HCMC OSM PBF, and returns one
-aggregate set of edge-level speeds, LOS, and estimated car passages for that
-six-hour window. For the fast layer, demand is deliberately fixed at one
-passenger-car trip attempt per minute (360 attempts total), independent of the
-selected start time. This is a minimum-load synthetic scenario, not a useful
-estimate of real city demand: it will generally understate traffic and
-congestion. The map displays only the
-currently selected run's result, with roads colored by estimated passenger-car
-passages over that six-hour run. This scenario simulates passenger cars only;
-motorcycle interactions are not modeled. It uses SUMO's mesoscopic queue model
+aggregate set of edge-level speeds, LOS, and simulated vehicle passages for
+that six-hour window. For the fast layer, demand is deliberately fixed at 360
+trip attempts total: 252 motorcycles (70%) and 108 passenger cars (30%),
+independent of the selected start time. This is a minimum-load synthetic
+scenario, not an estimate of real city demand: it will generally understate
+traffic and congestion. The map displays only the
+currently selected run's result, with roads colored by total simulated vehicle
+passages over that six-hour run and feature details splitting cars from
+motorcycles. It uses SUMO's mesoscopic queue model
 (`--mesosim true`) for throughput; this is less detailed than microscopic
 vehicle-following and lane-changing, and allows a stuck vehicle to be teleported
 after 300 seconds rather than disabling stuck-vehicle recovery. Cache lookups are model-versioned, so

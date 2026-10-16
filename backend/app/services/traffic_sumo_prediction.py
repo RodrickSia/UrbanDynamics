@@ -27,15 +27,18 @@ LOS_COLORS = {
     "F": "#8c3047",
 }
 SIMULATION_SECONDS = 6 * 60 * 60
-CAR_TRIP_PERIOD_SECONDS = 60.0
-PLANNED_CAR_TRIPS_6H = int(SIMULATION_SECONDS / CAR_TRIP_PERIOD_SECONDS)
+TOTAL_TRIP_PERIOD_SECONDS = 60.0
+PLANNED_TOTAL_TRIPS_6H = int(SIMULATION_SECONDS / TOTAL_TRIP_PERIOD_SECONDS)
+MOTORCYCLE_SHARE = 0.7
+PLANNED_MOTORCYCLE_TRIPS_6H = round(PLANNED_TOTAL_TRIPS_6H * MOTORCYCLE_SHARE)
+PLANNED_CAR_TRIPS_6H = PLANNED_TOTAL_TRIPS_6H - PLANNED_MOTORCYCLE_TRIPS_6H
 SIMULATION_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_SIMULATION_TIMEOUT_SECONDS", "12600"))
 TRIP_GENERATION_TIMEOUT_SECONDS = int(
     os.getenv("TRAFFIC_TRIP_GENERATION_TIMEOUT_SECONDS", "3600")
 )
 ROUTE_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_ROUTE_BUILD_TIMEOUT_SECONDS", "1800"))
 NETWORK_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS", "1800"))
-SIMULATION_MODEL = "mesoscopic-6h-min-demand-v1"
+SIMULATION_MODEL = "mesoscopic-6h-mixed-motorcycle-v1"
 logger = logging.getLogger(__name__)
 
 
@@ -174,9 +177,21 @@ def _network_file(data: Path, runtime: Path) -> Path:
 
 
 def _target_demand(weekday: int, period: str) -> tuple[float, int]:
-    """Use a fixed, deliberately low synthetic demand for the fast six-hour layer."""
+    """Use a fixed, deliberately low synthetic mixed-fleet demand for the six-hour layer."""
     del weekday, period  # Scenario identity does not alter this minimal test demand.
-    return CAR_TRIP_PERIOD_SECONDS, 0
+    return TOTAL_TRIP_PERIOD_SECONDS, 0
+
+
+def _entered_by_edge(intervals: list[ET.Element]) -> dict[str, int]:
+    entered: dict[str, int] = {}
+    for interval in intervals:
+        for element in interval.findall("edge"):
+            edge_id = element.get("id", "")
+            if edge_id and not edge_id.startswith(":"):
+                entered[edge_id] = entered.get(edge_id, 0) + int(
+                    float(element.get("entered", "0"))
+                )
+    return entered
 
 
 def _features_from_intervals(
@@ -188,10 +203,14 @@ def _features_from_intervals(
     trip_period: float,
     observation_rows: int,
     road_edges: tuple[tuple[str, list[list[float]], float], ...] | None = None,
+    car_intervals: list[ET.Element] | None = None,
+    motorcycle_intervals: list[ET.Element] | None = None,
 ) -> dict:
     if not intervals:
         raise RuntimeError("SUMO completed without edge-level output")
-    entered_by_edge: dict[str, int] = {}
+    entered_by_edge = _entered_by_edge(intervals)
+    entered_cars_by_edge = _entered_by_edge(car_intervals or [])
+    entered_motorcycles_by_edge = _entered_by_edge(motorcycle_intervals or [])
     sampled_seconds_by_edge: dict[str, float] = {}
     speed_seconds_by_edge: dict[str, float] = {}
     occupancy_seconds_by_edge: dict[str, float] = {}
@@ -200,9 +219,6 @@ def _features_from_intervals(
             edge_id = element.get("id", "")
             if not edge_id or edge_id.startswith(":"):
                 continue
-            entered_by_edge[edge_id] = entered_by_edge.get(edge_id, 0) + int(
-                float(element.get("entered", "0"))
-            )
             sampled = float(element.get("sampledSeconds", "0"))
             if sampled > 0:
                 sampled_seconds_by_edge[edge_id] = sampled_seconds_by_edge.get(edge_id, 0) + sampled
@@ -256,7 +272,9 @@ def _features_from_intervals(
                     "free_flow_speed_kmh": round(free_speed * 3.6, 1),
                     "speed_ratio": round(ratio, 3),
                     "congestion_score": round((1 - min(1, ratio)) * 100, 1),
-                    "estimated_cars_6h": entered_by_edge.get(edge_id, 0),
+                    "simulated_vehicles_6h": entered_by_edge.get(edge_id, 0),
+                    "simulated_cars_6h": entered_cars_by_edge.get(edge_id, 0),
+                    "simulated_motorcycles_6h": entered_motorcycles_by_edge.get(edge_id, 0),
                     "occupancy_percent": round(
                         occupancy_seconds_by_edge.get(edge_id, 0) / sampled if sampled else 0, 1
                     ),
@@ -281,24 +299,27 @@ def _features_from_intervals(
             ),
             "vehicle_count_period_seconds": SIMULATION_SECONDS,
             "vehicle_count_period_label": "simulated 6-hour period",
-            "vehicle_count_type": "passenger cars only; motorcycles are not simulated",
-            "max_estimated_cars_6h": max(
-                (feature["properties"]["estimated_cars_6h"] for feature in features),
+            "vehicle_count_type": "passenger cars and motorcycles",
+            "max_simulated_vehicles_6h": max(
+                (feature["properties"]["simulated_vehicles_6h"] for feature in features),
                 default=0,
             ),
-            "estimated_trip_period_seconds": trip_period,
+            "total_trip_period_seconds": trip_period,
+            "planned_total_trips_6h": PLANNED_TOTAL_TRIPS_6H,
             "planned_car_trips_6h": PLANNED_CAR_TRIPS_6H,
+            "planned_motorcycle_trips_6h": PLANNED_MOTORCYCLE_TRIPS_6H,
+            "motorcycle_share": MOTORCYCLE_SHARE,
             "historical_observation_rows_used": observation_rows,
             "demand_method": (
-                "Fixed low-load synthetic rate: one passenger car per minute, "
-                "360 planned trip attempts across six hours; not observed demand, "
-                "vehicle counts, or an origin-destination matrix"
+                "Fixed low-load synthetic rate: 360 planned vehicle trip attempts across six hours, "
+                "split 70% motorcycles and 30% passenger cars; not observed demand, vehicle counts, "
+                "or an origin-destination matrix"
             ),
-            "simulated_modes": ["passenger_car"],
-            "motorcycles_simulated": False,
+            "simulated_modes": ["passenger_car", "motorcycle"],
+            "motorcycles_simulated": True,
             "stuck_vehicle_teleport_after_seconds": 300,
             "interpretation": (
-                "Standalone six-hour, minimum-demand SUMO scenario output; not live traffic, "
+                "Standalone six-hour, low-demand mixed car/motorcycle SUMO scenario output; not live traffic, "
                 "observed congestion, or a validated forecast."
             ),
             "features": len(features),
@@ -334,6 +355,8 @@ def _features(
 ) -> dict:
     road_edges = _cached_road_edges(str(network_path.resolve()))
     root = ET.parse(output_path / "edge-data.xml").getroot()
+    car_root = ET.parse(output_path / "car-edge-data.xml").getroot()
+    motorcycle_root = ET.parse(output_path / "motorcycle-edge-data.xml").getroot()
     return _features_from_intervals(
         None,
         root.findall("interval"),
@@ -343,6 +366,8 @@ def _features(
         trip_period,
         observation_rows,
         road_edges,
+        car_intervals=car_root.findall("interval"),
+        motorcycle_intervals=motorcycle_root.findall("interval"),
     )
 
 
@@ -374,46 +399,60 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         length="4.5",
         minGap="2.5",
     )
+    ET.SubElement(
+        vehicle_types,
+        "vType",
+        id="motorcycle",
+        vClass="motorcycle",
+        guiShape="motorcycle",
+        length="2.2",
+        minGap="2.5",
+    )
     ET.ElementTree(vehicle_types).write(
         directory / "vehicle-types.xml", encoding="utf-8", xml_declaration=True
     )
-    _run(
-        [
-            sys.executable,
-            str(random_trips),
-            "--net-file",
-            str(network_path),
-            "--output-trip-file",
-            "car-trips.xml",
-            "--begin",
-            "0",
-            "--end",
-            str(SIMULATION_SECONDS),
-            "--period",
-            str(trip_period),
-            "--seed",
-            "17",
-            "--prefix",
-            "car",
-            "--fringe-factor",
-            "5",
-            "--additional-file",
-            "vehicle-types.xml",
-            "--edge-permission",
-            "passenger",
-            "--trip-attributes",
-            'type="car"',
-        ],
-        directory,
-        TRIP_GENERATION_TIMEOUT_SECONDS,
+    modes = (
+        ("car", "passenger", PLANNED_CAR_TRIPS_6H),
+        ("motorcycle", "motorcycle", PLANNED_MOTORCYCLE_TRIPS_6H),
     )
+    for vehicle_type, edge_permission, planned_trips in modes:
+        _run(
+            [
+                sys.executable,
+                str(random_trips),
+                "--net-file",
+                str(network_path),
+                "--output-trip-file",
+                f"{vehicle_type}-trips.xml",
+                "--begin",
+                "0",
+                "--end",
+                str(SIMULATION_SECONDS),
+                "--period",
+                str(SIMULATION_SECONDS / planned_trips),
+                "--seed",
+                "17",
+                "--prefix",
+                vehicle_type,
+                "--fringe-factor",
+                "5",
+                "--additional-file",
+                "vehicle-types.xml",
+                "--edge-permission",
+                edge_permission,
+                "--trip-attributes",
+                f'type="{vehicle_type}"',
+            ],
+            directory,
+            TRIP_GENERATION_TIMEOUT_SECONDS,
+        )
     _run(
         [
             str(binaries / ("duarouter" + suffix)),
             "--net-file",
             str(network_path),
             "--route-files",
-            "car-trips.xml",
+            "car-trips.xml,motorcycle-trips.xml",
             "--additional-files",
             "vehicle-types.xml",
             "--output-file",
@@ -425,19 +464,24 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         ROUTE_BUILD_TIMEOUT_SECONDS,
     )
     root = ET.Element("additional")
-    ET.SubElement(
-        root,
-        "edgeData",
-        id="traffic",
-        file="edge-data.xml",
-        # One aggregate interval exposes only the full six-hour count and
-        # weighted speed/occupancy in the scenario data layer.
-        period=str(SIMULATION_SECONDS),
-        begin="0",
-        end=str(SIMULATION_SECONDS),
-        excludeEmpty="false",
-        vTypes="car",
-    )
+    # Total traffic drives the layer color and speed/LOS; extra detectors
+    # preserve per-mode passage counts for the feature inspector.
+    for detector_id, output_file, vehicle_types_filter in (
+        ("traffic", "edge-data.xml", "car motorcycle"),
+        ("cars", "car-edge-data.xml", "car"),
+        ("motorcycles", "motorcycle-edge-data.xml", "motorcycle"),
+    ):
+        ET.SubElement(
+            root,
+            "edgeData",
+            id=detector_id,
+            file=output_file,
+            period=str(SIMULATION_SECONDS),
+            begin="0",
+            end=str(SIMULATION_SECONDS),
+            excludeEmpty="false",
+            vTypes=vehicle_types_filter,
+        )
     ET.ElementTree(root).write(directory / "additional.xml", encoding="utf-8", xml_declaration=True)
     _run(
         [

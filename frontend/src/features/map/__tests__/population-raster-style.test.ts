@@ -50,7 +50,7 @@ describe('Population raster rendering', () => {
     const color = (style.paint as Record<string, unknown> | undefined)?.['line-color'];
 
     expect(color).toEqual([
-      'interpolate', ['linear'], ['to-number', ['get', 'estimated_cars_6h'], 0],
+      'interpolate', ['linear'], ['to-number', ['get', 'simulated_vehicles_6h'], 0],
       0, '#277da1', 30, '#50b5b0', 60, '#b8d76b', 90, '#f2ae49', 120, '#c43d3d',
     ]);
   });
