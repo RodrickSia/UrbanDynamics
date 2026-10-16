@@ -1,0 +1,22 @@
+# Apply after compose.yaml on the team server. Secrets stay in ignored env files.
+services:
+  backend:
+    env_file:
+      - path: .env.agent.production.local
+        required: false
+    environment:
+      AGENT_SQLITE_PATH: /runtime/agent.sqlite
+      DEVELOPMENT_CONTEXT_DIR: /runtime/road-context
+      PLANNING_SYSTEM_SNAPSHOT_DIR: /snapshots
+      PLANNING_COUNTING_REFERENCE_DIR: /counting
+    volumes:
+      - ${PLANNING_SNAPSHOT_HOST_DIR:?Set snapshot directory}:/snapshots:ro
+      - ${PLANNING_COUNTING_HOST_DIR:?Set counting directory}:/counting:ro
+  planning-worker:
+    environment:
+      DEVELOPMENT_CONTEXT_DIR: /runtime/road-context
+      PLANNING_SYSTEM_SNAPSHOT_DIR: /snapshots
+      PLANNING_COUNTING_REFERENCE_DIR: /counting
+    volumes:
+      - ${PLANNING_SNAPSHOT_HOST_DIR:?Set snapshot directory}:/snapshots:ro
+      - ${PLANNING_COUNTING_HOST_DIR:?Set counting directory}:/counting:ro
