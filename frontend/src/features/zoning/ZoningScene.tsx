@@ -219,7 +219,7 @@ export function ZoningScene({ map, bridge }: { map: MapLibreMap | null; bridge: 
         type: 'fill', paint: { 'fill-opacity': 0 } }, PARCEL_LINE);
       if (current.current.plan && !map.getLayer(PARCEL_FILL)) map.addLayer({ id: PARCEL_FILL,
         source: PARCEL_SOURCE, 'source-layer': 'features', type: 'fill', minzoom: PARCEL_MIN_ZOOM,
-        paint: { 'fill-color': ['to-color', ['get', 'color'], '#94a3b8'], 'fill-opacity': .35,
+        paint: { 'fill-color': ['to-color', ['get', 'color'], '#94a3b8'], 'fill-opacity': .44,
           'fill-antialias': false } }, map.getLayer(FILL) ? FILL : PARCEL_LINE);
     };
     if (map.isStyleLoaded()) attach();

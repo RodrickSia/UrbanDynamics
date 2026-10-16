@@ -1,31 +1,30 @@
-"""Conservative classification of observed parcel land-use labels for road prices.
+"""User-reviewed source-code groups for indicative published road prices.
 
-Only observed, explicitly reviewed source labels appear here. Planning areas are
-not cadastral subareas and must not be used to apportion a parcel valuation.
+Needs-review and outside-scope codes intentionally have no price category.
+Planning areas are not cadastral subareas and cannot apportion a parcel value.
 """
 import unicodedata
 
 
 FAMILIES = {
-    'Residential land': ('Residential', 'high', {'ODT', 'OTC'}),
-    'Retail': ('Commercial', 'high', {'C.hang', 'Cho', 'S.thị'}),
-    'Hotel': ('Commercial', 'high', {'K.san', 'K.sạn', 'Nh.khách', 'Nhà khách'}),
-    'Cinema or theatre': ('Commercial', 'high', {'Rap'}),
+    'Residential land': ('Residential', 'high', {'ODT', 'OTC', 'T'}),
+    'Retail': ('Commercial', 'high', {'C.hang', 'S.thị'}),
+    'Hotel': ('Commercial', 'high', {'K.san', 'K.sạn'}),
     'Fuel retail': ('Commercial', 'high', {'Xg.dau', 'Xg.dầu'}),
+    'Market': ('Other non-agricultural', 'high', {'Cho'}),
     'Hospital': ('Other non-agricultural', 'high', {'B.Vien', 'B.vien', 'B.viƯn', 'B.viện', 'Y tế', 'Y.tế'}),
     'School': ('Other non-agricultural', 'high', {'D.hoc', 'Đ.học', 'M.giáo', 'M.non', 'N.tre', 'N.trÅ',
                                                  'T.Hoc', 'T.hoc', 'Tr.hoc', 'Tr.học', 'Th.nhi', 'V.C.học'}),
     'Research': ('Other non-agricultural', 'high', {'Ngh.cứu'}),
     'Library': ('Other non-agricultural', 'high', {'T.viƯn', 'T.viện'}),
-    'Culture and community': ('Other non-agricultural', 'high', {'V.hoá', 'Tr.hình', 'C.L.B', 'CLB', 'Tr.C.đoàn'}),
+    'Culture and community': ('Other non-agricultural', 'high', {'V.hoá', 'Tr.hình', 'Tr.C.đoàn'}),
     'Government and security': ('Other non-agricultural', 'high', {'C.A', 'C.quan', 'U.B', 'UB',
         'UBND Phường 19 QL', 'AN', 'AN/QP', 'Q.sư', 'Q.sự'}),
     'Religious use': ('Other non-agricultural', 'high', {'Chùa', 'chùa', 'Ch*a', 'Miếu', 'N.tho', 'N.thê', 'TON'}),
-    'Infrastructure and utilities': ('Other non-agricultural', 'high', {'GT', 'B.điện', 'Tr.liên lạc'}),
-    'Industrial and storage': ('Other non-agricultural', 'high', {'Nh.máy', 'Kho', 'Xưởng',
-        'X.nghiep', 'X.nghiêp', 'X.nghiƯp', 'X.nghiệp', 'XD'}),
-    'Company': ('Other non-agricultural', 'medium', {'C. ty', 'C.ty', 'Cty'}),
-    'Public facility': ('Other non-agricultural', 'high', {'Nhà vệ sinh', 'Sân', 'sân'}),
+    'Infrastructure and utilities': ('Other non-agricultural', 'high', {'GT', 'B.điện', 'Tr.liên lạc', 'V.sinh'}),
+    'Industrial': ('Other non-agricultural', 'high', {'Nh.máy', 'Xưởng', 'Dầu khí',
+        'X.nghiep', 'X.nghiêp', 'X.nghiƯp', 'X.nghiệp'}),
+    'Public facility': ('Other non-agricultural', 'high', {'Nhà vệ sinh', 'DDT', 'DSK', 'DT', 'NĐ', 'TL'}),
 }
 
 PRICE_CATEGORIES = {

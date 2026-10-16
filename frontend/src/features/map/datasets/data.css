@@ -231,7 +231,7 @@
 .dataset-line-preview {
   position: absolute;
   z-index: 72;
-  width: 244px;
+  width: 288px;
   max-width: calc(100vw - 24px);
   padding: 0.75rem;
   border: 1px solid var(--border);

@@ -14,7 +14,7 @@ const PRICE_NOTES = {
   unverified: 'The nearby road geometry is unreviewed; a price cannot be assigned yet.',
   unsupported_land_use: 'This land-use type has no reliable road-price category.',
   reference: 'Indicative association by proximity to a published road segment. Road frontage is not verified.',
-  provisional: 'Nearby published road price for comparison. The applicable frontage and road segment are not verified, so no total is calculated.',
+  provisional: 'Nearest mapped road price for comparison. Applicable frontage is unverified, so no total is calculated.',
 };
 
 export function ParcelDetails({ parcelId, onClose }: { parcelId: string; onClose: () => void }) {
