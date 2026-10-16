@@ -37,3 +37,46 @@ def test_response_language_follows_prompt_not_vietnamese_place_names():
     assert hint('Within the visible map, find parcels near Hẻm 114 Trần Quốc Tuấn and show the source price.')=='English'
     assert hint('Tiếp tục trong vùng này, bỏ giá và hiển thị 2 thửa đất.')=='Vietnamese'
     assert hint('Tìm đất rồi reply in English please')=='English'
+
+
+@pytest.mark.parametrize('message',['yes','Yes.','no','sure','continue','go ahead','thanks','why?'])
+def test_short_english_replies_are_english(message):
+    from app.services.agent.language import resolve
+    assert resolve(message,[{'role':'assistant','content':'Bạn muốn tìm ở đâu?'}])=='English'
+
+
+@pytest.mark.parametrize('message',['ok','OK.','2','👍'])
+def test_neutral_replies_keep_user_language_despite_wrong_assistant_answer(message):
+    from app.services.agent.language import resolve
+    history=[{'role':'user','content':'Find 3 sites between 2,000 and 10,000 m² in the visible area. Explain what is still unknown.'},
+             {'role':'assistant','content':'Bạn muốn tìm ở đâu?'}]
+    assert resolve(message,history)=='English'
+    assert resolve(message,[{'role':'user','content':'Tìm những khu đất trong vùng này.'}])=='Vietnamese'
+
+
+def test_explicit_language_switch_overrides_history():
+    from app.services.agent.language import resolve
+    history=[{'role':'user','content':'Tìm đất trong vùng này.'}]
+    assert resolve('Please respond in English',history)=='English'
+    assert resolve('Tiếp tục trong vùng này',[])=='Vietnamese'
+    assert resolve('ok',[]) is None
+
+
+def test_yes_turn_supplies_english_instruction_to_model(tmp_path,monkeypatch):
+    from app.services.agent import service,store
+    from app.services.agent.models import ChatRequest
+    from uuid import uuid4
+    monkeypatch.setenv('AGENT_SQLITE_PATH',str(tmp_path/'agent.sqlite'))
+    monkeypatch.setattr(service,'configured',lambda:True)
+    monkeypatch.setattr(service,'context',lambda *args:{})
+    session=store.create()
+    session['messages']=[{'role':'user','content':'Find 3 sites in the visible area. Explain what is unknown.'},
+                         {'role':'assistant','content':'Please confirm the visible map.'}]
+    store.save(session)
+    calls=[]
+    def model(inputs):
+        calls.append(inputs)
+        return {'output':[{'type':'message','content':[{'type':'output_text','text':'I will use the visible map.'}]}]}
+    monkeypatch.setattr(service,'model_response',model)
+    service.chat(ChatRequest(session_id=session['id'],request_id=uuid4(),message='yes'))
+    assert any(item.get('role')=='developer' and 'final answer in English' in item.get('content','') for item in calls[0])

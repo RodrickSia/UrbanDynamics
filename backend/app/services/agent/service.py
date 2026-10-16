@@ -123,8 +123,8 @@ def chat(body):
         inputs = [{"role":message["role"],"content":message["content"]} for message in session["messages"][-10:]]
         inputs += [{"role":"developer","content":"Current verified app context: "+json.dumps(context(session,body.allow_native),ensure_ascii=False)},
                    {"role":"user","content":body.message}]
-        from .language import hint as language_hint
-        reply_language=language_hint(body.message)
+        from .language import resolve as resolve_language
+        reply_language=resolve_language(body.message,session['messages'])
         if reply_language:
             inputs.insert(len(inputs)-1,{'role':'developer','content':'For this current turn, write the final answer in '+reply_language+'. Source place names and previous turns must not change the response language.'})
         traces, usage, answer = [], [], ""

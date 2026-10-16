@@ -283,3 +283,6 @@ delta as zero. Native outputs remain scenario results until calibrated locally.
 Implementation: `backend/app/services/agent/general_tools.py`, the shared agent
 schema/service/store, and `frontend/src/features/agent/DevelopmentAssistant.tsx`.
 Verification and reproducible scripts: [test report](urban-ai-agent-test-report.md).
+# Language continuity for short replies
+
+English confirmations such as `yes`, `no`, `sure`, and `continue` receive an explicit English response instruction on every model round. Neutral replies such as `ok`, an option number, or a thumbs-up inherit the most recent detectable **user** language; assistant replies and tool output cannot set that fallback. Explicit language changes still take priority. Existing saved conversations work without a migration. Regression coverage includes the English site-search → English confirmation → `yes` case and a wrong Vietnamese assistant reply followed by `ok`.
