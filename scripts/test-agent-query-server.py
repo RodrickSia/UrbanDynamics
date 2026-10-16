@@ -18,6 +18,8 @@ def main():
             for file in (ROOT/parent).rglob('*'):
                 if not file.is_file() or any(x in file.parts for x in ('__pycache__','.venv','.runtime','node_modules')) or file.name.startswith('.env'):continue
                 tar.add(file,arcname=str(file.relative_to(ROOT)),recursive=False)
+        catalog=ROOT/'frontend/src/features/zoning/zoningCatalog.json'
+        tar.add(catalog,arcname=str(catalog.relative_to(ROOT)),recursive=False)
     subprocess.run(['ssh','-o','BatchMode=yes',HOST,'mkdir -p '+TARGET],check=True,capture_output=True,timeout=15)
     subprocess.run(['scp','-q',str(archive),HOST+':'+TARGET+'/source.tar.gz'],check=True,capture_output=True,timeout=90)
     code=r'''
@@ -43,8 +45,8 @@ try:
   time.sleep(1)
  else:raise RuntimeError('Disposable PostGIS failed to start')
  url='postgresql://agent_test:'+password+'@agent-query-test-db:5432/agent_tests'
- command=['docker','run','--rm','--user','0:0','--network',network,'-v',str(target)+':/workspace:ro','-w','/workspace','-e','PYTHONPATH=/workspace/backend:/workspace/etl','-e','AGENT_TEST_DATABASE_URL='+url,'--entrypoint','/bin/sh',image,'-c',
- 'uv pip install --python /app/.venv/bin/python pytest httpx >/tmp/test-install.log 2>&1 && /app/.venv/bin/python -m pytest backend/tests/test_agent_dataset_query.py backend/tests/test_general_agent.py backend/tests/test_development_agent.py backend/tests/test_goong_places.py backend/tests/test_query_postgis.py backend/tests/test_agent_accessibility.py backend/tests/test_agent_scope.py -q --tb=short -p no:cacheprovider']
+ command=['docker','run','--rm','--user','0:0','--network',network,'-v',str(target)+':/workspace:ro','-w','/workspace','-e','PYTHONPATH=/workspace/backend:/workspace/etl','-e','AGENT_TEST_DATABASE_URL='+url,'-e','TEST_DATABASE_URL='+url,'--entrypoint','/bin/sh',image,'-c',
+ 'uv pip install --python /app/.venv/bin/python pytest httpx >/tmp/test-install.log 2>&1 && /app/.venv/bin/python -m pytest backend/tests/test_agent_dataset_query.py backend/tests/test_general_agent.py backend/tests/test_development_agent.py backend/tests/test_goong_places.py backend/tests/test_query_postgis.py backend/tests/test_agent_accessibility.py backend/tests/test_agent_scope.py backend/tests/test_plan_projection.py -q --tb=short -p no:cacheprovider']
  result=subprocess.run(command,capture_output=True,text=True,timeout=180)
  print(json.dumps({'exit_code':result.returncode,'output':(result.stdout+result.stderr).replace(password,'[TEST_PASSWORD]').replace(url,'[TEST_DATABASE]')}))
 finally:

@@ -75,6 +75,30 @@ def test_schema_script_ignores_semicolons_in_comments():
     assert all(not statement.startswith("no mesh") for statement in connection.statements)
 
 
+def test_batch_execution_uses_cursor_and_closes_it_without_committing():
+    from app.services.zoning.project import execute_many
+    events = []
+
+    class Cursor:
+        def __enter__(self):
+            events.append('open')
+            return self
+
+        def __exit__(self, *_):
+            events.append('close')
+
+        def executemany(self, statement, rows):
+            events.append((statement, rows))
+
+    class Connection:
+        # No executemany/commit methods, matching psycopg's transaction boundary.
+        def cursor(self):
+            return Cursor()
+
+    execute_many(Connection(), 'INSERT INTO fixture VALUES (%s)', [(1,), (2,)])
+    assert events == ['open', ('INSERT INTO fixture VALUES (%s)', [(1,), (2,)]), 'close']
+
+
 def test_postgis_schema_bootstraps_once_after_a_committed_transaction(monkeypatch):
     from app.services.zoning import store
 
@@ -127,6 +151,8 @@ def test_postgis_tracks_scenarios_and_drops_removed_buildings(monkeypatch):
     revision = saved["revision"]
     try:
         store.save_new(saved)
+        assert store.load(saved['id'])['name'] == saved['name']
+        assert any(row['id'] == saved['id'] for row in store.listing())
         with psycopg.connect(url) as connection:
             counts = connection.execute(
                 "SELECT (SELECT count(*) FROM plans.scenario WHERE plan_id = %s), "
@@ -161,3 +187,39 @@ def test_postgis_tracks_scenarios_and_drops_removed_buildings(monkeypatch):
         if revision is not None:
             with psycopg.connect(url) as connection:
                 connection.execute("DELETE FROM zoning_plans WHERE id = %s", (saved["id"],))
+
+
+@pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="Requires real PostGIS")
+def test_plans_api_create_list_open_update_delete_on_real_postgis(monkeypatch):
+    from uuid import uuid4
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.services.zoning import store
+    monkeypatch.setenv('DATABASE_URL', os.environ['TEST_DATABASE_URL'])
+    monkeypatch.delenv('ZONING_STORAGE', raising=False)
+    monkeypatch.setattr(store, '_initialized_databases', set())
+    name = 'PostGIS cursor regression ' + uuid4().hex
+    identifier = None
+    try:
+        with TestClient(app) as client:
+            created = client.post('/api/v1/zoning/plans', json={'name': name, 'study_area': POLY})
+            assert created.status_code == 201, created.text
+            plan = created.json()
+            identifier = plan['id']
+            listed = client.get('/api/v1/zoning/plans')
+            assert listed.status_code == 200, listed.text
+            assert any(p['id'] == identifier for p in listed.json()['plans'])
+            assert client.get('/api/v1/zoning/plans/' + identifier).status_code == 200
+            changed = client.post('/api/v1/zoning/plans/' + identifier + '/commands', json={
+                'revision': plan['revision'], 'scenario_id': plan['scenarios'][1]['id'],
+                'action': 'add_scenario', 'payload': {'name': 'Cursor regression alternative'}})
+            assert changed.status_code == 200, changed.text
+            assert len(changed.json()['scenarios']) == len(plan['scenarios']) + 1
+            deleted = client.delete('/api/v1/zoning/plans/' + identifier, params={'revision': changed.json()['revision']})
+            assert deleted.status_code == 204, deleted.text
+            assert client.get('/api/v1/zoning/plans/' + identifier).status_code == 404
+            identifier = None
+    finally:
+        if identifier:
+            with psycopg.connect(os.environ['TEST_DATABASE_URL']) as connection:
+                connection.execute('DELETE FROM zoning_plans WHERE id=%s', (identifier,))

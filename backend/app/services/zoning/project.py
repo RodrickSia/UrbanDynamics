@@ -32,9 +32,16 @@ def execute_script(connection, sql):
             connection.execute(statement)
 
 
+def execute_many(connection, statement, rows):
+    # psycopg 3 exposes batch execution on Cursor, not Connection. Keep the
+    # caller's transaction so document and projection still commit atomically.
+    with connection.cursor() as cursor:
+        cursor.executemany(statement, rows)
+
+
 def ensure_schema(connection):
     execute_script(connection, _SCRIPT)
-    connection.executemany(
+    execute_many(connection,
         'INSERT INTO plans.zone_type_catalog (code, name, description, category, "group", land_use_codes) '
         "VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (code) DO UPDATE SET "
         "name = EXCLUDED.name, description = EXCLUDED.description, category = EXCLUDED.category, "
@@ -168,7 +175,7 @@ def _parcel(plan_id, item):
 def _insert_types(connection, rows):
     if not rows:
         return
-    connection.executemany(
+    execute_many(connection,
         "INSERT INTO plans.zone_type (plan_id, id, code, name, color, description, uses, max_height, "
         "max_floors, coverage, far, setback_front, setback_side, setback_rear, source, version, status, "
         "origin_id, catalog_code, position) VALUES "
@@ -180,7 +187,7 @@ def _insert_types(connection, rows):
 def _insert_scenarios(connection, rows):
     if not rows:
         return
-    connection.executemany(
+    execute_many(connection,
         "INSERT INTO plans.scenario (plan_id, id, name, description, kind, locked, copied_from, revision, "
         "created_at, updated_at, created_by, position) VALUES "
         "(%(plan_id)s, %(id)s, %(name)s, %(description)s, %(kind)s, %(locked)s, %(copied_from)s, "
@@ -190,7 +197,7 @@ def _insert_scenarios(connection, rows):
 def _insert_zones(connection, rows):
     if not rows:
         return
-    connection.executemany(
+    execute_many(connection,
         "INSERT INTO plans.zone (plan_id, scenario_id, id, type_id, origin_id, geom, label_point, "
         "area_m2, revision, source, position) VALUES "
         "(%(plan_id)s, %(scenario_id)s, %(id)s, %(type_id)s, %(origin_id)s, "
@@ -203,7 +210,7 @@ def _insert_zones(connection, rows):
 def _insert_buildings(connection, rows):
     if not rows:
         return
-    connection.executemany(
+    execute_many(connection,
         "INSERT INTO plans.building (plan_id, scenario_id, id, parcel_id, origin_id, name, geom, floors, "
         "floor_height, height_m, footprint_m2, space_use_id, counts_gfa, counts_far, color, status, "
         "origin, template_id, template_version, ground_anchor, floor_stack, floor_overrides, position) "
@@ -219,7 +226,7 @@ def _insert_buildings(connection, rows):
 def _insert_parcels(connection, rows):
     if not rows:
         return
-    connection.executemany(
+    execute_many(connection,
         "INSERT INTO plans.parcel_snapshot (plan_id, parcel_id, geom, area_m2, land_use, source, status, "
         "captured_at) VALUES (%(plan_id)s, %(parcel_id)s, ST_SetSRID(ST_GeomFromGeoJSON(%(geom)s), 4326), "
         "%(area_m2)s, %(land_use)s, %(source)s, %(status)s, %(captured_at)s)", rows)
@@ -228,7 +235,7 @@ def _insert_parcels(connection, rows):
 def _insert_masks(connection, rows):
     if not rows:
         return
-    connection.executemany(
+    execute_many(connection,
         "INSERT INTO plans.demolition_mask (plan_id, scenario_id, id, parcel_id, geom, status) VALUES "
         "(%(plan_id)s, %(scenario_id)s, %(id)s, %(parcel_id)s, "
         "ST_SetSRID(ST_GeomFromGeoJSON(%(geom)s), 4326), %(status)s)", rows)
