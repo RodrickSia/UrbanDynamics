@@ -1,7 +1,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
 
-import { DEFAULT_VIEWPORT, getMapStyle } from '../config/mapConfig';
+import { DEFAULT_VIEWPORT, getMapStyle, getFallbackMapStyle } from '../config/mapConfig';
 import { configureMapLibreWorker } from '../config/maplibreWorker';
 import { configureSceneLod, MAP_CACHE_BUDGET } from '../config/renderBudget';
 import { useLocationMarkers } from '../hooks/useLocationMarkers';
@@ -21,6 +21,7 @@ import { MeasurementLabels } from './MeasurementLabels';
 import type { UrbanMapProps } from './UrbanMap.types';
 import { ViewshedScene } from '../viewshed/ViewshedScene';
 import { createPoiVisibility } from '../layers/poi';
+import { mapPoiSnapshot } from '../../agent/mapPoi';
 import { BackendDataScene } from '../datasets/BackendDataScene';
 import { ZoningScene } from '../../zoning/ZoningScene';
 import { DevelopmentScene } from '../../zoning/DevelopmentScene';
@@ -53,6 +54,8 @@ export function UrbanMap(props: UrbanMapProps) {
   const styleReadyRef = useRef(false);
   const cameraModeRef = useRef('2d');
   const [mapRevision, setMapRevision] = useState(0);
+  const fallbackActive=useRef(false);
+  const [fallbackReason,setFallbackReason]=useState('');
   const [landPriceStatus, setLandPriceStatus] = useState<LandPriceStatus>({ state: 'loading' });
   const [landPriceSelection, setLandPriceSelection] = useState<LandPriceProperties | null>(null);
   const [priceRetry, setPriceRetry] = useState(0);
@@ -60,6 +63,7 @@ export function UrbanMap(props: UrbanMapProps) {
 
   useLocationMarkers(mapRef, markerConstructorRef, mapRevision, selection, userLocation);
   useMapCommands({
+    readyRevision:mapRevision,
     mapRef,
     focusRequest,
     controlRequest,
@@ -99,6 +103,7 @@ export function UrbanMap(props: UrbanMapProps) {
         configureMapLibreWorker(maplibregl);
         const initialStyle = propsRef.current.mapStyle;
         styleRef.current = initialStyle;
+        fallbackActive.current=false;setFallbackReason('');
         const map = new maplibregl.Map({
           ...MAP_CACHE_BUDGET,
           container: containerRef.current,
@@ -119,6 +124,7 @@ export function UrbanMap(props: UrbanMapProps) {
         setMapRevision((revision) => revision + 1);
 
         map.addControl(new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 110 }), 'bottom-left');
+        map.addControl(new maplibregl.AttributionControl({compact:true}), 'bottom-right');
 
         const applyMode = () => {
           const current = propsRef.current;
@@ -148,7 +154,8 @@ export function UrbanMap(props: UrbanMapProps) {
             propsRef.current.measurement,
             propsRef.current.mode,
           );
-          propsRef.current.onStatusChange(true, 'Map ready');
+          propsRef.current.onStatusChange(true, fallbackActive.current?'Map ready · alternate basemap':'Map ready');
+          { const b=map.getBounds(); propsRef.current.onViewportChange?.([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]); }
           setMapRevision((revision) => revision + 1);
         };
 
@@ -160,12 +167,24 @@ export function UrbanMap(props: UrbanMapProps) {
         map.on('mousemove', interactions.mousemove);
         map.on('mouseout', interactions.mouseout);
         map.on('movestart', interactions.movestart);
+        map.on('moveend',()=>{const b=map.getBounds();propsRef.current.onViewportChange?.([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]);});
         map.on('idle', interactions.idle);
         map.on('sourcedata', interactions.scenechange);
         map.on('styledata', interactions.scenechange);
-        map.on('error', () =>
-          propsRef.current.onStatusChange(false, 'Some map data could not be loaded'),
-        );
+        map.on('error', event => {
+          const error=event.error as Error&{status?:number;url?:string};
+          const goong=String(error.url??error.message??'').includes('goong.io');
+          if(goong&&fallbackActive.current)return; // Ignore cancelled outgoing provider requests.
+          if(goong&&!fallbackActive.current&&([401,403,429,500,502,503,504].includes(error.status??0))){
+            fallbackActive.current=true;
+            setFallbackReason(error.status===429?'Goong is rate-limited. Showing OpenStreetMap instead.':'Goong is unavailable. Showing OpenStreetMap instead.');
+            styleReadyRef.current=false;
+            propsRef.current.onStatusChange(false,'Loading alternate basemap…');
+            map.setStyle(getFallbackMapStyle());
+            return;
+          }
+          propsRef.current.onStatusChange(false,'Some map data could not be loaded');
+        });
       })
       .catch(() => propsRef.current.onStatusChange(false, 'MapLibre could not be initialized'));
 
@@ -185,6 +204,7 @@ export function UrbanMap(props: UrbanMapProps) {
     const map = mapRef.current;
     if (!map || !configuration.ok || styleRef.current === mapStyle) return;
     styleRef.current = mapStyle;
+    fallbackActive.current=false;setFallbackReason('');
     styleReadyRef.current = false;
     onStatusChange(false, 'Changing basemap…');
     map.setStyle(getMapStyle(configuration.mapKey, mapStyle));
@@ -242,6 +262,34 @@ export function UrbanMap(props: UrbanMapProps) {
     map.getCanvas().classList.toggle('is-measuring', measurement.status === 'active');
   }, [measurement, mode]);
 
+  useEffect(()=>{
+    const map=mapRef.current;
+    if(!map||!styleReadyRef.current)return;
+    const id='urban-agent-candidates';
+    const data=props.agentCandidates??{type:'FeatureCollection' as const,features:[]};
+    if(!map.getSource(id))map.addSource(id,{type:'geojson',data});
+    else (map.getSource(id) as import('maplibre-gl').GeoJSONSource).setData(data);
+    if(!map.getLayer(id+'-fill'))map.addLayer({id:id+'-fill',type:'fill',source:id,filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':'#d7791f','fill-opacity':.22}});
+    if(!map.getLayer(id+'-line'))map.addLayer({id:id+'-line',type:'line',source:id,paint:{'line-color':['case',['==',['get','source'],'Goong Directions V2'],'#1d4ed8','#bd6415'],'line-width':['case',['==',['get','source'],'Goong Directions V2'],5,3]}});
+    if(!map.getLayer(id+'-points'))map.addLayer({id:id+'-points',type:'circle',source:id,filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':6,'circle-color':'#d7791f','circle-stroke-color':'white','circle-stroke-width':2}});
+    if(!map.getLayer(id+'-labels'))map.addLayer({id:id+'-labels',type:'symbol',source:id,filter:['==',['geometry-type'],'Polygon'],layout:{'text-field':['to-string',['get','parcel_id']],'text-size':12},paint:{'text-color':'#773d0b','text-halo-color':'white','text-halo-width':1.5}});
+  },[props.agentCandidates,mapRevision]);
+
+  useEffect(()=>{
+    const map=mapRef.current,callback=props.onPoiSnapshot;
+    if(!map||!styleReadyRef.current||!callback)return;
+    let previous='';
+    const publish=()=>{
+      try{
+        const snapshot=mapPoiSnapshot(map);
+        const signature=JSON.stringify([snapshot.bbox,snapshot.zoom,snapshot.features]);
+        if(signature!==previous){previous=signature;callback(snapshot);}
+      }catch{/* A style switch temporarily removes source layers. Retry at idle. */}
+    };
+    publish();map.on('idle',publish);
+    return ()=>{map.off('idle',publish);};
+  },[props.onPoiSnapshot,mapRevision]);
+
   if (!configuration.ok) {
     return (
       <div className="map-fallback" role="alert">
@@ -257,6 +305,9 @@ export function UrbanMap(props: UrbanMapProps) {
   return (
     <>
       <div ref={containerRef} className="map-canvas" aria-label="Interactive map of Vietnam" />
+      {fallbackReason&&<div role="status" style={{position:'absolute',bottom:28,left:'50%',transform:'translateX(-50%)',zIndex:8,
+        maxWidth:'min(460px,75%)',padding:'8px 12px',borderRadius:8,background:'#fff8e7',border:'1px solid #dfc78c',
+        color:'#604510',fontSize:12,pointerEvents:'none'}}>{fallbackReason} Data layers and the assistant remain available.</div>}
       {props.backend && <BackendDataScene map={mapRef.current} bridge={{ ...props.backend,
         selections: props.backend.selections.filter(selection => selection.id !== 'land-price' &&
           !(props.zoning?.active && selection.id === 'parcels')) }}

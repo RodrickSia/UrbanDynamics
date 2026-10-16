@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.repository import readiness
 from app.routers import (
+    agent,
     area_indicators,
     building_scenarios,
     floods,
@@ -13,6 +14,7 @@ from app.routers import (
     land_prices,
     layers,
     parcels,
+    places,
     planning_scenarios,
     planning_system_demo,
     population,
@@ -59,9 +61,11 @@ async def invalid_request(_request, error):
 
 
 for router in (
+    agent.router,
     area_indicators.router,
     zoning.router,
     parcels.router,
+    places.router,
     layers.router,
     floods.router,
     land_prices.router,

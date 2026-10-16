@@ -8,7 +8,10 @@ services:
         BACKEND_BASE_IMAGE: ${DEV_BACKEND_BASE_IMAGE:-urbandynamics-agent-preview-backend:local}
     image: urbandynamics-development-preview-backend:local
     restart: unless-stopped
-    env_file: .env.development.local
+    env_file:
+      - .env.development.local
+      - path: .env.development-agent.local
+        required: false
     environment: &runtime
       PGOPTIONS: "-c default_transaction_read_only=on"
       ZONING_STORAGE: sqlite
@@ -16,6 +19,7 @@ services:
       PLANNING_SQLITE_PATH: /runtime/studies.sqlite
       SIMULATION_WORK_DIR: /runtime/solvers
       DEVELOPMENT_CONTEXT_DIR: /runtime/road-context
+      AGENT_SQLITE_PATH: /runtime/agent.sqlite
       PLANNING_SYSTEM_DEMO_ENABLED: "1"
       PLANNING_SYSTEM_SNAPSHOT_DIR: /snapshots
       PLANNING_COUNTING_REFERENCE_DIR: /counting

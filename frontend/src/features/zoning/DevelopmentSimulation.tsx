@@ -29,7 +29,7 @@ const trafficMetrics: Record<string, string> = {
   unfinished_vehicles: 'Unfinished vehicles', undeparted_vehicles: 'Vehicles not departed',
 };
 
-function ComparisonTable({ rows, traffic = false }: {rows: ComparisonRow[]; traffic?: boolean}) {
+export function ComparisonTable({ rows, traffic = false }: {rows: ComparisonRow[]; traffic?: boolean}) {
   return <div className="zoning-table-scroll"><table className="simulation-comparison">
     <thead><tr><th>Indicator</th><th>Before</th><th>After</th><th>Change</th></tr></thead>
     <tbody>{rows.map((row, index) => {

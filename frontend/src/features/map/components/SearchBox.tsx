@@ -4,6 +4,9 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { gsap, motionDuration, useGSAP } from '../motion';
 import type { PlaceDetails } from '../types/map';
 import { AreaWeatherCard } from './AreaWeatherCard';
+import { API_BASE_URL } from '../../../services/api';
+
+type PlaceSuggestion = {id:string;name:string;context:string};
 
 interface SearchBoxProps {
   isOpen: boolean;
@@ -56,6 +59,41 @@ export function SearchBox({ isOpen, onOpenChange, onSelectPlace, onWorkspaceHeig
   const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [recentPlaces, setRecentPlaces] = useState(INITIAL_RECENT_PLACES);
+  const [results,setResults]=useState<PlaceSuggestion[]>([]);
+  const [loading,setLoading]=useState(false),[searchError,setSearchError]=useState('');
+  const [selecting,setSelecting]=useState(false);
+  const selectionRequest=useRef(0);
+
+  useEffect(()=>{
+    const controller=new AbortController();
+    ++selectionRequest.current;setSelecting(false);
+    setResults([]);setSearchError('');
+    if(!isOpen||query.trim().length<3){setLoading(false);return;}
+    setLoading(true);
+    const timer=window.setTimeout(async()=>{
+      try{
+        const response=await fetch(`${API_BASE_URL}/api/v1/places/search?q=${encodeURIComponent(query.trim())}`,{signal:controller.signal});
+        const data=await response.json();
+        if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Place search unavailable');
+        if(!controller.signal.aborted)setResults(data.results??[]);
+      }catch(error){if(!controller.signal.aborted)setSearchError(error instanceof Error?error.message:'Place search unavailable');}
+      finally{if(!controller.signal.aborted)setLoading(false);}
+    },350);
+    return ()=>{controller.abort();window.clearTimeout(timer);};
+  },[query,isOpen]);
+
+  const chooseSuggestion=async(suggestion:PlaceSuggestion)=>{
+    const version=++selectionRequest.current;
+    setSelecting(true);setSearchError('');
+    try{
+      const response=await fetch(`${API_BASE_URL}/api/v1/places/detail?place_id=${encodeURIComponent(suggestion.id)}`,{signal:AbortSignal.timeout(20000)});
+      const place=await response.json();
+      if(!response.ok)throw Error(typeof place.detail==='string'?place.detail:'Place details unavailable');
+      if(version!==selectionRequest.current)return;
+      selectPlace(place);
+    }catch(error){if(version===selectionRequest.current)setSearchError(error instanceof Error?error.message:'Place details unavailable');}
+    finally{if(version===selectionRequest.current)setSelecting(false);}
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -97,6 +135,7 @@ export function SearchBox({ isOpen, onOpenChange, onSelectPlace, onWorkspaceHeig
     event.preventDefault();
     const normalizedQuery = query.trim().toLocaleLowerCase();
     if (!normalizedQuery) return;
+    if(results.length&&!loading){void chooseSuggestion(results[0]);return;}
     const match = recentPlaces.find((place) =>
       `${place.name} ${place.context}`.toLocaleLowerCase().includes(normalizedQuery),
     );
@@ -136,6 +175,14 @@ export function SearchBox({ isOpen, onOpenChange, onSelectPlace, onWorkspaceHeig
 
       {isOpen && (
         <section className="search-workspace solid-panel" role="region" aria-label="Search workspace">
+          {query.trim().length>=3&&<>
+            <div className="search-section-heading"><span>Search results · Goong</span></div>
+            {loading&&<p className="compact-empty-state" role="status">Searching places…</p>}
+            {selecting&&<p className="compact-empty-state" role="status">Opening place…</p>}
+            {searchError&&<p className="compact-empty-state" role="alert">{searchError}</p>}
+            {!loading&&!searchError&&!results.length&&<p className="compact-empty-state">No matching places.</p>}
+            {!!results.length&&<ul className="recent-place-list">{results.map(place=><li key={place.id}><button className="recent-place" type="button" disabled={selecting} onClick={()=>void chooseSuggestion(place)} aria-label={`${place.name}, ${place.context}`}><span className="result-icon" aria-hidden="true"><MapPin size={16}/></span><span><strong>{place.name}</strong><small>{place.context}</small></span></button></li>)}</ul>}
+          </>}
           <div className="search-section-heading">
             <span>Recent</span>
           </div>

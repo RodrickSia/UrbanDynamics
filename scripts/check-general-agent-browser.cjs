@@ -1,0 +1,51 @@
+const fs=require('fs'),path=require('path'),{createRequire}=require('module');
+const root=path.resolve(__dirname,'..'),req=createRequire(path.join(root,'frontend/package.json'));
+const {chromium}=req('@playwright/test');
+const out=path.join(root,'test-results/general-agent');
+(async()=>{
+ const live=JSON.parse(fs.readFileSync(path.join(out,'model-workflow.json'),'utf8'));
+ const browser=await chromium.launch({channel:'msedge',headless:true});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.addInitScript(id=>localStorage.setItem('development-assistant-session',id),live.session_id);
+  await page.goto('http://127.0.0.1:8192/',{waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Planning assistant',exact:true}).click();
+  const panel=page.getByRole('complementary',{name:'Planning assistant'});
+  await panel.getByText('Urban map workspace',{exact:true}).waitFor();
+  await panel.getByText('Site comparison · declared criteria',{exact:true}).waitFor();
+  await page.getByText('Map ready',{exact:true}).waitFor({timeout:45000});
+  // style.load precedes camera animation and raster/vector tile rendering.
+  await page.waitForTimeout(2500);
+  await panel.getByText('Site comparison · declared criteria',{exact:true}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(out,'general-desktop.png'),fullPage:true});
+  const job=Object.keys(live.turns.at(-1).response.development_runs).at(-1);
+  await panel.getByLabel('Assistant simulation run').selectOption(job);
+  await panel.getByText('Full result and sources',{exact:true}).waitFor({timeout:30000});
+  const tableCount=await panel.locator('table.simulation-comparison').count();
+  if(tableCount<2)throw Error('Both candidate result tables must be present');
+  const downloadPromise=page.waitForEvent('download');
+  await panel.getByRole('button',{name:'Download evidence report',exact:true}).click();
+  const download=await downloadPromise;
+  await download.saveAs(path.join(out,'browser-export.md'));
+  const report=fs.readFileSync(path.join(out,'browser-export.md'),'utf8');
+  if(!report.includes('WorldPop 2026')||!report.includes('## Simulation')||!report.includes('succeeded'))throw Error('Export lacks source year or completed simulation output');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'Planning assistant',exact:true}).click();
+  await panel.getByText('Site comparison · declared criteria',{exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});
+  await page.getByText('Map ready',{exact:true}).waitFor({timeout:45000});
+  await page.waitForTimeout(1500);
+  await panel.getByText('Site comparison · declared criteria',{exact:true}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(out,'general-mobile.png'),fullPage:true});
+  const fits=await panel.locator('.assistant-assessments table').evaluateAll(t=>t.every(e=>e.getBoundingClientRect().right<=window.innerWidth));
+  if(!fits)throw Error('Comparison table overflows mobile');
+  const cellsFit=await panel.locator('.assistant-assessments td').evaluateAll(c=>c.every(e=>e.scrollWidth<=e.clientWidth+1));
+  if(!cellsFit)throw Error('Comparison text clips inside mobile cells');
+  const controlsVisible=await panel.locator('header button').evaluateAll(buttons=>buttons.every(button=>{const b=button.getBoundingClientRect();return button.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2));}));
+  if(!controlsVisible)throw Error('Map controls cover the assistant close button');
+  if(errors.length)throw Error(errors.join('; '));
+  const result={passed:true,checks:['no_plan_required','area_context','candidate_comparison','two_site_result_tables','human_readable_report_export','completed_job_outputs_in_report','reload_session','mobile_table_fit','no_page_errors']};
+  fs.writeFileSync(path.join(out,'browser-result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(String(e));process.exit(1);});

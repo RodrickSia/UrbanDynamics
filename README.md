@@ -7,6 +7,25 @@ outputs are modeled results, not forecasts or official determinations.
 
 ## Development simulation preview — this branch
 
+**Planning assistant:** the robot button below Data Layers supports area questions,
+source-aware site search, weighted comparison, same-program simulations on
+alternative sites, and evidence reports **without opening a plan**. With a plan
+open, it also edits Development buildings/zoning, creates alternatives and reads
+saved results. Start with [the general assistant guide](docs/urban-ai-agent.md)
+and [verification results](docs/urban-ai-agent-test-report.md). The
+[Development guide](docs/development-ai-agent.md) explains plan-editing tools.
+Model credentials stay on the backend.
+
+**Structured dataset queries (16 October):** the assistant now discovers source
+fields, applies AND/OR/range/date filters, spatially joins up to three datasets,
+sorts/groups/aggregates results, highlights filtered geometry and refines the last
+five queries. Read [syntax, examples and limits](docs/agent-structured-dataset-query.md).
+Nearby road reference prices remain distinct from parcel market values.
+
+**PostGIS + Goong routes:** warehouse filtering/joins/counts now precede display
+limits; route accessibility, route display and shared location scope are available.
+See [implementation, usage and limits](docs/agent-query-routing-upgrade.md).
+
 `feat/development-simulation-context` extends main's Development workflow with
 preserved/sourced ground cover, cached local OSM road context, explicit background
 traffic assumptions, and Before / After / Change tables with SUMO delay and queue.

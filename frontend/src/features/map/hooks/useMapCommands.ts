@@ -1,9 +1,10 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { type RefObject, useEffect } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 
 import type { MapControlRequest, MapFocusRequest, UserLocation } from '../types/map';
 
 interface MapCommandOptions {
+  readyRevision?: number;
   mapRef: RefObject<MapLibreMap | null>;
   focusRequest: MapFocusRequest | null;
   controlRequest: MapControlRequest | null;
@@ -12,6 +13,7 @@ interface MapCommandOptions {
 }
 
 export function useMapCommands(options: MapCommandOptions) {
+  const appliedFocus=useRef<{id:number;map:MapLibreMap}|null>(null);
   const {
     mapRef,
     focusRequest,
@@ -21,13 +23,16 @@ export function useMapCommands(options: MapCommandOptions) {
   } = options;
 
   useEffect(() => {
-    if (!focusRequest) return;
-    mapRef.current?.easeTo({
+    const map=mapRef.current;
+    if (!focusRequest||!map||(options.readyRevision!==undefined&&!options.readyRevision)) return;
+    if(appliedFocus.current?.id===focusRequest.id&&appliedFocus.current.map===map)return;
+    appliedFocus.current={id:focusRequest.id,map};
+    map.easeTo({
       center: focusRequest.center,
       zoom: focusRequest.zoom,
       duration: 900,
     });
-  }, [focusRequest, mapRef]);
+  }, [focusRequest, mapRef,options.readyRevision]);
 
   useEffect(() => {
     const map = mapRef.current;

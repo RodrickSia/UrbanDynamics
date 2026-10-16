@@ -1,8 +1,8 @@
 import type { StyleSpecification } from 'maplibre-gl';
 
 export const DEFAULT_VIEWPORT = {
-  center: [107.8, 16.1] as [number, number],
-  zoom: 4.7,
+  center: [106.75785, 10.82403] as [number, number],
+  zoom: 13,
   pitch: 0,
   bearing: 0,
 } as const;
@@ -13,6 +13,15 @@ export const MAP_STYLES = [
 ] as const;
 
 export type MapStyleId = (typeof MAP_STYLES)[number]['id'];
+
+/** Visible-browser fallback; normal HTTP cache, no prefetch or offline download. */
+export function getFallbackMapStyle():StyleSpecification {
+  return {version:8,name:'OpenStreetMap fallback',
+    glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources:{'osm-fallback':{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}},
+    layers:[{id:'osm-fallback',type:'raster',source:'osm-fallback'}]};
+}
 
 export type MapConfiguration =
   | { ok: true; mapKey: string; styleUrl: string }

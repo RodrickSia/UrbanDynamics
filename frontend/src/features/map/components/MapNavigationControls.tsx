@@ -1,4 +1,4 @@
-import { Layers3, LocateFixed, Minus, Plus } from 'lucide-react';
+import { Bot, Layers3, LocateFixed, Minus, Plus } from 'lucide-react';
 import { useRef } from 'react';
 
 import { gsap, motionDuration, useGSAP } from '../motion';
@@ -6,6 +6,8 @@ import type { MapControlAction, MapMode } from '../types/map';
 import { MotionIconButton } from './MotionIconButton';
 
 interface MapNavigationControlsProps {
+  assistantOpen?: boolean;
+  onToggleAssistant?: () => void;
   mode: MapMode;
   rightPanelOpen: boolean;
   layersOpen: boolean;
@@ -68,6 +70,8 @@ export function MapNavigationControls(props: MapNavigationControlsProps) {
       >
         <Layers3 aria-hidden="true" size={19} />
       </MotionIconButton>
+      {props.onToggleAssistant&&<MotionIconButton className={`navigation-action glass-surface ${props.assistantOpen?'is-active':''}`}
+        aria-label="Planning assistant" aria-expanded={props.assistantOpen} onClick={props.onToggleAssistant}><Bot size={19} aria-hidden="true"/></MotionIconButton>}
     </nav>
   );
 }
