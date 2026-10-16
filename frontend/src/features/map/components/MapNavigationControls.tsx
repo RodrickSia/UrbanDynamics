@@ -48,7 +48,7 @@ export function MapNavigationControls(props: MapNavigationControlsProps) {
       data-right-panel-open={props.rightPanelOpen}
       aria-label="Map navigation"
     >
-      <div className="navigation-buttons glass-surface">
+      <div className="navigation-buttons glass-surface" role="group" aria-label="Map controls">
         <MotionIconButton onClick={() => props.onCommand('zoom-in')} aria-label="Zoom in"><Plus aria-hidden="true" size={19} /></MotionIconButton>
         <MotionIconButton onClick={() => props.onCommand('zoom-out')} aria-label="Zoom out"><Minus aria-hidden="true" size={19} /></MotionIconButton>
         <MotionIconButton onClick={() => props.onCommand('locate')} aria-label="Locate me"><LocateFixed aria-hidden="true" size={18} /></MotionIconButton>
