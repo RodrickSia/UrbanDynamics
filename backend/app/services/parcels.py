@@ -2,6 +2,7 @@
 import json
 import math
 import re
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 from psycopg.rows import dict_row
@@ -116,9 +117,12 @@ def price_reference(parcel, candidates):
         'high' if result['geometry_review_status'] == 'reviewed' and
                   classification['classification_confidence'] == 'high' else 'medium')
     area = positive(parcel.get('area_m2'))
-    identity = str(parcel.get('uniq_id') or '').strip().lower()
-    if not provisional and area and identity not in UNKNOWN | {'0'} and math.isfinite(unit_price * area):
-        result['estimated_land_total_vnd'] = round(unit_price * area)
+    # The total is an indicative arithmetic estimate, even for provisional
+    # road associations. Planning-only category inference cannot value the
+    # whole parcel because its planned uses may cover different subareas.
+    if area and classification['classification_basis'] == 'source_land_use':
+        total = Decimal(str(area)) * Decimal(str(unit_price))
+        result['estimated_land_total_vnd'] = int(total.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     return result
 
 

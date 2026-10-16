@@ -50,7 +50,7 @@ test('plan colors and both building providers stay within the study area and res
     pending: Object.keys(window.dataMap.getStyle()?.sources ?? {}).filter(id => !window.dataMap.isSourceLoaded(id)) }))).toEqual({ loaded: true, moving: false, pending: [] });
   await expect.poll(() => page.evaluate(() => [...new Set(window.dataMap.queryRenderedFeatures({ layers: ['zoning-plan-parcels-fill'] }).map(f => f.properties.color))].sort())).toEqual(['#C18EAD','#D79B8C']);
   await page.getByRole('button', { name: 'Existing', exact: true }).click();
-  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-plan-parcels-fill', 'fill-opacity'))).toBe(.35);
+  expect(await page.evaluate(() => window.dataMap.getPaintProperty('zoning-plan-parcels-fill', 'fill-opacity'))).toBe(.44);
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('zoning-editor').find(f => f.properties.kind === 'zone')?.properties.color)).toBe('#FF6D00');
   await page.getByRole('button', { name: 'Switch to 3D' }).click();

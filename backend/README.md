@@ -47,13 +47,15 @@ are statutory reference prices, not transaction or asking prices. Feature
 properties include the source URL, effective date, unit, matching mode,
 geometry coverage, and annex page where available.
 
-Parcel details can return a `provisional` road-price association up to 40 m
-from the parcel when the published road segment is unique and spatially checked.
+Parcel details select the nearest mapped road with a price in the parcel's
+classified category, within 150 m. An uncertain road association is marked
+`provisional`; its total is an indicative calculation of mapped parcel area ×
+published unit price, not a verified parcel valuation.
 For source land-use code `L`, explicit apartment-planning metadata can supply
 the Residential category with `classification_basis: planning` and low
-confidence. Provisional associations expose only the reference unit price;
-`estimated_land_total_vnd` remains null. Missing or ambiguous road prices also
-remain null.
+confidence. This planning-only category exposes the reference unit price but
+does not calculate a whole-parcel total. Missing land-use categories, road
+prices, or valid area also leave the total null.
 
 Population values are persons per source raster cell. The service does not
 claim population density per square kilometer. The source rasters are stored

@@ -31,7 +31,7 @@ test('parcel colors, distant tiles, accessible details and style restoration', a
     if (url.pathname === '/api/v1/layers') return route.fulfill({ json: { layers: [{ id: 'parcels', available: true }] } });
     if (url.pathname === '/api/v1/parcels/42') return route.fulfill({ status: failDetail ? 503 : 200,
       json: automaticPrice ? { ...detail, price: { ...detail.price, status: 'provisional',
-        unit_price_vnd_m2: 210600000, estimated_land_total_vnd: null,
+        unit_price_vnd_m2: 210600000, estimated_land_total_vnd: 40504698000,
         road_match_status: 'automatic_reference', valuation_confidence: 'low',
         selected: { ...detail.price.selected, properties: { road: 'Trần Quốc Thảo',
           source_road: 'TRẦN QUỐC THẢO', match_method: 'same_ward_road_name' } } } }
@@ -89,7 +89,7 @@ test('parcel colors, distant tiles, accessible details and style restoration', a
   await page.mouse.click(500, 350);
   await expect(dialog).toContainText('Estimated Land Value');
   await expect(dialog.locator('.parcel-price')).toHaveText('null');
-  await expect(dialog.locator('.parcel-formula')).toContainText('null');
+  await expect(dialog.locator('.parcel-formula')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   provisionalPrice = true;
@@ -103,11 +103,11 @@ test('parcel colors, distant tiles, accessible details and style restoration', a
   await expect(dialog).toHaveCount(0);
   automaticPrice = true;
   await page.mouse.click(500, 350);
-  await expect(dialog.locator('.parcel-price')).toContainText('210.600.000');
-  await expect(dialog.locator('.parcel-price')).toContainText('₫/m²');
+  await expect(dialog.locator('.parcel-price')).toContainText('40.504.698.000');
+  await expect(dialog).toContainText('Indicative estimate · low confidence');
   await expect(dialog).toContainText('Automatic road-table reference');
   await expect(dialog).toContainText('TRẦN QUỐC THẢO');
-  await expect(dialog.locator('.parcel-formula')).toHaveCount(0);
+  await expect(dialog.locator('.parcel-formula')).toContainText(/192,33 m².*210\.600\.000 ₫\/m².*40\.504\.698\.000 ₫/);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await page.evaluate('window.dataMap.setStyle({version:8,sources:{},layers:[]})');

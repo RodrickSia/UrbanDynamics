@@ -49,6 +49,7 @@ export default function App() {
         <UrbanMap
           onViewportChange={setAgentViewport} onPoiSnapshot={assistantOpen?setAgentPois:undefined} agentCandidates={assistantOpen?agentCandidates:undefined}
           zoning={{ active: zoning.active, plan: zoning.plan, displayedPlans: zoning.displayedPlans,
+            displayedPlanScenes: zoning.displayedPlanScenes,
             scenario: zoning.analyzing && !zoning.includeScenario ? zoning.plan?.scenarios[0] ?? null : zoning.scenario,
             analysis: { active: zoning.analyzing, geometry: zoning.analysisArea, chart: zoning.indicatorChart },
             selected: zoning.selected, sketch: zoning.sketch, preview: zoning.preview,

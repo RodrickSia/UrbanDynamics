@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { deleteZoningPlan, zoningRequest } from './api';
 import { sketchGeometry } from './geometry';
 import { useDevelopment } from './useDevelopment';
@@ -48,6 +48,14 @@ export function useZoning(parcelAvailable = false, assistantBusy = false) {
   }
   const indicatorScenario = indicatorPlan?.scenarios.find(s => s.id === (plan ? scenarioId : rememberedScenario ?? scenarioId))
     ?? indicatorPlan?.scenarios.find(s => s.kind === 'proposal') ?? indicatorPlan?.scenarios[0] ?? null;
+  const displayedPlanScenes = useMemo(() => Object.entries(displayedPlanDetails).flatMap(([id, details]) => {
+    if (!displayedPlans[id]) return [];
+    let remembered: string | null = null;
+    try { remembered = localStorage.getItem(`urban-plan-scenario-${id}`); } catch { /* Optional preference. */ }
+    const displayedScenario = details.scenarios.find(s => s.id === (plan?.id === id ? scenarioId : remembered))
+      ?? details.scenarios.find(s => s.kind === 'proposal') ?? details.scenarios[0];
+    return displayedScenario ? [{ plan: details, scenario: displayedScenario }] : [];
+  }), [displayedPlanDetails, displayedPlans, plan?.id, scenarioId]);
   const active = panel !== null;
   const analyzing = active && (panel === 'indicators' || (!!plan && section === 'dashboard'));
   const analysisArea = panel === 'plans' && section === 'dashboard' ? plan?.study_area ?? null
@@ -218,7 +226,7 @@ export function useZoning(parcelAvailable = false, assistantBusy = false) {
     if (binding.plan_id !== plan?.id) zoomTo(next.study_area);
     await refresh();
   };
-  return { panel, setPanel, active, close, plan, plans, displayedPlans, loadingPlanId, togglePlanOnMap, scenario, indicatorPlan, indicatorScenario, chosenType, typeId, setTypeId, selected, pick,
+  return { panel, setPanel, active, close, plan, plans, displayedPlans, displayedPlanScenes, loadingPlanId, togglePlanOnMap, scenario, indicatorPlan, indicatorScenario, chosenType, typeId, setTypeId, selected, pick,
     analyzing, analysisArea, includeScenario, setIncludeScenario, useStudyArea,
     indicatorScope, setIndicatorChart, indicatorChart: analyzing && indicatorChart?.scope === indicatorScope ? indicatorChart : null,
     sketch, setSketch, begin, cancel: development.dirty ? development.cancel : cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,
