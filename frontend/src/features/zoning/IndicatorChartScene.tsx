@@ -8,13 +8,24 @@ export function IndicatorChartScene({ map, bridge, mode }: { map: MapLibreMap | 
   const chart = bridge.active && bridge.analysis?.active ? bridge.analysis.chart : undefined;
   const data = useMemo(() => chart ? chartFeatures(chart.geometry, chart.rows) : null, [chart]);
   const enabled = !!data;
-  const current = useRef({ data, mode });
+  const current = useRef({ data });
   useEffect(() => {
-    current.current = { data, mode };
+    current.current = { data };
     const source = map?.getSource(SOURCE) as GeoJSONSource | undefined;
     source?.setData(data ?? { type: 'FeatureCollection', features: [] });
-    if (map?.getLayer(BARS)) map.setLayoutProperty(BARS, 'visibility', mode === '3d' ? 'visible' : 'none');
-  }, [map, data, mode]);
+    if (map?.getLayer(BARS)) map.setLayoutProperty(BARS, 'visibility', 'visible');
+  }, [map, data]);
+  useEffect(() => {
+    if (!map || !enabled || mode !== '2d') return;
+    const showColumns = () => { if (map.getPitch() < 40) map.easeTo({ pitch: 50, duration: 420 }); };
+    showColumns();
+    // A global 2D camera transition may finish after the chart is enabled.
+    map.on('moveend', showColumns);
+    return () => {
+      map.off('moveend', showColumns);
+      if (map.getPitch() >= 40) map.easeTo({ pitch: 0, duration: 350 });
+    };
+  }, [map, enabled, mode]);
   useEffect(() => {
     if (!map || !enabled) return;
     const attach = () => {
@@ -22,7 +33,7 @@ export function IndicatorChartScene({ map, bridge, mode }: { map: MapLibreMap | 
       if (!map.getLayer(BASE)) map.addLayer({ id: BASE, type: 'fill', source: SOURCE,
         paint: { 'fill-color': ['get', 'color'], 'fill-opacity': .8 } });
       if (!map.getLayer(BARS)) map.addLayer({ id: BARS, type: 'fill-extrusion', source: SOURCE,
-        layout: { visibility: current.current.mode === '3d' ? 'visible' : 'none' },
+        layout: { visibility: 'visible' },
         paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['get', 'height'], 'fill-extrusion-opacity': .94 } });
     };
     let popup: Popup | undefined, disposed = false;

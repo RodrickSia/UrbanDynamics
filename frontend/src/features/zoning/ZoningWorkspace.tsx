@@ -45,7 +45,7 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
         <header><div><h2>{w.panel === 'indicators' ? 'Indicators' : 'Plans'}</h2></div>
           <button className="quiet-icon-button" aria-label="Close zoning workspace" disabled={w.busy} onClick={() => w.close()}><X size={18}/></button></header>
         {!w.plan && w.error && <div className="zoning-error" role="alert">{w.error}</div>}
-        {w.panel === 'indicators' ? <IndicatorsPanel workspace={w} onView={onView}/> : <PlansPanel workspace={w}/>}
+        {w.panel === 'indicators' ? <IndicatorsPanel workspace={w}/> : <PlansPanel workspace={w}/>}
       </aside>}
       {w.plan && <>
         <aside className="zoning-detail-drawer solid-panel zoning-ui" aria-label="Plan details">
@@ -59,7 +59,7 @@ export function ZoningWorkspace({ workspace: w, onActivate, searchOpen, searchPa
             {displayedTab === 'info' ? <PlanInfoPanel workspace={w}/>
               : displayedTab === 'zoning' ? <PlanZoningPanel workspace={w}/>
               : displayedTab === 'development' ? <DevelopmentPanel workspace={w} onView={onView} viewMode={viewMode}/>
-              : <IndicatorsPanel workspace={w} dashboard={w.panel !== 'indicators'} onView={onView}/>}
+              : <IndicatorsPanel workspace={w} dashboard={w.panel !== 'indicators'}/>}
           </div>
           <p role="status" className="zoning-save-status">{w.busy ? 'Working…' : w.development.dirty ? 'Unsaved proposal' : `Saved · revision ${w.plan.revision}`}</p>
         </aside>
