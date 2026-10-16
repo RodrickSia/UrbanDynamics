@@ -40,3 +40,30 @@ it('submits once and keeps a running job visible when more map tiles arrive', as
   expect(fetch.mock.calls[0][0]).toContain('/zoning/plans/plan/simulation/runs');
   unmount();
 });
+
+it('runs with the canonical plan when optional map building context is rejected', async () => {
+  const plan = { id: 'plan', revision: 2 } as Plan;
+  const scenario = { id: 'scenario' } as Scenario;
+  const job = { id: 'job', study_id: 'study', status: 'queued', result_id: null };
+  const requests: Record<string, unknown>[] = [];
+  const fetch = vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      requests.push(JSON.parse(String(init.body)));
+      if (requests.length === 1) return new Response(JSON.stringify({ detail: [
+        { loc: ['body', 'map_buildings', 'features', 0], msg: 'Invalid source geometry' },
+      ] }), { status: 422 });
+      return new Response(JSON.stringify({ study: { id: 'study' }, job }), { status: 202 });
+    }
+    return new Response(JSON.stringify(job));
+  });
+  vi.stubGlobal('fetch', fetch);
+  const mapBuildings: FeatureCollection = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {},
+    geometry: { type: 'Polygon', coordinates: [[[106.76,10.82],[106.761,10.82],[106.761,10.821],[106.76,10.82]]] } }] };
+  const { result, unmount } = renderHook(() => usePlanSimulation(plan, scenario, simulationDefaults, '123', true, mapBuildings));
+  await act(() => result.current.run('screening'));
+  expect(requests).toHaveLength(2);
+  expect(requests[0]).toHaveProperty('map_buildings');
+  expect(requests[1]).not.toHaveProperty('map_buildings');
+  expect(result.current.job?.id).toBe('job');
+  unmount();
+});

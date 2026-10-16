@@ -19,6 +19,7 @@ RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /app app
 RUN mkdir -p /runtime && chown app:app /runtime
 COPY --chown=app:app backend/app/ ./app/
+COPY --chown=app:app frontend/src/features/zoning/zoningCatalog.json ./app/services/zoning/zoningCatalog.json
 COPY --chown=app:app etl/src/ ./etl/src/
 USER app
 

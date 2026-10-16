@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from '../../services/api';
-import { zoningRequest } from './api';
+import { ZoningRequestError, zoningRequest } from './api';
 import type { Plan, Scenario } from './types';
 import type { SimulationJob, SimulationResult, SimulationSettings, SimulationStudy } from './simulationTypes';
 import type { FeatureCollection } from 'geojson';
@@ -72,11 +72,20 @@ export function usePlanSimulation(plan: Plan, scenario: Scenario, settings: Simu
     try {
       const submissionKey = `${key}/${mode}`;
       if (submission.current?.key !== submissionKey) submission.current = { key: submissionKey, id: crypto.randomUUID() };
-      const { study, job } = await zoningRequest<{ study: SimulationStudy; job: SimulationJob }>(`/${plan.id}/simulation/runs`, {
+      const canonicalInput = {
         revision: plan.revision, scenario_id: scenario.id, parcel_id: parcelId, ...settings,
         mode, idempotency_key: submission.current.id,
-        ...(mapBuildings ? { map_buildings: mapBuildings } : {}),
-      });
+      };
+      const input = mapBuildings ? { ...canonicalInput, map_buildings: mapBuildings } : canonicalInput;
+      let response: { study: SimulationStudy; job: SimulationJob };
+      try {
+        response = await zoningRequest(`/${plan.id}/simulation/runs`, input);
+      } catch (cause) {
+        if (!mapBuildings || !(cause instanceof ZoningRequestError) || cause.status !== 422) throw cause;
+        // A provider tile is optional evidence, not a prerequisite for a saved run.
+        response = await zoningRequest(`/${plan.id}/simulation/runs`, canonicalInput);
+      }
+      const { study, job } = response;
       remember(job);
       submission.current = null;
       if (currentKey.current === key) setState({ key, study, job });

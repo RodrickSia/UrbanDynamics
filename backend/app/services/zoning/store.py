@@ -10,7 +10,10 @@ import psycopg
 from psycopg.types.json import Jsonb
 from src.shared.database import connect_to_warehouse, warehouse_configured
 
+from .project import backfill, ensure_schema, project
+
 logger = logging.getLogger(__name__)
+_initialized_databases: set[tuple[str, ...]] = set()
 
 
 class Conflict(Exception):
@@ -21,9 +24,17 @@ class StorageUnavailable(Exception):
     pass
 
 
+def _database_key():
+    url = os.getenv("DATABASE_URL")
+    return (url,) if url else tuple(os.getenv(f"WAREHOUSE_{field}", "")
+                                    for field in ("HOST", "PORT", "DATABASE", "USER", "PASSWORD"))
+
+
 @contextmanager
 def database():
     remote = warehouse_configured() and os.getenv('ZONING_STORAGE', 'auto') != 'sqlite'
+    key = _database_key() if remote else None
+    bootstrap = remote and key not in _initialized_databases
     try:
         if remote:
             connection = connect_to_warehouse()
@@ -33,13 +44,19 @@ def database():
             connection = sqlite3.connect(directory / "plans.sqlite3", timeout=10)
         try:
             with connection:
-                if remote:
+                if bootstrap:
                     connection.execute("SELECT pg_advisory_xact_lock(hashtext('zoning_plans_schema'))")
-                else:
+                elif not remote:
                     connection.execute("BEGIN IMMEDIATE")
-                connection.execute("CREATE TABLE IF NOT EXISTS zoning_plans "
-                                   "(id TEXT PRIMARY KEY, document " + ("JSONB" if remote else "TEXT") + " NOT NULL)")
+                if bootstrap or not remote:
+                    connection.execute("CREATE TABLE IF NOT EXISTS zoning_plans "
+                                       "(id TEXT PRIMARY KEY, document " + ("JSONB" if remote else "TEXT") + " NOT NULL)")
+                if bootstrap:
+                    ensure_schema(connection)
+                    backfill(connection)
                 yield connection, remote
+            if bootstrap:
+                _initialized_databases.add(key)
         finally:
             connection.close()
     except (OSError, sqlite3.Error, psycopg.Error) as error:
@@ -63,6 +80,8 @@ def save_new(document):
         placeholder = "%s" if remote else "?"
         connection.execute(f"INSERT INTO zoning_plans(id,document) VALUES ({placeholder},{placeholder})",
                            (document["id"], encode(document, remote)))
+        if remote:
+            project(connection, document)
     return document
 
 
@@ -94,6 +113,8 @@ def update(identifier, revision, mutate):
         result = mutate(document)
         connection.execute(f"UPDATE zoning_plans SET document={placeholder} WHERE id={placeholder}",
                            (encode(result, remote), str(identifier)))
+        if remote:
+            project(connection, result)
         return result
 
 

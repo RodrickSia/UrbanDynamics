@@ -1,4 +1,5 @@
-import { Bot, Layers3, LocateFixed, Minus, Plus } from 'lucide-react';
+import { Layers3, LocateFixed, Minus, Plus } from 'lucide-react';
+import { AgentLauncher } from '../../agent/AgentLauncher';
 import { useRef } from 'react';
 
 import { gsap, motionDuration, useGSAP } from '../motion';
@@ -47,7 +48,7 @@ export function MapNavigationControls(props: MapNavigationControlsProps) {
       data-right-panel-open={props.rightPanelOpen}
       aria-label="Map navigation"
     >
-      <div className="navigation-buttons glass-surface">
+      <div className="navigation-buttons glass-surface" role="group" aria-label="Map controls">
         <MotionIconButton onClick={() => props.onCommand('zoom-in')} aria-label="Zoom in"><Plus aria-hidden="true" size={19} /></MotionIconButton>
         <MotionIconButton onClick={() => props.onCommand('zoom-out')} aria-label="Zoom out"><Minus aria-hidden="true" size={19} /></MotionIconButton>
         <MotionIconButton onClick={() => props.onCommand('locate')} aria-label="Locate me"><LocateFixed aria-hidden="true" size={18} /></MotionIconButton>
@@ -70,8 +71,7 @@ export function MapNavigationControls(props: MapNavigationControlsProps) {
       >
         <Layers3 aria-hidden="true" size={19} />
       </MotionIconButton>
-      {props.onToggleAssistant&&<MotionIconButton className={`navigation-action glass-surface ${props.assistantOpen?'is-active':''}`}
-        aria-label="Planning assistant" aria-expanded={props.assistantOpen} onClick={props.onToggleAssistant}><Bot size={19} aria-hidden="true"/></MotionIconButton>}
+      {props.onToggleAssistant && <AgentLauncher open={props.assistantOpen} onClick={props.onToggleAssistant}/>}
     </nav>
   );
 }

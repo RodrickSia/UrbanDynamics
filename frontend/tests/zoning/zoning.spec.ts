@@ -83,7 +83,7 @@ test('create, edit, preview, scenario isolation, reload and map-style recovery w
   await page.screenshot({ path: 'test-results/zoning-indicators-desktop.png' });
   await page.reload();
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await expect(page.getByRole('button', { name: 'Phase 1', exact: true })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'revision 5' })).toBeVisible();
   await page.waitForFunction('window.dataMap.getLayer("zoning-fill") && window.dataMap.getZoom() > 14 && !window.dataMap.isMoving()');
@@ -109,7 +109,14 @@ test('deleting a plan from the sidebar removes its saved scenarios', async ({ pa
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   const row = page.locator('.zoning-plan-list li').filter({ hasText: plan.name });
-  await row.getByRole('button', { name: `Delete plan ${plan.name}` }).click();
+  const swipe = row.locator('.zoning-swipe-content');
+  const box = (await swipe.boundingBox())!;
+  await page.mouse.move(box.x + box.width - 25, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 115, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect(row.locator('.zoning-swipe-delete')).toHaveAttribute('data-revealed', 'true');
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   await expect(row).toHaveCount(0);
   expect((await request.get(`/api/v1/zoning/plans/${plan.id}`)).status()).toBe(404);
@@ -137,7 +144,7 @@ test('vertex editing, split/merge, undo and exclusive measurement ownership', as
   await page.goto('/tests/browser/data-layers.html');
   await page.waitForFunction('window.dataMap?.isStyleLoaded()');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: plan.name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: plan.name }).click();
   await page.waitForFunction('window.dataMap.getLayer("zoning-fill") && window.dataMap.getZoom() > 14 && !window.dataMap.isMoving()');
   await page.waitForFunction('window.dataMap.queryRenderedFeatures({layers:["zoning-fill"]}).some(f=>f.properties.kind==="zone")');
   await mapClick(page, [106.761, 10.822]);

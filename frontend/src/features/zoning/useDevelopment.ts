@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { zoningRequest } from './api';
+import { ZoningRequestError, zoningRequest } from './api';
 import { buildingInput, type BuildingInput, type DevelopmentPreview, type ParcelDevelopment, type ProposedBuilding } from './developmentTypes';
 import { sketchGeometry } from './geometry';
 import type { Plan, Scenario, Sketch } from './types';
@@ -11,7 +11,7 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
   setError: (error: string) => void) {
   const scope = `${plan?.id}/${scenario?.id}`;
   const [selection, setSelection] = useState({ scope: '', parcelId: '', buildingId: '' });
-  const [response, setResponse] = useState<{ key: string; value?: ParcelDevelopment; error?: string } | null>(null);
+  const [response, setResponse] = useState<{ key: string; value?: ParcelDevelopment; error?: string; mapContextAccepted?: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
   const [mapped, setMapped] = useState<{ scope: string; parcelId: string; buildings: FeatureCollection }>();
   const [draftState, setDraftState] = useState<{ scope: string; value: BuildingInput } | null>(null);
@@ -39,8 +39,21 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
   useEffect(() => {
     if (!plan || !scenario || !parcelId) return;
     const controller = new AbortController();
-    void zoningRequest<ParcelDevelopment>(`/${plan.id}/development/parcels/${parcelId}${mapBuildings ? '/baseline' : ''}?scenario_id=${scenario.id}`, mapBuildings, controller.signal)
-      .then(value => { if (!controller.signal.aborted) setResponse({ key: requestKey, value }); })
+    const basePath = `/${plan.id}/development/parcels/${encodeURIComponent(parcelId)}`;
+    const path = `${basePath}?scenario_id=${scenario.id}`;
+    const read = async () => {
+      if (!mapBuildings) return { value: await zoningRequest<ParcelDevelopment>(path, undefined, controller.signal), mapContextAccepted: false };
+      try {
+        return { value: await zoningRequest<ParcelDevelopment>(`${basePath}/baseline?scenario_id=${scenario.id}`, mapBuildings, controller.signal), mapContextAccepted: true };
+      } catch (cause) {
+        if (!(cause instanceof ZoningRequestError) || cause.status !== 422) throw cause;
+        // Loaded basemap fragments are optional context. Keep the canonical
+        // zoning site usable even when one source footprint fails validation.
+        return { value: await zoningRequest<ParcelDevelopment>(path, undefined, controller.signal), mapContextAccepted: false };
+      }
+    };
+    void read()
+      .then(({ value, mapContextAccepted }) => { if (!controller.signal.aborted) setResponse({ key: requestKey, value, mapContextAccepted }); })
       .catch(cause => { if (!controller.signal.aborted) setResponse({ key: requestKey, error: cause.message }); });
     return () => controller.abort();
   }, [plan, scenario, parcelId, requestKey, mapBuildings]);
@@ -118,7 +131,8 @@ export function useDevelopment(plan: Plan | null, scenario: Scenario | null, ske
   return { parcel, parcelId, selectedBuilding, data, error, loading: !!parcelId && !data && !error,
     adoptAssistantSelection: (planId: string, scenarioId: string, parcelId = '', buildingId = '') =>
       setSelection({scope:`${planId}/${scenarioId}`,parcelId,buildingId}),
-    mapBuildings, onBaseline: (id: string, buildings: FeatureCollection) => {
+    mapBuildings: response?.key === requestKey && response.mapContextAccepted ? mapBuildings : undefined,
+    onBaseline: (id: string, buildings: FeatureCollection) => {
       if (id === parcelId) setMapped(previous => previous?.scope === scope && previous.parcelId === id
         && JSON.stringify(previous.buildings) === JSON.stringify(buildings) ? previous : { scope, parcelId: id, buildings });
     },

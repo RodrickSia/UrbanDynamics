@@ -48,7 +48,7 @@ test('zone site takes priority over parcels; drawing panel sits left and indicat
   await command('draw', { geometry: plan.study_area, type_id: plan.types[0].id, policy: 'preserve' });
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: prepared.name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: prepared.name }).click();
   await page.getByRole('button', { name: 'Draw zone', exact: true }).click();
   const bounds = await page.getByLabel('Zoning tools').boundingBox();
   expect(bounds!.x).toBeLessThan(25);
@@ -127,7 +127,7 @@ test('Existing reads streamed Goong buildings and measures scenario setbacks in 
   });
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
   await clickMap(page, [106.7607,10.8207]);
@@ -155,7 +155,7 @@ test('real API: parcel picking, draft, save, clone, edit, lock, masks, style res
   const { plan, name, fixtureStyle } = await prepare(page, request);
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
   await clickMap(page, [106.7607,10.8207]);
@@ -241,14 +241,14 @@ test('persisted locked proposals reload, resize and generate a new building type
   await command('lock_scenario', { locked: true }, plan.scenarios[2].id);
   await page.goto('/tests/browser/data-layers.html', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Scenario B', exact: true }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.locator('.development-list button').first().click();
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeDisabled();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Scenario B', exact: true }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.locator('.development-list button').first().click();
@@ -302,7 +302,7 @@ test('existing metrics, zoning precedence, selected-parcel simulation and cached
   await command('draw', { geometry: parcel, type_id: plan.types.at(-1).id, policy: 'replace' });
   await page.goto('/tests/browser/data-layers.html', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: plan.name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: plan.name }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   const editor = page.getByRole('region', { name: 'Development editor' });
   const simulation = page.getByRole('region', { name: 'Development simulation' });
@@ -349,7 +349,7 @@ test('mixed floor uses: preview, metrics, 2D picking, save, reload and floor rem
   const { plan, name } = await prepare(page, request);
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-pick') && window.dataMap.isStyleLoaded() && !window.dataMap.isMoving());
   await clickMap(page, [106.7607,10.8207]);
@@ -389,7 +389,7 @@ test('mixed floor uses: preview, metrics, 2D picking, save, reload and floor rem
   // Persisted mixed floors survive reload and remain editable in 2D.
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: name }).click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: name }).click();
   await page.getByRole('button', { name: 'Development', exact: true }).click();
   await page.locator('.development-list button').first().click();
   await expect(page.locator('.development-floor-table')).toContainText('Office');

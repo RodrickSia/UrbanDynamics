@@ -48,7 +48,7 @@ export default function App() {
       >
         <UrbanMap
           onViewportChange={setAgentViewport} onPoiSnapshot={assistantOpen?setAgentPois:undefined} agentCandidates={assistantOpen?agentCandidates:undefined}
-          zoning={{ active: zoning.active, plan: zoning.plan,
+          zoning={{ active: zoning.active, plan: zoning.plan, displayedPlans: zoning.displayedPlans,
             scenario: zoning.analyzing && !zoning.includeScenario ? zoning.plan?.scenarios[0] ?? null : zoning.scenario,
             analysis: { active: zoning.analyzing, geometry: zoning.analysisArea, chart: zoning.indicatorChart },
             selected: zoning.selected, sketch: zoning.sketch, preview: zoning.preview,
@@ -102,7 +102,7 @@ export default function App() {
           />
         </div>
 
-        <ZoningWorkspace workspace={zoning} onActivate={activateZoning} onView={workspace.handleModeChange}
+        <ZoningWorkspace workspace={zoning} onActivate={activateZoning} onView={workspace.handleModeChange} viewMode={workspace.mode}
           searchOpen={workspace.isSearchOpen} searchPanelHeight={searchPanelHeight}/>
 
         {workspace.rightPanel === 'layers' && (

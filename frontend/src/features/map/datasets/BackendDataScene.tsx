@@ -16,6 +16,8 @@ import { floodLocationDetails } from './floodLocation';
 import { populationRasterSource, viewportProbeDelayAfterMove } from './populationRaster';
 import { PARCEL_MIN_ZOOM, PARCEL_MAX_NATIVE_ZOOM, PARCEL_OUTLINE, parcelOutline } from './parcelStyle';
 import { ParcelDetails } from '../parcels/ParcelDetails';
+import { LAND_PRICE_LAYER } from '../layers/landPrice';
+import { nearestDatasetLine } from './datasetLineHover';
 import './data.css';
 
 export interface BackendBridge {
@@ -385,11 +387,64 @@ export function BackendDataScene({
 function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: BackendBridge }) {
   const [inspection, setInspection] = useState<Record<string, unknown> | null>(null);
   const [parcelId, setParcelId] = useState<string | null>(null);
+  const [hover, setHover] = useState<{
+    layer: string;
+    properties: Record<string, unknown>;
+    x: number;
+    y: number;
+  } | null>(null);
   const current = useRef(bridge);
   useEffect(() => {
     current.current = bridge;
   }, [bridge]);
-  const selectionKey = bridge.selections.map((s) => s.url).join('|');
+  const selectionKey = bridge.selections.map((s) => `${s.id}:${s.url}:${s.visible !== false}`).join('|');
+  useEffect(() => {
+    if (!map) return;
+    let frame = 0;
+    let previousCursor: string | null = null;
+    const canvas = map.getCanvas();
+    const clear = () => {
+      cancelAnimationFrame(frame);
+      setHover(null);
+      if (previousCursor !== null) {
+        if (canvas.style.cursor === 'pointer') canvas.style.cursor = previousCursor;
+        previousCursor = null;
+      }
+    };
+    const move = (event: MapMouseEvent) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const layers = [
+          ...current.current.selections
+            .filter((selection) => selection.visible !== false &&
+              ['traffic', 'sumo_simulation', 'sumo_network'].includes(selection.dataset))
+            .map((selection) => dataSourceId(selection.id)),
+          LAND_PRICE_LAYER,
+        ].filter((id) => map.getLayer(id) && map.getLayoutProperty(id, 'visibility') !== 'none');
+        const snap = nearestDatasetLine(map, event.point, layers);
+        if (!snap) { clear(); return; }
+        if (previousCursor === null) previousCursor = canvas.style.cursor;
+        canvas.style.cursor = 'pointer';
+        setHover({
+          layer: snap.feature.layer.id,
+          properties: snap.feature.properties,
+          x: snap.point.x,
+          y: snap.point.y,
+        });
+      });
+    };
+    map.on('mousemove', move);
+    map.on('mouseout', clear);
+    map.on('movestart', clear);
+    map.on('style.load', clear);
+    return () => {
+      clear();
+      map.off('mousemove', move);
+      map.off('mouseout', clear);
+      map.off('movestart', clear);
+      map.off('style.load', clear);
+    };
+  }, [map, selectionKey]);
   useEffect(() => {
     if (!map) return;
     let request: AbortController | undefined;
@@ -444,6 +499,7 @@ function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: B
   return (
     <>
       {parcelId && <ParcelDetails key={parcelId} parcelId={parcelId} onClose={() => setParcelId(null)} />}
+      {hover && map && <DatasetLinePreview map={map} hover={hover} />}
       {inspection && bridge.selections.length > 0 && (
         <aside className="dataset-inspection solid-panel" aria-label="Dataset details">
           <button
@@ -474,4 +530,57 @@ function DatasetInspection({ map, bridge }: { map: MapLibreMap | null; bridge: B
       )}
     </>
   );
+}
+
+function previewValue(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+  return String(value).replaceAll('_', ' ');
+}
+
+function DatasetLinePreview({ map, hover }: {
+  map: MapLibreMap;
+  hover: { layer: string; properties: Record<string, unknown>; x: number; y: number };
+}) {
+  const traffic = hover.layer === dataSourceId('traffic');
+  const simulation = hover.layer === dataSourceId('sumo-simulation');
+  const network = hover.layer === dataSourceId('sumo-network');
+  const title = traffic ? 'Historical congestion' : simulation ? 'SUMO simulation'
+    : network ? 'Road network' : 'Land price';
+  const properties = hover.properties;
+  const rows: [string, unknown][] = traffic ? [
+    ['LOS', properties.predicted_los],
+    ['Score', properties.congestion_score],
+    ['Basis', properties.prediction_basis],
+    ['Confidence', properties.confidence],
+  ] : simulation ? [
+    ['LOS', properties.simulated_los],
+    ['Speed', properties.simulated_speed_kmh == null ? null : `${properties.simulated_speed_kmh} km/h`],
+    ['Vehicles / 6h', properties.simulated_vehicles_6h],
+  ] : network ? [
+    ['Road type', properties.road_type],
+    ['Lanes', properties.lane_count],
+  ] : [
+    ['Residential', properties.residential_vnd_m2 == null ? null : `${new Intl.NumberFormat('vi-VN').format(Number(properties.residential_vnd_m2))} ₫/m²`],
+    ['Commercial', properties.commercial_vnd_m2 == null ? null : `${new Intl.NumberFormat('vi-VN').format(Number(properties.commercial_vnd_m2))} ₫/m²`],
+  ];
+  const road = previewValue(properties.road ?? properties.name ?? properties.edge_id) ?? 'Unnamed road';
+  const visibleRows = rows.flatMap(([label, value]) => {
+    const text = previewValue(value);
+    return text === null ? [] : [{ label, text }];
+  });
+  const width = map.getContainer().clientWidth;
+  const height = map.getContainer().clientHeight;
+  const cardLeft = Math.max(12, Math.min(hover.x + 18, width - 262));
+  const cardTop = Math.max(12, Math.min(hover.y + 18, height - 180));
+  return <>
+    <span className="dataset-line-anchor" style={{ left: hover.x, top: hover.y }} aria-hidden="true" />
+    <aside className="dataset-line-preview solid-panel" role="tooltip" aria-label={`${title} road details`}
+      data-layer={hover.layer} style={{ left: cardLeft, top: cardTop }}>
+      <small>{title}</small>
+      <strong>{road}</strong>
+      {visibleRows.length > 0 && <dl>{visibleRows.map(({ label, text }) =>
+        <div key={label}><dt>{label}</dt><dd>{text}</dd></div>)}</dl>}
+    </aside>
+  </>;
 }

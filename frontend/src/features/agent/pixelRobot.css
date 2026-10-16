@@ -1,0 +1,35 @@
+.pixel-robot { display: inline-block; width: 48px; height: 53px; flex: 0 0 auto; pointer-events: none; }
+.pixel-robot svg { display: block; width: 100%; height: 100%; overflow: visible; image-rendering: pixelated; }
+.robot-body, .robot-head, .robot-eyes, .robot-arm, .robot-mouth { transform-box: fill-box; transform-origin: center; }
+.robot-face { transform: translateX(var(--robot-look, 0px)); transition: transform .18s ease-out; }
+.robot-smile, .robot-thoughts, .robot-spark { opacity: 0; transition: opacity .2s; }
+.pixel-robot[data-state=completed] .robot-smile { opacity: 1; }
+.pixel-robot[data-state=completed] .robot-mouth { opacity: 0; }
+.pixel-robot[data-state=thinking] .robot-thoughts { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .robot-body { animation: robot-breathe 3.2s ease-in-out infinite; }
+  .robot-eyes { animation: robot-blink 5.8s infinite; }
+  .robot-beacon { animation: robot-glow 2.4s ease-in-out infinite; }
+  .pixel-robot[data-state=thinking] .robot-head { animation: robot-ponder 2.2s ease-in-out infinite; }
+  .pixel-robot[data-state=thinking] .robot-thoughts path { animation: robot-dots 1.2s infinite; }
+  .robot-thoughts path:nth-child(2) { animation-delay: .2s !important; }
+  .robot-thoughts path:nth-child(3) { animation-delay: .4s !important; }
+  .pixel-robot[data-state=thinking] .robot-spark { animation: robot-particle 2.2s ease-in-out infinite; }
+  .pixel-robot[data-state=speaking] .robot-mouth { animation: robot-talk .18s steps(2) infinite; }
+  .pixel-robot[data-state=speaking] .robot-head { animation: robot-nod .6s ease-in-out infinite; }
+  .pixel-robot[data-state=completed] .robot-body { animation: robot-hop .7s cubic-bezier(.2,.7,.3,1) both; }
+  .pixel-robot[data-state=completed] .robot-arm-right { animation: robot-wave .24s ease-in-out 3; }
+  .pixel-robot[data-walking=true] .robot-foot-left { animation: robot-step .32s steps(2) infinite; }
+  .pixel-robot[data-walking=true] .robot-foot-right { animation: robot-step .32s steps(2) infinite reverse; }
+  @keyframes robot-breathe { 50% { transform: translateY(-1.5px) scaleY(1.015); } }
+  @keyframes robot-blink { 0%, 43%, 47%, 91%, 95%, 100% { transform: scaleY(1); } 45%, 93% { transform: scaleY(.1); } }
+  @keyframes robot-glow { 50% { opacity: .55; } }
+  @keyframes robot-ponder { 35%, 65% { transform: rotate(-6deg) translateY(-1px); } }
+  @keyframes robot-dots { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @keyframes robot-particle { 0%, 100% { opacity: 0; transform: translateY(2px); } 50% { opacity: 1; transform: translateY(-2px); } }
+  @keyframes robot-talk { 50% { transform: scale(1.25, 3); } }
+  @keyframes robot-nod { 50% { transform: translateY(1px); } }
+  @keyframes robot-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-5px); } 75% { transform: scaleY(.95); } }
+  @keyframes robot-wave { 50% { transform: rotate(-35deg) translateY(-2px); } }
+  @keyframes robot-step { 50% { transform: translateY(-2px); } }
+}

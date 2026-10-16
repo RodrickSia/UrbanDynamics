@@ -38,6 +38,23 @@
 .indicator-draw-state { margin: .75rem 0; padding: .75rem; background: var(--accent-muted); border-radius: var(--radius-control); }
 .indicator-draw-state .zoning-row { margin-top: .5rem; }
 .indicator-assumptions, .indicator-methods, .indicator-plan-report { margin: 1rem 0; }
+.indicator-bound-plan { margin: .65rem 0; color: var(--text-secondary); font-size: .78rem; }
+.indicator-toolbar-dashboard { position: relative; display: flex; align-items: center; gap: .35rem; margin: .6rem 0 .85rem; padding: .25rem; width: fit-content; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-raised); }
+.zoning-ui .indicator-toolbar-dashboard > button { width: 2.45rem; height: 2.45rem; min-height: 0; padding: 0; border: 0; background: transparent; }
+.zoning-ui .indicator-toolbar-dashboard > button[aria-pressed='true'],
+.indicator-toolbar-dashboard > .indicator-assumptions[open] > summary { color: var(--accent-strong); background: var(--accent-muted); }
+.zoning-ui .indicator-toolbar-dashboard .indicator-assumptions { margin: 0; padding: 0; border: 0; }
+.indicator-toolbar-dashboard .indicator-assumptions > summary { display: grid; place-items: center; width: 2.45rem; height: 2.45rem; border-radius: var(--radius-control); color: var(--accent-strong); list-style: none; }
+.indicator-toolbar-dashboard .indicator-assumptions > summary::-webkit-details-marker { display: none; }
+.indicator-toolbar-dashboard .indicator-assumptions > form { position: absolute; z-index: 5; top: calc(100% + .45rem); left: 0; width: min(19rem, calc(100vw - 2.5rem)); max-height: min(60dvh, 32rem); overflow: auto; padding: .85rem; border: 1px solid var(--border-strong); border-radius: var(--radius-panel); background: var(--surface-solid); box-shadow: var(--shadow-panel); }
+.zoning-ui .indicator-chart-toggle[aria-pressed='true'] { color: var(--accent-strong); background: var(--accent-muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .indicator-toolbar-dashboard > button, .indicator-toolbar-dashboard .indicator-assumptions > summary, .indicator-chart-toggle { transition: background-color .2s ease, color .2s ease, transform .28s cubic-bezier(.2,1.35,.4,1); }
+  .indicator-toolbar-dashboard > button:hover:not(:disabled), .indicator-toolbar-dashboard .indicator-assumptions > summary:hover { transform: translateY(-2px); }
+  .indicator-toolbar-dashboard > button:active:not(:disabled), .indicator-toolbar-dashboard .indicator-assumptions > summary:active { transform: scale(.91); }
+  .indicator-toolbar-dashboard > button[aria-pressed='true'] svg, .indicator-toolbar-dashboard .indicator-assumptions[open] > summary svg { animation: indicator-icon-pop .32s cubic-bezier(.2,1.35,.4,1); }
+  @keyframes indicator-icon-pop { 0% { transform: scale(.7) rotate(-9deg); } 65% { transform: scale(1.17) rotate(4deg); } 100% { transform: scale(1) rotate(0); } }
+}
 .indicator-loading { padding: 1.25rem .75rem; background: var(--surface-raised); color: var(--text-secondary); }
 .indicator-metric-table caption { text-align: left; padding: .6rem 0; font-weight: 650; }
 .indicator-metric-table th small { display: block; font-weight: 400; }
@@ -53,12 +70,30 @@
 .indicator-transit-value strong { font-size: 1.6rem; color: var(--accent-strong); white-space: nowrap; }
 .zoning-empty { padding: 1.5rem 0; }
 .zoning-plan-list, .zoning-type-list, .zoning-findings { list-style: none; padding: 0; margin: .75rem 0; }
-.zoning-plan-list li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.zoning-plan-list li { border-bottom: 1px solid var(--border); }
 .zoning-plan-list li[data-selected='true'] { background: var(--accent-muted); }
-.zoning-plan-list li > button:first-child { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; background: transparent; padding: .85rem .5rem; }
-.zoning-ui .zoning-plan-delete { flex: 0 0 auto; width: 2.3rem; padding: .4rem; border: 0; background: transparent; color: var(--warning); }
-.zoning-ui .zoning-plan-delete:hover:not(:disabled), .zoning-ui .zoning-delete-action:hover:not(:disabled) { color: var(--warning); }
-.zoning-ui .zoning-delete-action { width: 100%; margin-top: 1.5rem; color: var(--warning); border-color: var(--border); background: transparent; }
+.zoning-ui .zoning-plan-open { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; background: transparent; padding: .85rem .5rem; }
+.zoning-ui .zoning-plan-visibility { flex: 0 0 2.5rem; width: 2.5rem; height: 2.5rem; min-height: 2.5rem; padding: .35rem; border: 0; background: transparent; }
+.zoning-ui .zoning-plan-visibility[aria-pressed='true'] { color: var(--accent-strong); }
+.zoning-eye-icons { display: grid; place-items: center; width: 1.125rem; height: 1.125rem; }
+.zoning-eye-icons svg { grid-area: 1 / 1; }
+.zoning-plan-visibility[data-visible='true'] .zoning-eye-icons svg:last-child,
+.zoning-plan-visibility[data-visible='false'] .zoning-eye-icons svg:first-child { opacity: 0; transform: scale(.7); }
+.zoning-swipe-delete { position: relative; width: 100%; overflow: hidden; }
+.zoning-swipe-delete:focus-visible { outline: .15rem solid var(--accent); outline-offset: -.15rem; }
+.zoning-swipe-content { position: relative; z-index: 1; display: flex; align-items: center; width: 100%; min-height: 3.4rem; background: var(--surface-solid); touch-action: pan-y; }
+.zoning-plan-list li[data-selected='true'] .zoning-swipe-content { background: var(--accent-muted); }
+.zoning-ui .zoning-swipe-confirm { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 5.5rem; border: 0; border-radius: 0; background: var(--warning); color: white; }
+.zoning-ui .zoning-swipe-confirm:hover:not(:disabled) { background: var(--warning); filter: brightness(.9); }
+.zoning-swipe-prompt { flex: 1; padding: .75rem; color: var(--text-secondary); }
+.zoning-plan-details ~ .zoning-swipe-delete { margin-top: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius-control); }
+@media (prefers-reduced-motion: no-preference) {
+  .zoning-swipe-content { transition: width .38s cubic-bezier(.2,1.35,.4,1); }
+  .zoning-eye-icons svg { transition: opacity .22s ease, transform .38s cubic-bezier(.2,1.4,.4,1); }
+  .zoning-swipe-delete[data-jelly='true'] .zoning-swipe-content { transform-origin: right center; animation: zoning-swipe-jelly .48s ease-out both; }
+  @keyframes zoning-swipe-jelly { 0%, 100% { transform: scaleX(1); } 30% { transform: scaleX(1.045); } 60% { transform: scaleX(.985); } 82% { transform: scaleX(1.008); } }
+}
+.zoning-swipe-delete[data-dragging='true'] .zoning-swipe-content { transition: none; }
 .zoning-plan-list span { color: var(--text-secondary); }
 .zoning-plan-meta { display: flex; align-items: center; gap: .75rem; }
 .zoning-badge { display: inline-block; width: fit-content; padding: .2rem .5rem; background: var(--accent-muted); border-radius: .4rem; color: var(--accent-strong); font-size: .72rem; font-weight: 600; }
@@ -92,7 +127,30 @@
 .zoning-land-use-list { list-style: none; margin: .5rem 0; padding: 0; }
 .zoning-land-use-list li { display: flex; align-items: center; gap: .5rem; min-height: 2rem; border-bottom: 1px solid var(--border); font-size: .78rem; }
 .development-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .75rem 0; }
+.zoning-ui .development-view-switch { display: inline-flex; flex-direction: row; align-items: center; gap: .6rem; margin: 0 auto 0 0; font-weight: 650; color: var(--text); cursor: pointer; }
+.development-view-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.development-view-track { display: flex; align-items: center; width: 2.8rem; height: 1.55rem; padding: .18rem; border-radius: 1rem; background: var(--border-strong); }
+.development-view-track > span { width: 1.18rem; height: 1.18rem; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #18364a40; }
+.development-view-switch input:checked + .development-view-track { background: var(--accent-strong); }
+.development-view-switch input:checked + .development-view-track > span { transform: translateX(1.25rem); }
+.development-view-switch input:focus-visible + .development-view-track { outline: .15rem solid var(--accent); outline-offset: .15rem; }
+.development-view-switch input:disabled + .development-view-track { opacity: .5; cursor: default; }
 .development-simulation { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .75rem; }
+.simulation-actions { display: grid; gap: .55rem; margin-top: 1rem; }
+.zoning-ui .simulation-actions button { position: relative; isolation: isolate; overflow: hidden; width: 100%; min-height: 2.65rem; justify-content: center; font-weight: 650; }
+.zoning-ui .simulation-run { box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-strong) 20%, transparent); }
+.zoning-ui .simulation-history { background: var(--surface-raised); border-color: var(--border-strong); }
+.simulation-actions button svg { flex: 0 0 auto; }
+.simulation-actions button::after { content: ''; position: absolute; z-index: -1; inset: 0; background: linear-gradient(110deg, transparent 25%, #ffffff45 50%, transparent 75%); transform: translateX(-140%); }
+.simulation-hint { display: block; margin-top: .4rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .development-view-track, .development-view-track > span { transition: background-color .22s ease, transform .32s cubic-bezier(.2,1.35,.4,1); }
+  .simulation-actions button { transition: transform .22s cubic-bezier(.2,1.3,.4,1), box-shadow .22s ease; }
+  .simulation-actions button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 16px #17384d22; }
+  .simulation-actions button:active:not(:disabled) { transform: scale(.965); }
+  .simulation-actions button:hover:not(:disabled)::after { animation: simulation-sheen .65s ease-out; }
+  @keyframes simulation-sheen { to { transform: translateX(140%); } }
+}
 .development-simulation h3, .development-result-link { display: flex; align-items: center; gap: .4rem; }
 .development-simulation fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .development-simulation-status { padding: .75rem 0; font-size: .8rem; }
@@ -115,9 +173,9 @@
 .zoning-scenario-tabs button { border: 0; border-radius: var(--radius-control); background: transparent; white-space: nowrap; padding: .45rem .7rem; }
 .zoning-scenario-menu { position: absolute; right: 0; top: calc(100% + .5rem); padding: .5rem; display: flex; flex-direction: column; min-width: 13rem; border-radius: var(--radius-panel); }
 .zoning-scenario-menu button { justify-content: flex-start; border: 0; background: transparent; }
-.zoning-tools { position: absolute; z-index: 44; top: clamp(17rem, 42%, 22rem); right: calc(var(--zoning-detail-width) + 1rem); max-height: calc(100dvh - 18rem); overflow: auto; padding: .35rem; border-radius: var(--radius-panel); }
+.zoning-tools { position: absolute; z-index: 44; top: calc(1rem + 6 * var(--map-tool-size) + 4 * var(--map-tool-gap) + 2px); bottom: calc(1rem + 2 * var(--map-tool-size) + 2 * var(--map-tool-gap)); right: calc(var(--zoning-detail-width) + 1rem); width: var(--map-tool-size); overflow: auto; padding: .25rem; border-radius: var(--radius-panel); }
 .zoning-tool-rail { display: grid; gap: .15rem; }
-.zoning-ui .zoning-tool-rail button { width: 2.7rem; height: 2.7rem; min-height: 0; padding: 0; border: 0; background: transparent; }
+.zoning-ui .zoning-tool-rail button { width: 100%; height: calc(var(--map-tool-size) - .5rem); min-height: 0; padding: 0; border: 0; background: transparent; }
 .zoning-ui .zoning-tool-rail button:hover:not(:disabled), .zoning-ui .zoning-tool-rail button[aria-pressed='true'] { background: var(--accent-muted); }
 .zoning-tools.is-editing { top: auto; bottom: 1rem; left: 1rem; right: auto; width: min(26rem, calc(100vw - var(--zoning-detail-width) - 2rem)); max-height: 65dvh; overflow: auto; transform: none; padding: .8rem 1rem; }
 .zoning-tools .zoning-row > strong { flex: 1; }

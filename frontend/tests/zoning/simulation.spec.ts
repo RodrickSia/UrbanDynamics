@@ -21,7 +21,7 @@ test('saved per-floor development runs screening and native simulation, restores
   const plan = await response.json();
   const open = async () => {
     await page.getByRole('button', { name: 'Plans', exact: true }).click();
-    await page.locator('.zoning-plan-list li > button:first-child').filter({ hasText: plan.name }).click();
+    await page.locator('.zoning-plan-list .zoning-plan-open').filter({ hasText: plan.name }).click();
     await page.getByRole('button', { name: 'Development', exact: true }).click();
     await page.getByRole('combobox',{name:'Scope',exact:true}).selectOption('scenario');
   };

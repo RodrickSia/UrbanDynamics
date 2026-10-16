@@ -97,8 +97,11 @@ and `TRAFFIC_SIMULATION_TIMEOUT_SECONDS`.
 
 Set `WAREHOUSE_DATABASE`, `WAREHOUSE_USER`, and `WAREHOUSE_PASSWORD` through
 the Compose environment. The backend uses the same connection settings as ETL
-and does not run migrations. Apply warehouse migrations using the existing
-database migration runner/workflow. Optional browser origins may be listed in
+and runs the Plans/Scenario PostGIS schema and catalog bootstrap on its first
+plan-storage transaction per process. Existing plan documents are projected
+into the new tables in that transaction; later edits update the document and
+projection atomically. Other warehouse migrations use the existing database
+migration runner/workflow. Optional browser origins may be listed in
 `BACKEND_CORS_ORIGINS` as a comma-separated environment variable; same-origin
 frontend proxy requests need no CORS configuration.
 
