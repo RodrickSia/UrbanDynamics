@@ -24,6 +24,9 @@ function feature(geometry: Geometry, properties: Record<string, unknown>): Featu
 function data(bridge: ZoningBridge): FeatureCollection {
   if (!bridge.active) return EMPTY;
   const features: Feature[] = [];
+  if (!bridge.plan) for (const [id, geometry] of Object.entries(bridge.displayedPlans ?? {})) {
+    features.push(feature(geometry, { kind: 'plan-preview', id, color: AREA_COLOR, alpha: .07, width: 2.5 }));
+  }
   if (bridge.plan) features.push(feature(bridge.plan.study_area, { kind: 'study', color: AREA_COLOR, alpha: 0, width: 3 }));
   if (bridge.analysis?.active && bridge.analysis.geometry) features.push(feature(bridge.analysis.geometry,
     { kind: 'analysis', color: AREA_COLOR, alpha: .06, width: 3 }));

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Plus } from 'lucide-react';
 import { ActionDialog } from './Dialog';
 import { areaText, sketchGeometry } from './geometry';
 import type { PlanSummary } from './types';
 import type { ZoningWorkspace } from './useZoning';
+import { SwipeDeletePlan } from './SwipeDeletePlan';
 
 export function PlansPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
   const [name, setName] = useState('');
@@ -26,10 +27,16 @@ export function PlansPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
     {w.loading && <p role="status">Loading plans…</p>}
     {!w.loading && !w.plans.length && <div className="zoning-empty"><h3>No plans yet</h3><p>Draw a study area to begin.</p></div>}
     <ul className="zoning-plan-list">{w.plans.map(p => <li key={p.id} data-selected={w.plan?.id === p.id}>
-      <button disabled={w.busy} aria-current={w.plan?.id === p.id ? 'true' : undefined} onClick={() => void w.openPlan(p.id)}>
-        <strong>{p.name}</strong><span>{areaText(p.area_m2)}</span><small>{new Date(p.updated_at).toLocaleDateString()}</small>
-      </button>
-      <button className="zoning-plan-delete" aria-label={`Delete plan ${p.name}`} title="Delete plan" disabled={w.busy} onClick={() => setDeletingPlan(p)}><Trash2 size={16}/></button>
+      <SwipeDeletePlan name={p.name} disabled={w.busy} onDelete={() => setDeletingPlan(p)}>
+        <button className="zoning-plan-open" disabled={w.busy} aria-current={w.plan?.id === p.id ? 'true' : undefined} onClick={() => void w.openPlan(p.id)}>
+          <strong>{p.name}</strong><span>{areaText(p.area_m2)}</span><small>{new Date(p.updated_at).toLocaleDateString()}</small>
+        </button>
+        <button className="zoning-plan-visibility" aria-label={`${w.displayedPlans[p.id] ? 'Hide' : 'Show'} plan ${p.name} on map`}
+          aria-pressed={!!w.displayedPlans[p.id]} title={w.displayedPlans[p.id] ? 'Hide on map' : 'Show on map'}
+          disabled={w.busy || !!w.loadingPlanId} onClick={() => void w.togglePlanOnMap(p.id)}>
+          {w.displayedPlans[p.id] ? <Eye size={18} aria-hidden="true"/> : <EyeOff size={18} aria-hidden="true"/>}
+        </button>
+      </SwipeDeletePlan>
     </li>)}</ul>
     {deletingPlan && <ActionDialog title="Delete plan?" message={`Delete “${deletingPlan.name}” and all scenarios? This cannot be undone.`}
       busy={w.busy} error={w.error} onClose={() => setDeletingPlan(null)} onConfirm={async () => !!await w.deletePlan(deletingPlan.id, deletingPlan.revision)}/>}

@@ -99,9 +99,29 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
       document.querySelector('.search-dock')!.getBoundingClientRect().width -
       document.querySelector('.search-dock')!.getBoundingClientRect().left * 2,
     ))).toBeLessThan(1);
+    if (width === 320) expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.screenshot({ path: 'test-results/zoning-plans-aligned.png' });
+  await page.evaluate(() => window.dataMap.jumpTo({ center: [106.762, 10.822], zoom: 16 }));
+  const showPlan = page.getByRole('button', { name: 'Show plan Fixture plan on map' });
+  await showPlan.click();
+  await expect(page.getByRole('button', { name: 'Hide plan Fixture plan on map' })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('zoning-editor')
+    .some(feature => feature.properties.kind === 'plan-preview'))).toBe(true);
+  await page.getByRole('button', { name: 'Hide plan Fixture plan on map' }).click();
+  await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('zoning-editor')
+    .some(feature => feature.properties.kind === 'plan-preview'))).toBe(false);
+  const planRow = page.locator('.zoning-plan-list li').filter({ hasText: 'Fixture plan' });
+  const swipeBox = (await planRow.locator('.zoning-swipe-content').boundingBox())!;
+  await page.mouse.move(swipeBox.x + swipeBox.width - 30, swipeBox.y + swipeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(swipeBox.x + swipeBox.width - 125, swipeBox.y + swipeBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(planRow.locator('.zoning-swipe-delete')).toHaveAttribute('data-revealed', 'true');
+  await page.screenshot({ path: 'test-results/zoning-plan-swipe.png' });
+  await planRow.getByRole('button', { name: 'Hide delete for Fixture plan' }).click();
+  await expect(planRow.locator('.zoning-swipe-delete')).toHaveAttribute('data-revealed', 'false');
   await page.evaluate(() => window.dataMap.jumpTo({ center: [106.762, 10.821], zoom: 16 }));
   const beforeCreate = await page.evaluate(() => ({ center: window.dataMap.getCenter().toArray(), zoom: window.dataMap.getZoom() }));
   await page.getByRole('button', { name: 'New plan', exact: true }).click();
@@ -119,7 +139,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await outlines.check();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline'));
-  await page.locator('.zoning-plan-list li > button:first-child').click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').click();
   await page.waitForFunction(() => !!window.dataMap.getLayer('zoning-plan-parcels-outline'));
   await expect(page.getByLabel('Plans panel')).toHaveCount(0);
   await expect(page.getByLabel('Plan details')).toBeVisible();
@@ -146,7 +166,7 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await expect(page.getByLabel('Plans panel')).toBeVisible();
   await expect(page.getByLabel('Plan details')).toHaveCount(0);
-  await page.locator('.zoning-plan-list li > button:first-child').click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').click();
   await expect(page.getByLabel('Plan details')).toBeVisible();
   await page.screenshot({ path: 'test-results/zoning-panel-right-desktop.png' });
   await page.setViewportSize({ width: 320, height: 900 });
@@ -173,7 +193,10 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.getByRole('button', { name: 'Plan info' }).click();
   await expect(page.getByLabel('Plan details')).toContainText('Planning horizon');
   for (const action of ['Rename', 'Locate', 'Edit study area']) await expect(page.getByRole('button', { name: action, exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Delete plan', exact: true }).click();
+  await page.getByRole('button', { name: 'Plans', exact: true }).click();
+  await expect(page.getByLabel('Plans panel')).toBeVisible();
+  await page.getByRole('button', { name: 'Reveal delete for Fixture plan' }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline') && !window.dataMap.getSource('zoning-plan-parcels'));
   expect(deleted).toBe(true);

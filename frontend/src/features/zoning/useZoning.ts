@@ -10,6 +10,8 @@ const EMPTY_SKETCH: Sketch = { tool: null, points: [], geometry: null };
 export function useZoning(parcelAvailable = false, assistantBusy = false) {
   const [panel, setPanel] = useState<'plans' | 'indicators' | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
+  const [displayedPlans, setDisplayedPlans] = useState<Record<string, PolygonGeometry>>({});
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [typeId, setTypeId] = useState('');
@@ -31,6 +33,7 @@ export function useZoning(parcelAvailable = false, assistantBusy = false) {
   const [leaving, setLeaving] = useState(false);
   const leaveAction = useRef<(() => void) | null>(null);
   const pending = useRef(false);
+  const removedPlanIds = useRef(new Set<string>());
   const scenario = plan?.scenarios.find(s => s.id === scenarioId) ?? plan?.scenarios[0] ?? null;
   const readOnly = !scenario || scenario.locked || scenario.kind === 'reference';
   const chosenType = plan?.types.find(t => t.id === typeId) ?? plan?.types[0];
@@ -60,10 +63,31 @@ export function useZoning(parcelAvailable = false, assistantBusy = false) {
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
-    try { setPlans((await zoningRequest<{ plans: PlanSummary[] }>('', undefined, signal)).plans); setError(''); }
+    try {
+      const next = (await zoningRequest<{ plans: PlanSummary[] }>('', undefined, signal)).plans;
+      setPlans(next);
+      const available = new Set(next.map(item => item.id));
+      setDisplayedPlans(current => Object.fromEntries(Object.entries(current).filter(([id]) => available.has(id))));
+      setError('');
+    }
     catch (cause) { if (!signal?.aborted) setError(cause instanceof Error ? cause.message : 'Unable to load plans'); }
     finally { if (!signal?.aborted) setLoading(false); }
   }, []);
+  const togglePlanOnMap = async (id: string) => {
+    if (displayedPlans[id]) {
+      setDisplayedPlans(current => { const next = { ...current }; delete next[id]; return next; });
+      return;
+    }
+    if (loadingPlanId) return;
+    setLoadingPlanId(id);
+    try {
+      const details = await zoningRequest<Plan>(`/${encodeURIComponent(id)}`);
+      if (!removedPlanIds.current.has(id)) setDisplayedPlans(current => ({ ...current, [id]: details.study_area }));
+      setError('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to show plan on map');
+    } finally { setLoadingPlanId(null); }
+  };
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
@@ -114,8 +138,10 @@ export function useZoning(parcelAvailable = false, assistantBusy = false) {
   const deletePlan = async (id: string, revision: number) => {
     const result = await run(() => deleteZoningPlan(id, revision).then(() => true));
     if (result) {
+      removedPlanIds.current.add(id);
       if (plan?.id === id) { setPlan(null); setScenarioId(null); setSelected([]); cancel(); }
       setPlans(current => current.filter(item => item.id !== id));
+      setDisplayedPlans(current => { const next = { ...current }; delete next[id]; return next; });
     }
     return result;
   };
@@ -172,7 +198,7 @@ export function useZoning(parcelAvailable = false, assistantBusy = false) {
     if (binding.plan_id !== plan?.id) zoomTo(next.study_area);
     await refresh();
   };
-  return { panel, setPanel, active, close, plan, plans, scenario, chosenType, typeId, setTypeId, selected, pick,
+  return { panel, setPanel, active, close, plan, plans, displayedPlans, loadingPlanId, togglePlanOnMap, scenario, chosenType, typeId, setTypeId, selected, pick,
     analyzing, analysisArea, includeScenario, setIncludeScenario, useStudyArea,
     indicatorScope, setIndicatorChart, indicatorChart: analyzing && indicatorChart?.scope === indicatorScope ? indicatorChart : null,
     sketch, setSketch, begin, cancel: development.dirty ? development.cancel : cancel, preview, policy, setPolicy, finish, confirm, readOnly, opacity, setOpacity,

@@ -44,7 +44,7 @@ test('plan colors and both building providers stay within the study area and res
     : route.fulfill({ json: route.request().url().endsWith('/plan-scope-fixture') ? plan : { plans: [plan], rows: [] } }));
   await page.goto('/tests/browser/data-layers.html');
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
-  await page.locator('.zoning-plan-list li > button:first-child').click();
+  await page.locator('.zoning-plan-list .zoning-plan-open').click();
   expect(errors).toEqual([]);
   await expect.poll(() => page.evaluate(() => ({ loaded: window.dataMap.isStyleLoaded(), moving: window.dataMap.isMoving(),
     pending: Object.keys(window.dataMap.getStyle()?.sources ?? {}).filter(id => !window.dataMap.isSourceLoaded(id)) }))).toEqual({ loaded: true, moving: false, pending: [] });

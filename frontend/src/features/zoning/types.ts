@@ -56,6 +56,7 @@ export type Tool = 'study' | 'edit-study' | 'draw' | 'reshape' | 'split' | 'buil
 export interface Sketch { tool: Tool; points: Position[]; geometry: SketchGeometry | null }
 export interface ZoningBridge {
   active: boolean; plan: Plan | null; scenario: Scenario | null; selected: string[];
+  displayedPlans?: Record<string, PolygonGeometry>;
   sketch: Sketch; preview: Preview | null; opacity: number; visible: boolean; showParcels: boolean;
   parcelAvailable: boolean; busy: boolean;
   development?: DevelopmentBridge;
