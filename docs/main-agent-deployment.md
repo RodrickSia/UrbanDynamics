@@ -2,6 +2,8 @@
 
 The main web uses server 156 loopback port **51873**. Preview **51875** (local tunnel 8192) stays separate.
 
+GitHub Actions **Deploy** is a manual workflow targeting `main`. It calls the same deployment script against the persistent server checkout and private configuration; it does not delete the server env files or deploy from a temporary runner data directory. It must run on the existing server 156 Linux runner.
+
 On the existing server checkout, run:
 
 ```sh
@@ -29,3 +31,14 @@ ssh -N -L 127.0.0.1:8173:127.0.0.1:51873 nguyenmv@192.168.20.156
 ```
 
 Open `http://127.0.0.1:8173/`. The server port is bound to loopback; use a tunnel or the team's existing reverse proxy.
+
+## Verification on 16 October 2026
+
+- Merged the development simulation context and all 34 agent tools into current main, retaining main's newer SUMO fixes.
+- 82 agent/PostGIS tests and 35 traffic/development-context/zoning tests passed (117 total); frontend TypeScript/Vite build passed.
+- Deployed frontend, backend, planning worker and the existing traffic worker service; PostGIS was not recreated and no warehouse migration/ETL was run.
+- Main web and agent configuration returned HTTP 200; all 11 dataset query adapters returned HTTP 200. Empty flood/SUMO results in the tested viewport indicate missing records/results, not absence of risk.
+- Verified the robot button opens the panel, Goong map responses succeed, and no browser runtime errors occurred in Edge.
+- A real English prompt submitted with Enter completed through the model and PostGIS query tools and returned counts, two candidates and the vacancy caveat.
+- Local evidence: ignored `test-results/main-release/`, including `main-smoke.json`, `main-model.json`, and desktop/response screenshots.
+- The updated manual GitHub Deploy workflow has not itself been dispatched as part of this deployment.
