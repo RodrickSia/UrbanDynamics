@@ -491,7 +491,9 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
             "--route-files",
             "routes.xml",
             "--additional-files",
-            "additional.xml,vehicle-types.xml",
+            # duarouter includes the referenced vType definitions in routes.xml.
+            # Loading vehicle-types.xml again here causes duplicate vType IDs.
+            "additional.xml",
             "--begin",
             "0",
             "--end",

@@ -226,6 +226,7 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     assert sumo_command[sumo_command.index("--mesosim") + 1] == "true"
     assert sumo_command[sumo_command.index("--end") + 1] == "21600"
     assert sumo_command[sumo_command.index("--time-to-teleport") + 1] == "300"
+    assert sumo_command[sumo_command.index("--additional-files") + 1] == "additional.xml"
     trip_commands = [command for command in commands if command[1].endswith("randomTrips.py")]
     assert len(trip_commands) == 2
     trip_commands_by_mode = {command[command.index("--prefix") + 1]: command for command in trip_commands}
