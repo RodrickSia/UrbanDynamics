@@ -227,6 +227,10 @@ def test_run_prediction_enables_mesoscopic_sumo(tmp_path, monkeypatch):
     trips_command = next(command for command in commands if command[1].endswith("randomTrips.py"))
     assert trips_command[trips_command.index("--end") + 1] == "21600"
     assert trips_command[trips_command.index("--period") + 1] == "60.0"
+    assert trips_command[trips_command.index("--additional-file") + 1] == "vehicle-types.xml"
+    assert trips_command[trips_command.index("--edge-permission") + 1] == "passenger"
+    assert trips_command[trips_command.index("--trip-attributes") + 1] == 'type="car"'
+    assert "--vehicle-class" not in trips_command
     assert result["metadata"]["simulation_model"] == "mesoscopic-6h-min-demand-v1"
 
 
