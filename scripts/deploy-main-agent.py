@@ -93,6 +93,8 @@ def main():
     base_env = ROOT / '.env'
     if not base_env.exists():
         inherited = {k: v for k, v in env(backend).items() if k.startswith(('WAREHOUSE_', 'GOONG_', 'VITE_', 'BACKEND_', 'TRAFFIC_', 'SIMULATION_', 'PLANNING_', 'SCENARIO_', 'ZONING_')) or k == 'DATA_DIR'}
+        # Dedicated backend credentials must not enter the shared worker env.
+        inherited.pop('GOONG_REST_API_KEY', None)
         if not inherited.get('WAREHOUSE_PASSWORD'):
             raise RuntimeError('Cannot recover warehouse configuration')
         base_env.write_text(''.join(k + '=' + json.dumps(v) + '\n' for k, v in inherited.items()))
