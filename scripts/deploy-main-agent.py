@@ -57,6 +57,15 @@ def main():
             dest = backup / name
             dest.write_bytes(source.read_bytes())
             dest.chmod(0o600)
+    # The existing Actions workflow removes its generated .env after deployment.
+    # Recover only application configuration from the still-existing container.
+    base_env = ROOT / '.env'
+    if not base_env.exists():
+        inherited = {k: v for k, v in env(backend).items() if k.startswith(('WAREHOUSE_', 'GOONG_', 'VITE_', 'BACKEND_', 'TRAFFIC_', 'SIMULATION_', 'PLANNING_', 'SCENARIO_', 'ZONING_')) or k == 'DATA_DIR'}
+        if not inherited.get('WAREHOUSE_PASSWORD'):
+            raise RuntimeError('Cannot recover warehouse configuration')
+        base_env.write_text(''.join(k + '=' + json.dumps(v) + '\n' for k, v in inherited.items()))
+        base_env.chmod(0o600)
     settings = env(preview)
     agent = {key: settings[key] for key in ['OPENAI_API_KEY', 'OPENAI_MODEL', 'GOONG_REST_API_KEY', 'AGENT_ENABLED', 'AGENT_DAILY_MODEL_CALL_LIMIT', 'AGENT_MAX_ROUNDS'] if key in settings}
     if not agent.get('OPENAI_API_KEY') or not agent.get('GOONG_REST_API_KEY'):
