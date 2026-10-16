@@ -4,6 +4,7 @@ Configuration is taken from existing containers, never written to Git or stdout.
 The preview remains separate. Existing PostGIS and runtime volumes are retained.
 """
 import datetime
+import argparse
 import json
 import subprocess
 from pathlib import Path
@@ -24,6 +25,9 @@ def env(container):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--bundle', type=Path, help='Verified Git bundle when server GitHub authentication is unavailable')
+    args = parser.parse_args()
     if ROOT.name != 'UrbanDynamics' or ROOT.parent.name != 'UrbanDynamics':
         raise RuntimeError('Run only from the existing team server checkout')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
@@ -74,7 +78,11 @@ def main():
     run(['docker', 'cp', preview['Id'] + ':/runtime/agent-pois', str(backup / 'agent-pois')])
     run(['docker', 'cp', str(backup / 'agent-pois'), backend['Id'] + ':/runtime/agent-pois'])
     run(['docker', 'exec', '--user', '0', backend['Id'], 'chown', '-R', '10001:10001', '/runtime/agent-pois'])
-    run(['git', 'fetch', 'origin'], cwd=ROOT)
+    if args.bundle:
+        run(['git', 'bundle', 'verify', str(args.bundle.resolve())], cwd=ROOT)
+        run(['git', 'fetch', str(args.bundle.resolve()), 'HEAD:refs/remotes/origin/main'], cwd=ROOT)
+    else:
+        run(['git', 'fetch', 'origin'], cwd=ROOT)
     run(['git', 'switch', 'main'], cwd=ROOT)
     run(['git', 'merge', '--ff-only', 'origin/main'], cwd=ROOT)
     compose = ['docker', 'compose', '-p', 'urbandynamics', '--env-file', '.env', '--env-file', '.env.production.local', '-f', 'compose.yaml', '-f', 'compose.production-agent.yaml']

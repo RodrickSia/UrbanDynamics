@@ -10,6 +10,8 @@ python3 scripts/deploy-main-agent.py
 
 The script checks for active planning jobs, records the previous commit and image tags in `.runtime/main-release-<UTC timestamp>/`, preserves existing PostGIS/runtime volumes, fast-forwards the server checkout to `origin/main`, builds, and recreates only the application services. It does not run ETL or database migrations. The backend initializes its own application storage when used, as before.
 
+If the server cannot authenticate to GitHub, transfer a Git bundle of the already pushed main commit and pass `--bundle /absolute/path/main.bundle`. The script verifies it before fetching; no GitHub credentials need to be copied to the server.
+
 Backend credentials are copied server-to-server from the authorized preview into ignored `.env.agent.production.local` (mode 0600). They are not included in the frontend or added to Git. Only the public map tile key is a frontend build argument. Supplementary offline POIs and read-only snapshot/counting mounts are reused; preview conversations, plans and job history are not moved into main.
 
 For later manual Compose commands, include **both** env files and the override:
