@@ -10,6 +10,10 @@ On the existing server checkout, run:
 python3 scripts/deploy-main-agent.py
 ```
 
+For a UI-only change, use `python3 scripts/deploy-main-agent.py --frontend-only` (combine with `--bundle` if needed). This builds/recreates only the frontend, retains current private configuration and does not restart active simulation workers.
+
+Candidate parcel cards in the assistant now immediately focus the map using their existing geometry. Clicking a card does not call the model, fetch parcel details, change the saved analysis scope or edit the building plan.
+
 The script checks for active planning jobs, records the previous commit and image tags in `.runtime/main-release-<UTC timestamp>/`, preserves existing PostGIS/runtime volumes, fast-forwards the server checkout to `origin/main`, builds, and recreates only the application services. It does not run ETL or database migrations. The backend initializes its own application storage when used, as before.
 
 If the server cannot authenticate to GitHub, transfer a Git bundle of the already pushed main commit and pass `--bundle /absolute/path/main.bundle`. The script verifies it before fetching; no GitHub credentials need to be copied to the server.

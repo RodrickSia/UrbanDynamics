@@ -24,14 +24,45 @@ def env(container):
     return dict(item.split('=', 1) for item in container['Config']['Env'] if '=' in item)
 
 
+def update_checkout(bundle):
+    if bundle:
+        run(['git', 'bundle', 'verify', str(bundle.resolve())], cwd=ROOT)
+        run(['git', 'fetch', str(bundle.resolve()), 'HEAD:refs/remotes/origin/main'], cwd=ROOT)
+    else:
+        run(['git', 'fetch', 'origin'], cwd=ROOT)
+    run(['git', 'switch', 'main'], cwd=ROOT)
+    run(['git', 'merge', '--ff-only', 'origin/main'], cwd=ROOT)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--bundle', type=Path, help='Verified Git bundle when server GitHub authentication is unavailable')
+    parser.add_argument('--frontend-only', action='store_true', help='Update only the web UI; preserve running backend and simulation jobs')
     args = parser.parse_args()
     if ROOT.name != 'UrbanDynamics' or ROOT.parent.name != 'UrbanDynamics':
         raise RuntimeError('Run only from the existing team server checkout')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
         raise RuntimeError('Server checkout has uncommitted changes')
+    if args.frontend_only:
+        for name in ['.env', '.env.production.local', 'compose.production-agent.yaml']:
+            if not (ROOT / name).is_file():
+                raise RuntimeError('Complete the initial deployment before a frontend-only update')
+        stamp = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+        backup = ROOT / '.runtime' / ('main-frontend-release-' + stamp)
+        backup.mkdir(parents=True, mode=0o700)
+        frontend = inspect('urbandynamics-frontend-1')
+        tag = 'urbandynamics-rollback-frontend:' + stamp.lower()
+        run(['docker', 'tag', frontend['Image'], tag])
+        (backup / 'previous-commit.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True))
+        (backup / 'images.json').write_text(json.dumps({'frontend': tag}, indent=2))
+        update_checkout(args.bundle)
+        compose = ['docker', 'compose', '-p', 'urbandynamics', '--env-file', '.env', '--env-file', '.env.production.local', '-f', 'compose.yaml', '-f', 'compose.production-agent.yaml']
+        run(compose + ['config', '--quiet'], cwd=ROOT)
+        run(compose + ['build', 'frontend'], cwd=ROOT)
+        run(compose + ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '180', 'frontend'], cwd=ROOT)
+        (backup / 'deployed-commit.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True))
+        print(json.dumps({'status': 'deployed', 'scope': 'frontend', 'port': 51873, 'backup': str(backup)}))
+        return
     backend = inspect('urbandynamics-backend-1')
     frontend = inspect('urbandynamics-frontend-1')
     preview = inspect('urbandynamics-development-preview-backend-1')
@@ -87,13 +118,7 @@ def main():
     run(['docker', 'cp', preview['Id'] + ':/runtime/agent-pois', str(backup / 'agent-pois')])
     run(['docker', 'cp', str(backup / 'agent-pois'), backend['Id'] + ':/runtime/agent-pois'])
     run(['docker', 'exec', '--user', '0', backend['Id'], 'chown', '-R', '10001:10001', '/runtime/agent-pois'])
-    if args.bundle:
-        run(['git', 'bundle', 'verify', str(args.bundle.resolve())], cwd=ROOT)
-        run(['git', 'fetch', str(args.bundle.resolve()), 'HEAD:refs/remotes/origin/main'], cwd=ROOT)
-    else:
-        run(['git', 'fetch', 'origin'], cwd=ROOT)
-    run(['git', 'switch', 'main'], cwd=ROOT)
-    run(['git', 'merge', '--ff-only', 'origin/main'], cwd=ROOT)
+    update_checkout(args.bundle)
     compose = ['docker', 'compose', '-p', 'urbandynamics', '--env-file', '.env', '--env-file', '.env.production.local', '-f', 'compose.yaml', '-f', 'compose.production-agent.yaml']
     # Validate and build before recreating any live service. Never restart PostGIS.
     run(compose + ['config', '--quiet'], cwd=ROOT)

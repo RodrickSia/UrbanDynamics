@@ -53,6 +53,27 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
   const chat = useDraggableChat();
   const draft = useRef<{message:string;id:string}|null>(null);
   const end=useRef<HTMLDivElement>(null);
+  const focusCandidate = (feature: import('geojson').Feature) => {
+    const coordinates: number[][] = [];
+    const collect = (value: unknown): void => {
+      if (!Array.isArray(value)) return;
+      if (typeof value[0] === 'number' && typeof value[1] === 'number') {
+        if (Number.isFinite(value[0]) && Number.isFinite(value[1])) coordinates.push([value[0], value[1]]);
+      } else value.forEach(collect);
+    };
+    const geometry = (value: import('geojson').Geometry | null): void => {
+      if (!value) return;
+      if (value.type === 'GeometryCollection') value.geometries.forEach(geometry);
+      else collect(value.coordinates);
+    };
+    geometry(feature.geometry);
+    if (!coordinates.length) { setError('This candidate has no mapped location.'); return; }
+    const bbox = coordinates.reduce(([west,south,east,north],[x,y]) =>
+      [Math.min(west,x),Math.min(south,y),Math.max(east,x),Math.max(north,y)],
+      [Infinity,Infinity,-Infinity,-Infinity]);
+    setError('');
+    onMapAction({type:'focus',bbox});
+  };
   const binding:Binding={plan_id:w.plan?.id,revision:w.plan?.revision,scenario_id:w.scenario?.id,
     parcel_id:w.development.parcelId||undefined,building_id:w.development.selectedBuilding||undefined,dirty:w.development.dirty,viewport,map_pois:mapPois,selected_place:selectedPlace??undefined};
   const selectedIds=Object.keys(session?.development_runs??{});
@@ -149,7 +170,7 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
       </section>)}</details>}
       {!!session?.dataset_queries?.length&&<details open><summary>Dataset evidence</summary>{session.dataset_queries.map((q,i)=><section key={`${q.layer}-${i}`}><h4>{q.title}</h4><p>{q.records.length} source records · {q.status.replaceAll('_',' ')}</p>{q.records.slice(0,5).map(r=><p key={r.id}><strong>{String(r.properties.road??r.id)}</strong> · {r.distance_m.toFixed(0)} m from query area{r.properties.residential_vnd_m2!=null&&<> · residential reference: {Number(r.properties.residential_vnd_m2).toLocaleString()} VND/m²</>}{r.properties.effective_from!=null&&<> · effective {String(r.properties.effective_from)}</>}</p>)}<small>{q.interpretation}</small></section>)}</details>}
       {session?.amenity_search&&<details open><summary>Amenities near candidate sites</summary><p>{session.amenity_search.matching_in_sample} matching sites in the evaluated sample/shortlist (parcel sample: {session.amenity_search.sample_size}). {session.amenity_search.distance_method}</p>{session.amenity_search.results.map(r=><section key={r.parcel_id}><h4>Parcel {r.parcel_id} · {r.meets_all_proximity_requirements?'Meets proximity filters':'Partial match'}</h4>{Object.entries(r.amenities).map(([category,a])=><p key={category}><strong>{category}</strong>: {a.name??'No mapped match'} · {a.distance_m==null?'Unknown distance':`${a.distance_m.toFixed(0)} m`} (limit {a.maximum_distance_m} m) · {a.meets_proximity?'Pass':'Not met'}</p>)}</section>)}<small>{session.amenity_search.amenity_source.attribution} · captured {session.amenity_search.amenity_source.captured_at}</small></details>}
-      {!session?.query_features&&!!session?.candidates?.features.length&&<details open><summary>Candidate sites · vacancy unverified</summary>{session.candidates.features.map(f=><button disabled={busy} key={f.id} onClick={()=>void send(`Analyze source parcel ${f.id} as the selected analysis area and explain available evidence and gaps.`)}>Parcel {f.id} · {Math.round(Number(f.properties?.area_m2??0)).toLocaleString()} m²</button>)}</details>}
+      {!session?.query_features&&!!session?.candidates?.features.length&&<details open><summary>Candidate sites · vacancy unverified</summary>{session.candidates.features.map(f=><button type="button" key={f.id} title="Show this parcel on the map" aria-label={`Show parcel ${f.id} on map`} onClick={()=>focusCandidate(f)}>Parcel {f.id} · {Math.round(Number(f.properties?.area_m2??0)).toLocaleString()} m²</button>)}</details>}
       {!!session?.accessibility_results?.length&&<details open><summary>Travel access · Goong routes</summary>{session.accessibility_results.slice(-1).map(result=><section key={result.id}><p>{result.source} · {result.vehicle} · {result.routing_status.replaceAll('_',' ')}</p><small>{result.shortlist.parcels} shortlisted parcels; up to {result.shortlist.facilities_per_category_per_parcel} mapped facilities per category and parcel.</small>{result.rows.map(row=><section key={row.parcel_id}><h4>Parcel {row.parcel_id}</h4>{Object.entries(row.amenities).map(([category,amenity])=><div key={category}><p>{category}: {amenity.name??'Unknown mapped destination'} · {amenity.distance_m==null?'Unknown distance':`${Math.round(amenity.distance_m)} m by route`} · {amenity.duration_s==null?'Unknown time':`${(amenity.duration_s/60).toFixed(1)} min`}</p>{amenity.status==='available'&&<button disabled={busy} onClick={()=>void(async()=>{setBusy(true);try{await accept(await api<Session>(`/api/v1/agent/sessions/${session.session_id}/tools/route_show`,{arguments:{accessibility_id:result.id,parcel_id:row.parcel_id,category},workspace:binding}));}catch(e){setError(String(e));}finally{setBusy(false);}})()}>Show route to {category}</button>}</div>)}</section>)}{result.limitations.map(text=><small key={text} style={{display:'block'}}>{text}</small>)}</section>)}</details>}
       {session?.route_result&&<p>Displayed route to {session.route_result.destination_name} · {session.route_result.vehicle} · {session.route_result.distance_m==null?'Unknown distance':`${Math.round(session.route_result.distance_m)} m`} · {session.route_result.duration_s==null?'Unknown time':`${(session.route_result.duration_s/60).toFixed(1)} min`}. {session.route_result.interpretation}</p>}
       {session?.analysis_area?.scope_summary&&<details><summary>Analysis boundary</summary><p>{session.analysis_area.scope_summary.kind.replaceAll('_',' ')} · {(session.analysis_area.scope_summary.area_m2/1000000).toFixed(2)} km²{session.analysis_area.scope_summary.radius_m!=null?` · radius ${session.analysis_area.scope_summary.radius_m} m`:''}</p><small>{session.analysis_area.scope_summary.source}</small></details>}
