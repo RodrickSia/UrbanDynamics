@@ -8,7 +8,7 @@ import { DevelopmentValues } from './DevelopmentValues';
 import { DevelopmentSimulation } from './DevelopmentSimulation';
 import type { ZoningWorkspace } from './useZoning';
 
-export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWorkspace; onView?: (mode: '2d' | '3d') => void }) {
+export function DevelopmentPanel({ workspace: w, onView, viewMode }: { workspace: ZoningWorkspace; onView?: (mode: '2d' | '3d') => void; viewMode: '2d' | '3d' }) {
   const d = w.development;
   const [confirm, setConfirm] = useState<'delete' | 'demolish' | 'restore' | null>(null);
   const [coverage, setCoverage] = useState(40), [setback, setSetback] = useState(3);
@@ -20,7 +20,11 @@ export function DevelopmentPanel({ workspace: w, onView }: { workspace: ZoningWo
   return <section aria-label="Development editor">
     <div className="zoning-row"><h3>Development</h3><span className="zoning-badge">{w.readOnly ? 'Read-only' : 'Proposal'}</span></div>
     <div className="development-actions">
-      <button onClick={() => onView?.('2d')}>2D</button><button onClick={() => onView?.('3d')}>3D</button>
+      <label className="development-view-switch">3D
+        <input type="checkbox" role="switch" aria-label="3D view" checked={viewMode === '3d'} disabled={!onView}
+          onChange={event => onView?.(event.target.checked ? '3d' : '2d')}/>
+        <span className="development-view-track" aria-hidden="true"><span/></span>
+      </label>
       <button title="Undo development" aria-label="Undo development" disabled={w.busy || w.readOnly || d.dirty || !w.scenario?.can_undo_development} onClick={() => void w.execute('undo_development')}><Undo2 size={16}/></button>
       <button title="Redo development" aria-label="Redo development" disabled={w.busy || w.readOnly || d.dirty || !w.scenario?.can_redo_development} onClick={() => void w.execute('redo_development')}><Redo2 size={16}/></button>
     </div>

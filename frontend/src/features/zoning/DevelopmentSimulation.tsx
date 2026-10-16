@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Activity, Download, Play, Square } from 'lucide-react';
+import { Activity, Download, History, Play, Square } from 'lucide-react';
 import { API_BASE_URL } from '../../services/api';
 import { usePlanSimulation } from './usePlanSimulation';
 import { simulationDefaults, type SimulationSettings, type ComparisonRow } from './simulationTypes';
@@ -90,15 +90,15 @@ export function DevelopmentSimulation({ plan, scenario, parcelId, disabled, mapB
           </select></label>
           {fields.filter(([key]) => key !== 'green_open_percent' || settings.landscape_mode === 'redesign').map(([key, label, min, max]) => <label key={key}>{label}<input type="number" min={min} max={max}
             step="any" required value={Number.isFinite(settings[key]) ? settings[key] : ''} onChange={event => change(key, event.target.valueAsNumber)}/></label>)}
-          <p className="zoning-muted">Occupancy is estimated from floor use. Commercial uses Other coefficients. Physical floors still generate demand when excluded from GFA.</p>
+          <p className="zoning-muted">Occupancy follows floor use; physical floors still count when excluded from GFA. Ground cover is kept unless the design changes it. Missing ground cover and traffic counts use assumptions.</p>
         </details>
-        <p className="zoning-muted">{mode === 'screening' ? 'Estimated demand, runoff and shade. Local OSM roads are prepared when you choose a detailed run.' : 'Downloads and caches local OSM roads; compares the same road network and background traffic. Drainage remains a synthetic model.'}</p>
-        <p className="zoning-muted">{settings.landscape_mode === 'preserve' ? 'Ground cover is preserved unless building footprints change.' : 'Landscape changes apply to all open ground in the selected scope.'} Missing ground cover and traffic counts use labelled assumptions. A proposed design represents the final buildings in this scope.</p>
-        <button className="zoning-primary" type="submit" disabled={scope === 'parcel' && !parcelId}><Play size={15}/>{requesting ? 'Preparing…' : 'Run simulation'}</button>
-        {scope === 'parcel' && !parcelId && <small>Select a parcel on the map.</small>}
+        <div className="simulation-actions">
+          <button className="zoning-primary simulation-run" type="submit" disabled={scope === 'parcel' && !parcelId}><Play size={15}/>{requesting ? 'Preparing…' : 'Run simulation'}</button>
+          <button className="simulation-history" type="button" disabled={requesting || running || disabled || (scope === 'parcel' && !parcelId)} onClick={() => void simulation.loadSaved()}><History size={16}/>View last completed run</button>
+        </div>
+        {scope === 'parcel' && !parcelId && <small className="simulation-hint">Select a parcel to run.</small>}
       </fieldset>
     </form>
-    <button disabled={requesting || running || disabled || (scope === 'parcel' && !parcelId)} onClick={() => void simulation.loadSaved()}>View last completed run</button>
     {disabled && <p className="zoning-muted">Save or discard the draft before running.</p>}
     {job && <div role="status" className="development-simulation-status">
       {job.cancel_requested && running ? 'Cancellation requested' : job.status === 'queued' ? 'Queued · waiting for simulation worker' : job.status}

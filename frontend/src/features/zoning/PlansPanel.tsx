@@ -32,9 +32,10 @@ export function PlansPanel({ workspace: w }: { workspace: ZoningWorkspace }) {
           <strong>{p.name}</strong><span>{areaText(p.area_m2)}</span><small>{new Date(p.updated_at).toLocaleDateString()}</small>
         </button>
         <button className="zoning-plan-visibility" aria-label={`${w.displayedPlans[p.id] ? 'Hide' : 'Show'} plan ${p.name} on map`}
-          aria-pressed={!!w.displayedPlans[p.id]} title={w.displayedPlans[p.id] ? 'Hide on map' : 'Show on map'}
-          disabled={w.busy || !!w.loadingPlanId} onClick={() => void w.togglePlanOnMap(p.id)}>
-          {w.displayedPlans[p.id] ? <Eye size={18} aria-hidden="true"/> : <EyeOff size={18} aria-hidden="true"/>}
+          aria-pressed={!!w.displayedPlans[p.id]} aria-busy={w.loadingPlanId === p.id}
+          data-visible={!!w.displayedPlans[p.id]} title={w.displayedPlans[p.id] ? 'Hide on map' : 'Show on map'}
+          disabled={w.busy} onClick={() => void w.togglePlanOnMap(p.id)}>
+          <span className="zoning-eye-icons" aria-hidden="true"><Eye size={18}/><EyeOff size={18}/></span>
         </button>
       </SwipeDeletePlan>
     </li>)}</ul>

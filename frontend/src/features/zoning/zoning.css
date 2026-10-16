@@ -56,18 +56,26 @@
 .zoning-plan-list li { border-bottom: 1px solid var(--border); }
 .zoning-plan-list li[data-selected='true'] { background: var(--accent-muted); }
 .zoning-ui .zoning-plan-open { flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; border: 0; background: transparent; padding: .85rem .5rem; }
-.zoning-ui .zoning-plan-visibility, .zoning-ui .zoning-swipe-trigger { flex: 0 0 auto; width: 2.35rem; padding: .35rem; border: 0; background: transparent; }
+.zoning-ui .zoning-plan-visibility { flex: 0 0 2.5rem; width: 2.5rem; height: 2.5rem; min-height: 2.5rem; padding: .35rem; border: 0; background: transparent; }
 .zoning-ui .zoning-plan-visibility[aria-pressed='true'] { color: var(--accent-strong); }
+.zoning-eye-icons { display: grid; place-items: center; width: 1.125rem; height: 1.125rem; }
+.zoning-eye-icons svg { grid-area: 1 / 1; }
+.zoning-plan-visibility[data-visible='true'] .zoning-eye-icons svg:last-child,
+.zoning-plan-visibility[data-visible='false'] .zoning-eye-icons svg:first-child { opacity: 0; transform: scale(.7); }
 .zoning-swipe-delete { position: relative; width: 100%; overflow: hidden; }
+.zoning-swipe-delete:focus-visible { outline: .15rem solid var(--accent); outline-offset: -.15rem; }
 .zoning-swipe-content { position: relative; z-index: 1; display: flex; align-items: center; width: 100%; min-height: 3.4rem; background: var(--surface-solid); touch-action: pan-y; }
 .zoning-plan-list li[data-selected='true'] .zoning-swipe-content { background: var(--accent-muted); }
 .zoning-ui .zoning-swipe-confirm { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 5.5rem; border: 0; border-radius: 0; background: var(--warning); color: white; }
 .zoning-ui .zoning-swipe-confirm:hover:not(:disabled) { background: var(--warning); filter: brightness(.9); }
-.zoning-swipe-trigger svg { transition: transform .2s ease; }
-.zoning-swipe-delete[data-revealed='true'] .zoning-swipe-trigger svg { transform: rotate(180deg); }
 .zoning-swipe-prompt { flex: 1; padding: .75rem; color: var(--text-secondary); }
 .zoning-plan-details ~ .zoning-swipe-delete { margin-top: 1.5rem; border: 1px solid var(--border); border-radius: var(--radius-control); }
-@media (prefers-reduced-motion: no-preference) { .zoning-swipe-content { transition: width .25s cubic-bezier(.22,1,.36,1); } }
+@media (prefers-reduced-motion: no-preference) {
+  .zoning-swipe-content { transition: width .38s cubic-bezier(.2,1.35,.4,1); }
+  .zoning-eye-icons svg { transition: opacity .22s ease, transform .38s cubic-bezier(.2,1.4,.4,1); }
+  .zoning-swipe-delete[data-jelly='true'] .zoning-swipe-content { transform-origin: right center; animation: zoning-swipe-jelly .48s ease-out both; }
+  @keyframes zoning-swipe-jelly { 0%, 100% { transform: scaleX(1); } 30% { transform: scaleX(1.045); } 60% { transform: scaleX(.985); } 82% { transform: scaleX(1.008); } }
+}
 .zoning-swipe-delete[data-dragging='true'] .zoning-swipe-content { transition: none; }
 .zoning-plan-list span { color: var(--text-secondary); }
 .zoning-plan-meta { display: flex; align-items: center; gap: .75rem; }
@@ -102,7 +110,30 @@
 .zoning-land-use-list { list-style: none; margin: .5rem 0; padding: 0; }
 .zoning-land-use-list li { display: flex; align-items: center; gap: .5rem; min-height: 2rem; border-bottom: 1px solid var(--border); font-size: .78rem; }
 .development-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .75rem 0; }
+.zoning-ui .development-view-switch { display: inline-flex; flex-direction: row; align-items: center; gap: .6rem; margin: 0 auto 0 0; font-weight: 650; color: var(--text); cursor: pointer; }
+.development-view-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.development-view-track { display: flex; align-items: center; width: 2.8rem; height: 1.55rem; padding: .18rem; border-radius: 1rem; background: var(--border-strong); }
+.development-view-track > span { width: 1.18rem; height: 1.18rem; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #18364a40; }
+.development-view-switch input:checked + .development-view-track { background: var(--accent-strong); }
+.development-view-switch input:checked + .development-view-track > span { transform: translateX(1.25rem); }
+.development-view-switch input:focus-visible + .development-view-track { outline: .15rem solid var(--accent); outline-offset: .15rem; }
+.development-view-switch input:disabled + .development-view-track { opacity: .5; cursor: default; }
 .development-simulation { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: .75rem; }
+.simulation-actions { display: grid; gap: .55rem; margin-top: 1rem; }
+.zoning-ui .simulation-actions button { position: relative; isolation: isolate; overflow: hidden; width: 100%; min-height: 2.65rem; justify-content: center; font-weight: 650; }
+.zoning-ui .simulation-run { box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-strong) 20%, transparent); }
+.zoning-ui .simulation-history { background: var(--surface-raised); border-color: var(--border-strong); }
+.simulation-actions button svg { flex: 0 0 auto; }
+.simulation-actions button::after { content: ''; position: absolute; z-index: -1; inset: 0; background: linear-gradient(110deg, transparent 25%, #ffffff45 50%, transparent 75%); transform: translateX(-140%); }
+.simulation-hint { display: block; margin-top: .4rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .development-view-track, .development-view-track > span { transition: background-color .22s ease, transform .32s cubic-bezier(.2,1.35,.4,1); }
+  .simulation-actions button { transition: transform .22s cubic-bezier(.2,1.3,.4,1), box-shadow .22s ease; }
+  .simulation-actions button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 16px #17384d22; }
+  .simulation-actions button:active:not(:disabled) { transform: scale(.965); }
+  .simulation-actions button:hover:not(:disabled)::after { animation: simulation-sheen .65s ease-out; }
+  @keyframes simulation-sheen { to { transform: translateX(140%); } }
+}
 .development-simulation h3, .development-result-link { display: flex; align-items: center; gap: .4rem; }
 .development-simulation fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .development-simulation-status { padding: .75rem 0; font-size: .8rem; }

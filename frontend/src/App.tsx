@@ -102,7 +102,7 @@ export default function App() {
           />
         </div>
 
-        <ZoningWorkspace workspace={zoning} onActivate={activateZoning} onView={workspace.handleModeChange}
+        <ZoningWorkspace workspace={zoning} onActivate={activateZoning} onView={workspace.handleModeChange} viewMode={workspace.mode}
           searchOpen={workspace.isSearchOpen} searchPanelHeight={searchPanelHeight}/>
 
         {workspace.rightPanel === 'layers' && (

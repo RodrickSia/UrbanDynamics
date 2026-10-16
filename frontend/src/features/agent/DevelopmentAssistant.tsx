@@ -109,25 +109,16 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
     finally{setBusy(false);onBusy(false);}
   };
   const refresh=async()=>{if(session)try{setSession(await api<Session>(`/api/v1/agent/sessions/${session.session_id}`));setPollEpoch(n=>n+1);}catch(e){setError(String(e));}};
-  const exportEvidence=async()=>{
-    if(!session||busy)return;
-    try{
-      const data=await api<{tool_result:{markdown:string}}>(`/api/v1/agent/sessions/${session.session_id}/tools/urban_report`,{arguments:{},workspace:binding});
-      const url=URL.createObjectURL(new Blob([data.tool_result.markdown],{type:'text/markdown;charset=utf-8'}));
-      const link=document.createElement('a');link.href=url;link.download='urban-planning-report.md';link.click();URL.revokeObjectURL(url);
-    }catch(e){setError(String(e));}
-  };
   return <aside className="development-assistant solid-panel zoning-ui" aria-label="Planning assistant">
     <header><div><span className="eyebrow">AI WORKSPACE</span><h2><Bot size={18}/>Planning assistant</h2></div>
       <button aria-label="Close assistant" disabled={busy} onClick={onClose}><X size={17}/></button></header>
-    <div className="assistant-context"><strong>{w.plan?.name??'Urban map workspace'}</strong>
-      <span>{w.scenario?.name??'Analyze an area or find sites without opening a plan'}{w.plan?` · revision ${w.plan.revision}`:''}</span>
+    {(w.plan || session?.analysis_area || binding.parcel_id || binding.dirty) && <div className="assistant-context">
+      {w.plan && <><strong>{w.plan.name}</strong><span>{w.scenario?.name} · revision {w.plan.revision}</span></>}
       {session?.analysis_area&&<span>Analysis area: {session.analysis_area.title}</span>}
-      <small>{session?.analysis_area?'This search area is saved. Ask to use the current map view to update it.':'Name a neighborhood or street, or ask to search the visible map.'}</small>
       {session?.analysis_area?.source.includes('Nominatim')&&<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">Place lookup © OpenStreetMap contributors · Nominatim</a>}
       {binding.parcel_id&&<span>Site {binding.parcel_id}{binding.building_id?' · building selected':''}</span>}
       {binding.dirty&&<p>Save or discard your unfinished proposal before AI edits or runs.</p>}
-    </div>
+    </div>}
     <div className="assistant-scroll">
       {!session?.messages.length&&!pendingMessage&&<div className="assistant-welcome"><h3>Explore, compare and plan</h3>
         <p>Ask about an area, find sites, compare tradeoffs, review a plan or simulate a building. You can start from the visible map. Missing data stays unknown.</p>
@@ -158,7 +149,6 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
       {session?.route_result&&<p>Displayed route to {session.route_result.destination_name} · {session.route_result.vehicle} · {session.route_result.distance_m==null?'Unknown distance':`${Math.round(session.route_result.distance_m)} m`} · {session.route_result.duration_s==null?'Unknown time':`${(session.route_result.duration_s/60).toFixed(1)} min`}. {session.route_result.interpretation}</p>}
       {session?.analysis_area?.scope_summary&&<details><summary>Analysis boundary</summary><p>{session.analysis_area.scope_summary.kind.replaceAll('_',' ')} · {(session.analysis_area.scope_summary.area_m2/1000000).toFixed(2)} km²{session.analysis_area.scope_summary.radius_m!=null?` · radius ${session.analysis_area.scope_summary.radius_m} m`:''}</p><small>{session.analysis_area.scope_summary.source}</small></details>}
       {!!session?.assessments?.length&&<details open className="assistant-assessments"><summary>Site comparison · declared criteria</summary>{session.assessments.map(a=><section key={a.id}><p>{a.ranking_status.replaceAll('_',' ')}</p><table><thead><tr><th>Parcel / status</th><th>Priority score</th><th>Data gaps</th></tr></thead><tbody>{a.rows.map(row=><tr key={row.parcel_id}><td>{row.parcel_id}<small>{row.qualification.replaceAll('_',' ')}</small></td><td>{row.priority_order==null?'Not ranked':row.score?.toFixed(1)}</td><td>{row.missing_metrics.join(', ')||'See unresolved requirements'}</td></tr>)}</tbody></table><p>{a.method}</p><p>Unresolved: {a.unresolved.join('; ')}.</p></section>)}</details>}
-      {session&&<button disabled={busy} onClick={()=>void exportEvidence()}>Download evidence report</button>}
       {!!selectedIds.length&&<section className="assistant-results"><h3>Saved simulation runs</h3>
         <label>Run<select aria-label="Assistant simulation run" value={jobId} onChange={e=>setJobId(e.target.value)}><option value="">Choose a run</option>{selectedIds.map(id=><option key={id} value={id}>{id.slice(0,8)} · {jobs[id]?.status??'Loading'} · {session?.development_runs?.[id].kind==='urban_comparison'?'Site study':`r${session?.development_runs?.[id].revision}`}</option>)}</select></label>
         {jobId&&<p role="status">{currentJob?.status??'Loading'} · {jobId}</p>}
@@ -177,11 +167,9 @@ export function DevelopmentAssistant({workspace:w,onClose,onBusy,onMapAction,vie
       {config?.requires_token&&<p>This preview needs an access token configured by the administrator.</p>}
       <label className="sr-only" htmlFor="assistant-message">Message to planning assistant</label>
       <textarea id="assistant-message" value={message} disabled={busy} maxLength={4000} rows={3} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!busy&&message.trim()&&config?.enabled&&config.model_configured&&!config.requires_token)e.currentTarget.form?.requestSubmit();}}} placeholder="Ask about an area, find sites, compare options or simulate impacts…"/>
-      <small>Enter to send · Shift+Enter for a new line</small>
       <div><button type="button" disabled={busy||!session} onClick={()=>void refresh()} title="Refresh saved session"><RefreshCw size={15}/>Refresh</button>
         <button type="button" disabled={busy} onClick={()=>{setSession(null);setPendingMessage(null);setJobId('');setJobs({});setResult(undefined);setError('');draft.current=null;localStorage.removeItem('development-assistant-session');}}>New chat</button>
         <button className="zoning-primary" type="submit" disabled={busy||!message.trim()||!config?.enabled||!config.model_configured||config.requires_token}><Send size={15}/>Send</button></div>
-      <small>{config?.model??'AI'} · Scenario estimates, not surveyed capacity or planning approval.</small>
     </form>
   </aside>;
 }

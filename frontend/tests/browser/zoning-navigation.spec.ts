@@ -105,8 +105,12 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.screenshot({ path: 'test-results/zoning-plans-aligned.png' });
   await page.evaluate(() => window.dataMap.jumpTo({ center: [106.762, 10.822], zoom: 16 }));
   const showPlan = page.getByRole('button', { name: 'Show plan Fixture plan on map' });
+  const eyeBefore = await showPlan.boundingBox();
   await showPlan.click();
   await expect(page.getByRole('button', { name: 'Hide plan Fixture plan on map' })).toHaveAttribute('aria-pressed', 'true');
+  const eyeAfter = await page.getByRole('button', { name: 'Hide plan Fixture plan on map' }).boundingBox();
+  expect(eyeAfter?.x).toBe(eyeBefore?.x);
+  expect(eyeAfter?.width).toBe(eyeBefore?.width);
   await expect.poll(() => page.evaluate(() => window.dataMap.querySourceFeatures('zoning-editor')
     .some(feature => feature.properties.kind === 'plan-preview'))).toBe(true);
   await page.getByRole('button', { name: 'Hide plan Fixture plan on map' }).click();
@@ -116,11 +120,13 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   const swipeBox = (await planRow.locator('.zoning-swipe-content').boundingBox())!;
   await page.mouse.move(swipeBox.x + swipeBox.width - 30, swipeBox.y + swipeBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(swipeBox.x + swipeBox.width - 125, swipeBox.y + swipeBox.height / 2, { steps: 6 });
+  await page.mouse.move(swipeBox.x + swipeBox.width - 170, swipeBox.y + swipeBox.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect(planRow.locator('.zoning-swipe-delete')).toHaveAttribute('data-revealed', 'true');
+  await expect(planRow.locator('.zoning-swipe-delete')).toHaveAttribute('data-jelly', 'true');
   await page.screenshot({ path: 'test-results/zoning-plan-swipe.png' });
-  await planRow.getByRole('button', { name: 'Hide delete for Fixture plan' }).click();
+  await planRow.locator('.zoning-swipe-delete').focus();
+  await page.keyboard.press('Escape');
   await expect(planRow.locator('.zoning-swipe-delete')).toHaveAttribute('data-revealed', 'false');
   await page.evaluate(() => window.dataMap.jumpTo({ center: [106.762, 10.821], zoom: 16 }));
   const beforeCreate = await page.evaluate(() => ({ center: window.dataMap.getCenter().toArray(), zoom: window.dataMap.getZoom() }));
@@ -158,7 +164,13 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   await page.getByRole('button', { name: 'Scenario A', exact: true }).click();
   await expect(page.getByLabel('Overlap policy')).toHaveValue('preserve');
   await page.getByRole('button', { name: 'Development' }).click();
-  await expect(page.getByLabel('Plan details')).toContainText('Select a parcel on the map.');
+  await expect(page.getByLabel('Plan details')).toContainText('Select a parcel to run.');
+  const viewSwitch = page.getByRole('switch', { name: '3D view' });
+  await viewSwitch.check();
+  await expect(viewSwitch).toBeChecked();
+  await viewSwitch.uncheck();
+  await expect(viewSwitch).not.toBeChecked();
+  await page.screenshot({ path: 'test-results/zoning-development-controls.png' });
   await page.getByRole('button', { name: 'Zoning', exact: true }).click();
   const scenarioBox = await page.locator('.zoning-scenario-bar').boundingBox();
   const navigationBox = await page.locator('.navigation-cluster').boundingBox();
@@ -195,7 +207,8 @@ test('study-area outlines appear, follow the toggle, and disappear when the acti
   for (const action of ['Rename', 'Locate', 'Edit study area']) await expect(page.getByRole('button', { name: action, exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Plans', exact: true }).click();
   await expect(page.getByLabel('Plans panel')).toBeVisible();
-  await page.getByRole('button', { name: 'Reveal delete for Fixture plan' }).click();
+  await planRow.locator('.zoning-swipe-delete').focus();
+  await page.keyboard.press('Delete');
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
   await page.waitForFunction(() => !window.dataMap.getLayer('zoning-plan-parcels-outline') && !window.dataMap.getSource('zoning-plan-parcels'));
