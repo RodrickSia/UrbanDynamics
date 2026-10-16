@@ -173,9 +173,9 @@
 .zoning-scenario-tabs button { border: 0; border-radius: var(--radius-control); background: transparent; white-space: nowrap; padding: .45rem .7rem; }
 .zoning-scenario-menu { position: absolute; right: 0; top: calc(100% + .5rem); padding: .5rem; display: flex; flex-direction: column; min-width: 13rem; border-radius: var(--radius-panel); }
 .zoning-scenario-menu button { justify-content: flex-start; border: 0; background: transparent; }
-.zoning-tools { position: absolute; z-index: 44; top: clamp(17rem, 42%, 22rem); right: calc(var(--zoning-detail-width) + 1rem); max-height: calc(100dvh - 18rem); overflow: auto; padding: .35rem; border-radius: var(--radius-panel); }
+.zoning-tools { position: absolute; z-index: 44; top: calc(1rem + 6 * var(--map-tool-size) + 4 * var(--map-tool-gap) + 2px); bottom: calc(1rem + 2 * var(--map-tool-size) + 2 * var(--map-tool-gap)); right: calc(var(--zoning-detail-width) + 1rem); width: var(--map-tool-size); overflow: auto; padding: .25rem; border-radius: var(--radius-panel); }
 .zoning-tool-rail { display: grid; gap: .15rem; }
-.zoning-ui .zoning-tool-rail button { width: 2.7rem; height: 2.7rem; min-height: 0; padding: 0; border: 0; background: transparent; }
+.zoning-ui .zoning-tool-rail button { width: 100%; height: calc(var(--map-tool-size) - .5rem); min-height: 0; padding: 0; border: 0; background: transparent; }
 .zoning-ui .zoning-tool-rail button:hover:not(:disabled), .zoning-ui .zoning-tool-rail button[aria-pressed='true'] { background: var(--accent-muted); }
 .zoning-tools.is-editing { top: auto; bottom: 1rem; left: 1rem; right: auto; width: min(26rem, calc(100vw - var(--zoning-detail-width) - 2rem)); max-height: 65dvh; overflow: auto; transform: none; padding: .8rem 1rem; }
 .zoning-tools .zoning-row > strong { flex: 1; }

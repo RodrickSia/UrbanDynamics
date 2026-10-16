@@ -1,5 +1,5 @@
-.agent-launcher { position: relative; display: grid; place-items: center; width: 56px; height: 64px; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--accent-strong); border-radius: var(--radius-control); touch-action: manipulation; }
-.agent-launcher .pixel-robot { width: 52px; height: 57px; }
+.agent-launcher { position: relative; display: grid; place-items: center; width: var(--map-tool-size); height: var(--map-tool-size); padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--accent-strong); border-radius: var(--radius-control); touch-action: manipulation; }
+.agent-launcher .pixel-robot { width: calc(var(--map-tool-size) - .25rem); height: calc(var(--map-tool-size) - .25rem); }
 .agent-walker { display: block; }
 .agent-launcher-label { position: absolute; right: calc(100% + 8px); white-space: nowrap; padding: 5px 9px; border-radius: var(--radius-control); background: var(--surface-solid, white); color: var(--text-primary); box-shadow: var(--shadow-panel); font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; transform: translateX(4px); }
 .agent-launcher:hover .agent-launcher-label, .agent-launcher:focus-visible .agent-launcher-label { opacity: 1; transform: translateX(0); }
@@ -8,5 +8,5 @@
   .agent-launcher:not([data-open=true]) .agent-walker { animation: agent-stroll 8s ease-in-out infinite; }
   .agent-launcher:hover .agent-walker, .agent-launcher:focus-visible .agent-walker { animation-play-state: paused; }
   .agent-launcher:active .pixel-robot { transform: scale(.93); }
-  @keyframes agent-stroll { 0%, 15%, 85%, 100% { transform: translateX(0); } 40%, 60% { transform: translateX(-18px); } }
+  @keyframes agent-stroll { 0%, 15%, 85%, 100% { transform: translate(0, 0); } 40% { transform: translate(-2px, -2px); } 60% { transform: translate(2px, -2px); } }
 }
