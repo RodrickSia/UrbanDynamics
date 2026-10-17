@@ -9,6 +9,7 @@ export type ExtraName = 'piling' | 'design' | 'permit' | 'special';
 export interface CostSettings {
   version: 1; profile: CostProfile; building_overrides: Record<string, CostProfile>;
   demolition_rate: number | null; demolition_area_m2: number | null; demolition_included: boolean;
+  demolition_floor_height_m?: number;
   demolition_source: string; extras: Partial<Record<ExtraName, { amount: number; included: boolean }>>;
   vat_included: boolean; vat_pct: number; reserve_pct: number;
 }
@@ -17,10 +18,12 @@ export interface ConstructionCostReport {
   status: 'estimate' | 'incomplete'; construction: number; demolition: number | null; extras: number;
   subtotal: number; vat: number; reserve: number; known_total: number; total: number | null;
   demolition_basis: string; warnings: string[];
+  demolition_default_rate?: number; demolition_rate?: number; demolition_area_m2?: number | null;
   buildings: { id: string; name: string; parcel_id: string; physical_floor_m2: number; converted_m2: number;
     unit_price: number | null; adjustment: number; base: number | null; total: number | null;
     source: string; area_source: string; components: {name: string; area_m2: number; factor: number}[] }[];
-  demolitions: { id: string; name: string; area_m2: number | null; cost: number | null; total: number | null; source: string }[];
+  demolitions: { id: string; name: string; area_m2: number | null; cost: number | null; total: number | null; source: string;
+    footprint_m2?: number; floors?: number | null; height_m?: number | null; floor_basis?: string }[];
 }
 export const costPackages = [
   ['shell', 'Shell + finishing labor', 3600000], ['standard', 'Standard turnkey', 5300000],

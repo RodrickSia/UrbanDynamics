@@ -5,6 +5,8 @@ from pydantic import Field, model_validator
 
 from .models import Input
 
+DEFAULT_DEMOLITION_RATE = 200000
+
 
 class CostArea(Input):
     name: str = Field(min_length=1, max_length=120)
@@ -44,9 +46,10 @@ class CostSettings(Input):
     profile: CostProfile = Field(default_factory=CostProfile)
     building_overrides: dict[str, CostProfile] = Field(default_factory=dict, max_length=500)
     demolition_rate: float | None = Field(default=None, ge=0, le=1e9)
+    demolition_floor_height_m: float = Field(default=3.2, ge=2, le=10)
     demolition_area_m2: float | None = Field(default=None, ge=0, le=1e8)
     demolition_included: bool = False
-    demolition_source: str = Field(default='User demolition quote required', min_length=1, max_length=1000)
+    demolition_source: str = Field(default='App estimate; replace with contractor quote', min_length=1, max_length=1000)
     extras: dict[Literal['piling', 'design', 'permit', 'special'], ExtraCost] = Field(default_factory=dict)
     vat_included: bool = False
     vat_pct: float = Field(default=0, ge=0, le=100)

@@ -19,7 +19,11 @@ Settings apply to the scenario with optional building-specific profiles. Piling,
 
 Saved demolition masks are land extents, never assumed to be building floor area. Their union queries the generated baseline inventory once; duplicate footprints are removed. Only intersecting footprint area × baseline floors is counted. Generated footprints/floors are estimates and partial demolition needs a surveyed quote. Goong visual meshes are not an authoritative demolition inventory.
 
-Missing inventory, unrepresented masks, unknown floors or missing rates produce an **incomplete** total with known costs shown separately. Users can override total demolition floor area, enter its source and unit price, or mark demolition already included in construction. Without demolition masks there is no demolition charge.
+Demolition area defaults to **Automatic**. Recorded floors take priority; if absent, positive building height is divided by an editable assumed floor height (initially 3.2 m), rounded to the nearest whole floor (minimum one). Each row exposes footprint, floor count and whether height estimation was used. Width alone is insufficient: mapped footprint geometry supplies actual floor-plate area. Missing inventory, unrepresented masks or missing both height and floors keep the total **incomplete**.
+
+The automatic demolition unit rate is **200,000 VND/m² of floor area**, an app budgeting assumption, not a verified contractor quote. `demolition_rate: null` selects this default, including previously saved nulls; explicit rates (including zero) are preserved. Users can edit the rate or reset it to Automatic, configure assumed floor height, choose a custom total floor area, or mark demolition already included in construction. Settings persist per scenario through the existing revision-aware command. Saving recalculates from current demolition masks; restoring a parcel removes its demolition charge. No demolition masks means no charge.
+
+The costs API includes `demolition_default_rate`, effective `demolition_rate`, and aggregate `demolition_area_m2` (null when incomplete or included). The assumptions form and each demolition row show the calculation basis. Existing Goong-only buildings still require a manual area when no corresponding server inventory is available.
 
 ## Storage/API
 

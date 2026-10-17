@@ -39,8 +39,11 @@ export function ConstructionCosts({plan, scenario, onSave, busy}: {
             <p className="zoning-muted">{row.source}<br/>{row.area_source}</p></div>
         </details>)}
         {!!data.demolitions.length && <details className="cost-building"><summary><Hammer size={17}/><span>Demolition · {data.demolitions.length}</span><strong>{costMoney(data.demolition)}</strong></summary>
+          <p className="zoning-muted">{data.demolition_basis === 'user_area' ? 'Custom area' : 'Automatic area'} · {costArea(data.demolition_area_m2 ?? null)} × {costMoney(data.demolition_rate ?? data.settings.demolition_rate)}/m²</p>
           <div className="cost-building-details">{data.demolitions.map(row => <div className="cost-demolition" key={row.id}>
             <b>{row.name}</b><span>{costArea(row.area_m2)} · {costMoney(row.total)}</span><small>{row.source}</small>
+            {row.footprint_m2 !== undefined && <small>{costArea(row.footprint_m2)} × {row.floors ?? '?'} floors
+              {row.floor_basis === 'height_estimate' ? ` · estimated from ${row.height_m} m height` : ''}</small>}
           </div>)}</div></details>}
         <details className="cost-assumptions"><summary><SlidersHorizontal size={16}/>Budget assumptions</summary>
           <CostSettingsEditor report={data} onSave={onSave} disabled={busy || scenario.locked || scenario.kind === 'reference'}/></details>

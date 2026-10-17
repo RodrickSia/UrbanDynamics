@@ -1,15 +1,30 @@
 """Scenario construction budget. All areas use metric geometry, never land area as GFA."""
 from decimal import Decimal, ROUND_HALF_UP
+from math import isfinite
 
 from shapely.ops import unary_union
 
 from . import baseline
-from .cost_models import CostSettings
+from .cost_models import CostSettings, DEFAULT_DEMOLITION_RATE
 from .geometry import geojson, projected
 
 
 def money(value):
     return int(Decimal(str(value)).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+
+
+def demolition_rate(settings):
+    return DEFAULT_DEMOLITION_RATE if settings.demolition_rate is None else settings.demolition_rate
+
+
+def demolition_floors(record, floor_height):
+    floors = record.get('floors')
+    if floors is not None and isfinite(floors) and floors > 0:
+        return floors, 'source_floors'
+    height = record.get('height_m')
+    if height is not None and isfinite(height) and height > 0:
+        return max(1, money(height / floor_height)), 'height_estimate'
+    return None, 'unknown'
 
 
 def demolition(plan, scenario, settings):
@@ -38,9 +53,11 @@ def demolition(plan, scenario, settings):
                 continue
             seen.add(fingerprint)
             shapes.append(shape)
-            floors = record.get('floors')
+            floors, floor_basis = demolition_floors(record, settings.demolition_floor_height_m)
             rows.append({'id': record['id'], 'name': f"Existing building {len(rows)+1}",
-                         'area_m2': shape.area * floors if floors and floors > 0 else None,
+                         'area_m2': shape.area * floors if floors is not None else None,
+                         'footprint_m2': shape.area, 'floors': floors, 'floor_basis': floor_basis,
+                         'height_m': record.get('height_m'),
                          'source': record.get('source') or 'Generated baseline; estimated floors'})
         complete = bool(rows) and all(row['area_m2'] is not None for row in rows)
         complete = complete and all(any(shape.intersection(projected(mask['geometry'])).area > .01
@@ -49,12 +66,9 @@ def demolition(plan, scenario, settings):
         warnings.append('Demolition uses generated buildings within the masks; verify coverage and floor area.')
         if not complete:
             warnings.append('Demolition floor area is incomplete. Enter the surveyed total to complete the estimate.')
-    if settings.demolition_rate is None:
-        warnings.append('Enter a demolition rate in VND/m².')
-        complete = False
+    rate = demolition_rate(settings)
     for row in rows:
-        row['cost'] = (money(row['area_m2'] * settings.demolition_rate)
-                       if row['area_m2'] is not None and settings.demolition_rate is not None else None)
+        row['cost'] = money(row['area_m2'] * rate) if row['area_m2'] is not None else None
     return rows, sum(row['cost'] or 0 for row in rows) if complete else None, basis, warnings
 
 
@@ -102,6 +116,9 @@ def calculate(plan, scenario, settings: CostSettings):
         row['total'] = money(row['cost'] * multiplier) if row['cost'] is not None else None
     complete = demolition_cost is not None and all(row['base'] is not None for row in rows)
     return {'settings': settings.model_dump(), 'currency': 'VND', 'status': 'estimate' if complete else 'incomplete',
+            'demolition_default_rate': DEFAULT_DEMOLITION_RATE, 'demolition_rate': demolition_rate(settings),
+            'demolition_area_m2': (sum(row['area_m2'] for row in demolition_rows)
+                                   if demolition_cost is not None and basis != 'included' else None),
             'buildings': rows, 'demolitions': demolition_rows, 'demolition_basis': basis,
             'construction': construction, 'demolition': demolition_cost, 'extras': extras,
             'subtotal': subtotal, 'vat': vat, 'reserve': reserve, 'known_total': subtotal + vat + reserve,

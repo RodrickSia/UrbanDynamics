@@ -43,6 +43,31 @@ test('shows missing demolition as incomplete and retries API failures', async ({
   await expect(page.getByText('Test indicators unavailable')).toBeVisible();
 });
 
+test('offers automatic demolition and saves editable rate and height assumptions', async ({page}) => {
+  await page.route('**/api/v1/zoning/plans/*/costs?*', route => route.fulfill({json:{...fixture.report,
+    demolition_default_rate:200000,demolition_rate:200000,demolition_area_m2:240,
+    settings:{...fixture.report.settings,demolition_rate:null,demolition_area_m2:null,demolition_floor_height_m:3.2}}}));
+  const toggle=page.getByRole('button',{name:'Construction costs',exact:true});
+  await toggle.click();await toggle.click();
+  await page.getByText('Budget assumptions',{exact:true}).first().click();
+  await page.locator('.cost-settings summary').filter({hasText:/^Demolition$/}).click();
+  await expect(page.getByRole('combobox',{name:'Demolition area',exact:true})).toHaveValue('auto');
+  await expect(page.getByLabel('Demolition (VND/m²)',{exact:true})).toHaveValue('200000');
+  await page.getByRole('combobox',{name:'Demolition area',exact:true}).selectOption('custom');
+  await expect(page.getByLabel('Total demolition floor area (m²)',{exact:true})).toHaveValue('240');
+  await page.getByRole('combobox',{name:'Demolition area',exact:true}).selectOption('auto');
+  await page.getByLabel('Demolition (VND/m²)',{exact:true}).fill('300000');
+  await page.getByRole('button',{name:/Reset to/}).click();
+  await expect(page.getByLabel('Demolition (VND/m²)',{exact:true})).toHaveValue('200000');
+  await page.getByLabel('Demolition (VND/m²)',{exact:true}).fill('250000');
+  await page.getByLabel('Estimated floor height (m)',{exact:true}).fill('4');
+  await page.screenshot({path:'test-results/demolition-settings.png'});
+  await page.route('**/api/v1/zoning/plans/cost-plan/commands', route => route.fulfill({json:{...fixture.plan,revision:2}}));
+  const request=page.waitForRequest('**/api/v1/zoning/plans/cost-plan/commands');
+  await page.getByRole('button',{name:'Save budget'}).click();
+  expect((await request).postDataJSON().payload).toMatchObject({demolition_rate:250000,demolition_area_m2:null,demolition_floor_height_m:4});
+});
+
 for (const width of [320,768,1024,1440]) test(`budget fits ${width}px with stable toolbar and no console errors`, async ({page}) => {
   const errors:string[]=[];
   page.on('pageerror',error => errors.push(error.message));

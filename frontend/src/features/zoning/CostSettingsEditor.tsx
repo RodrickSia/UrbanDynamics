@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Save } from 'lucide-react';
 import { CostNumber, CostProfileEditor } from './CostProfileEditor';
-import type { ConstructionCostReport, CostSettings, ExtraName } from './costTypes';
+import { costArea, costMoney, type ConstructionCostReport, type CostSettings, type ExtraName } from './costTypes';
 
 export function CostSettingsEditor({report, onSave, disabled}: {
   report: ConstructionCostReport; onSave: (value: CostSettings) => Promise<boolean>; disabled: boolean;
@@ -13,6 +13,7 @@ export function CostSettingsEditor({report, onSave, disabled}: {
   const profile = scope ? draft.building_overrides[scope] ?? draft.profile : draft.profile;
   const patch = (next: Partial<CostSettings>) => setDraft(previous => ({...previous, ...next}));
   const dirty = JSON.stringify(draft) !== JSON.stringify(report.settings);
+  const defaultRate = report.demolition_default_rate ?? 200000;
   return <form className="cost-settings" onSubmit={async e => {
     e.preventDefault(); if (saving) return;
     setSaving(true); setError('');
@@ -36,13 +37,24 @@ export function CostSettingsEditor({report, onSave, disabled}: {
           ? patch({building_overrides:{...draft.building_overrides,[scope]:next}}) : patch({profile:next})}/>
       </fieldset>
       <details><summary>Demolition</summary>
-        <p className="zoning-muted">Only buildings in saved demolition masks. The area override replaces the entire demolition floor area.</p>
+        <p className="zoning-muted">Saved demolition area: {costArea(report.demolition_area_m2 ?? null)} · footprint × floors.</p>
         <label className="zoning-check"><input type="checkbox" checked={draft.demolition_included}
           onChange={e => patch({demolition_included:e.target.checked})}/>Included in construction quote</label>
-        <CostNumber label="Demolition (VND/m²)" optional max={1e9} disabled={draft.demolition_included}
-          value={draft.demolition_rate} onChange={demolition_rate => patch({demolition_rate})}/>
-        <CostNumber label="Total demolition floor area (m²)" optional max={1e8} disabled={draft.demolition_included}
-          value={draft.demolition_area_m2} onChange={demolition_area_m2 => patch({demolition_area_m2})}/>
+        <CostNumber label="Demolition (VND/m²)" max={1e9} disabled={draft.demolition_included}
+          value={draft.demolition_rate ?? defaultRate} onChange={demolition_rate => patch({demolition_rate})}/>
+        <div className="zoning-row"><small className="zoning-muted">{draft.demolition_rate === null ? 'Automatic · app assumption' : 'Custom rate'}</small>
+          <button type="button" disabled={draft.demolition_included || draft.demolition_rate === null}
+            onClick={() => patch({demolition_rate:null})}>Reset to {costMoney(defaultRate)}/m²</button></div>
+        <label>Demolition area<select disabled={draft.demolition_included} value={draft.demolition_area_m2 === null ? 'auto' : 'custom'}
+          onChange={e => patch({demolition_area_m2:e.target.value === 'auto' ? null : report.demolition_area_m2 ?? 0})}>
+          <option value="auto">Automatic · demolished buildings</option><option value="custom">Custom total floor area</option>
+        </select></label>
+        {draft.demolition_area_m2 === null
+          ? <CostNumber label="Estimated floor height (m)" min={2} max={10} disabled={draft.demolition_included}
+              value={draft.demolition_floor_height_m ?? 3.2} onChange={n => patch({demolition_floor_height_m:n!})}/>
+          : <CostNumber label="Total demolition floor area (m²)" max={1e8} disabled={draft.demolition_included}
+              value={draft.demolition_area_m2} onChange={demolition_area_m2 => patch({demolition_area_m2})}/>}
+        <small className="zoning-muted">Recorded floors take priority. Otherwise, floors are estimated from building height. Save to recalculate.</small>
         <label>Demolition source<input required maxLength={1000} value={draft.demolition_source} onChange={e => patch({demolition_source:e.target.value})}/></label>
       </details>
       <details><summary>Extras · once per scenario</summary>

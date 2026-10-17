@@ -94,6 +94,73 @@ def test_unknown_demolition_never_becomes_a_zero_total(monkeypatch):
     assert fixed['demolition_basis'] == 'user_area'
 
 
+def test_demolition_defaults_to_automatic_rate_and_estimates_floors_from_height(monkeypatch):
+    geometry = building()['geometry']
+    monkeypatch.setattr(costs.baseline, 'buildings', lambda *_: [
+        {'id': 'old', 'geometry': geometry, 'floors': None, 'height_m': 9.6}])
+    scenario = {'kind': 'proposal', 'demolition_masks': [{'geometry': rectangle()}]}
+    result = costs.calculate({'study_area': rectangle()}, scenario, CostSettings())
+    row = result['demolitions'][0]
+    assert row['floors'] == 3
+    assert row['floor_basis'] == 'height_estimate'
+    assert row['area_m2'] == pytest.approx(projected(geometry).area * 3)
+    assert result['demolition_rate'] == 200000
+    assert result['total'] == round(row['area_m2'] * 200000)
+
+
+def test_demolition_prefers_source_floors_and_preserves_custom_zero_rate(monkeypatch):
+    monkeypatch.setattr(costs.baseline, 'buildings', lambda *_: [
+        {'id': 'old', 'geometry': building()['geometry'], 'floors': 2, 'height_m': 12.8}])
+    scenario = {'kind': 'proposal', 'demolition_masks': [{'geometry': rectangle()}]}
+    result = costs.calculate({'study_area': rectangle()}, scenario, CostSettings(demolition_rate=0))
+    assert result['demolitions'][0]['floors'] == 2
+    assert result['demolitions'][0]['floor_basis'] == 'source_floors'
+    assert result['demolition'] == 0
+
+
+def test_legacy_null_rate_becomes_automatic_but_missing_dimensions_stay_unknown(monkeypatch):
+    monkeypatch.setattr(costs.baseline, 'buildings', lambda *_: [
+        {'id': 'old', 'geometry': building()['geometry'], 'floors': None, 'height_m': None}])
+    scenario = {'kind': 'proposal', 'demolition_masks': [{'geometry': rectangle()}]}
+    result = costs.calculate({'study_area': rectangle()}, scenario,
+        CostSettings.model_validate({'demolition_rate': None}))
+    assert result['demolition_rate'] == 200000
+    assert result['total'] is None
+
+
+def test_demolition_custom_height_changes_inferred_area_and_manual_area_takes_priority(monkeypatch):
+    geometry = building()['geometry']
+    monkeypatch.setattr(costs.baseline, 'buildings', lambda *_: [
+        {'id': 'old', 'geometry': geometry, 'height_m': 12}])
+    scenario = {'kind': 'proposal', 'demolition_masks': [{'geometry': rectangle()}]}
+    result = costs.calculate({'study_area': rectangle()}, scenario,
+        CostSettings(demolition_floor_height_m=4, demolition_rate=300000))
+    assert result['demolition_area_m2'] == pytest.approx(projected(geometry).area * 3)
+    assert result['demolition'] == round(result['demolition_area_m2'] * 300000)
+    manual = costs.calculate({'study_area': rectangle()}, scenario,
+        CostSettings(demolition_area_m2=100))
+    assert manual['demolition'] == 20000000
+    assert manual['demolition_area_m2'] == 100
+
+
+def test_demolition_settings_persist_and_automatic_defaults_apply_to_api(client, plan, parcel_source, monkeypatch):
+    monkeypatch.setattr(costs.baseline, 'buildings', lambda *_: [
+        {'id': 'old', 'geometry': building()['geometry'], 'height_m': 12}])
+    plan = command(client, plan, 'demolish_parcel', {'parcel_id': '3885881', 'confirm': True})
+    plan = command(client, plan, 'save_cost_settings', {'demolition_rate': 250000, 'demolition_floor_height_m':4})
+    def report():
+        return client.get(f"/api/v1/zoning/plans/{plan['id']}/costs", params={
+            'scenario_id':plan['scenarios'][1]['id'], 'revision':plan['revision']}).json()
+    assert report()['demolition_rate'] == 250000
+    assert report()['demolitions'][0]['floors'] == 3
+    plan = command(client, plan, 'save_cost_settings', {'demolition_rate': None})
+    assert report()['demolition_rate'] == 200000
+    assert report()['demolitions'][0]['floors'] == 4
+    plan = command(client, plan, 'restore_parcel', {'parcel_id': '3885881', 'confirm': True})
+    assert report()['demolition'] == 0
+    assert report()['demolition_area_m2'] == 0
+
+
 def test_reference_has_no_construction_bill():
     result = costs.calculate({'study_area': rectangle()}, {'kind': 'reference'}, CostSettings())
     assert result['total'] == 0
