@@ -5,11 +5,14 @@ export class ZoningRequestError extends Error {
 }
 
 export async function zoningRequest<T>(path = '', body?: unknown, signal?: AbortSignal): Promise<T> {
+  // Preparing local OSM roads happens before the server returns the queued job.
+  const timeoutMs = /\/simulation\/(runs|studies)(?:\?|$)/.test(path) ? 120_000 : 20_000;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const response = await fetch(`${API_BASE_URL}/api/v1/zoning/plans${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
+    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
