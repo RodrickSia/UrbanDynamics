@@ -1,0 +1,31 @@
+.construction-costs { min-width: 0; }
+.cost-total { display: grid; gap: .35rem; padding: 1rem; background: var(--accent-muted); border: 1px solid var(--border); border-radius: var(--radius-control); }
+.cost-total > span, .cost-total > small { color: var(--text-secondary); font-size: .8rem; }
+.cost-total > strong { color: var(--accent-strong); font-size: clamp(1.2rem, 3vw, 1.6rem); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.cost-breakdown { display: grid; gap: .5rem; margin: .8rem 0; }
+.cost-breakdown > div { display: flex; justify-content: space-between; gap: .5rem; font-size: .82rem; }
+.cost-breakdown dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cost-building, .cost-assumptions { border-top: 1px solid var(--border); padding: .7rem 0; }
+.cost-building > summary, .cost-assumptions > summary { display: flex; align-items: center; gap: .5rem; cursor: pointer; font-size: .85rem; }
+.cost-building > summary svg { flex-shrink: 0; }
+.cost-building > summary span { min-width: 0; overflow-wrap: anywhere; }
+.cost-building > summary strong { margin-left: auto; text-align: right; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.cost-building-details { padding: .5rem 0; font-size: .82rem; overflow-wrap: anywhere; }
+.cost-demolition { display: grid; gap: .3rem; padding: .6rem 0; border-bottom: 1px solid var(--border); }
+.cost-settings fieldset { min-width: 0; margin: 0; padding: .6rem 0; border: 0; }
+.cost-settings .cost-area-item { padding: .6rem; border: 1px solid var(--border); border-radius: var(--radius-control); margin: .7rem 0; }
+.cost-settings legend { font-size: .8rem; font-weight: 600; }
+.cost-settings > fieldset > legend, .cost-settings .cost-profile-fields > legend { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.cost-settings details { padding: .7rem 0; border-top: 1px solid var(--border); }
+.cost-settings details > summary { font-size: .85rem; cursor: pointer; }
+.cost-settings label { min-width: 0; }
+.cost-settings input, .cost-settings select { min-width: 0; max-width: 100%; }
+.cost-settings .zoning-check input { width: auto; flex-shrink: 0; }
+.cost-extra { padding: .35rem 0; }
+.cost-notes { padding-left: 1.1rem; font-size: .78rem; line-height: 1.5; color: var(--text-secondary); }
+.cost-notes li + li { margin-top: .4rem; }
+.cost-formula { padding: .7rem; border: 1px solid var(--border); border-radius: var(--radius-control); font-size: .75rem; line-height: 1.5; }
+@media (prefers-reduced-motion: no-preference) {
+  .construction-costs { animation: cost-panel-enter .25s ease-out both; }
+  @keyframes cost-panel-enter { from { opacity: 0; transform: translateY(.4rem); } to { opacity: 1; transform: none; } }
+}

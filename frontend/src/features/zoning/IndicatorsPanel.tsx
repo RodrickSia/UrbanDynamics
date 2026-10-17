@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Check, Pentagon, RotateCcw, X, Layers, SlidersHorizontal, ChartColumnIncreasing } from 'lucide-react';
+import { Check, Pentagon, RotateCcw, X, Layers, SlidersHorizontal, ChartColumnIncreasing, Coins } from 'lucide-react';
+import { ConstructionCosts } from './ConstructionCosts';
 import { API_BASE_URL } from '../../services/api';
 import { AreaIndicatorResults } from './AreaIndicatorResults';
 import { indicatorDefaults, indicatorFields, type AreaIndicators, type IndicatorAssumptions } from './areaIndicatorTypes';
@@ -14,15 +15,17 @@ export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace
   const [showPlanReport, setShowPlanReport] = useState(false);
   const [metric, setMetric] = useState<ChartMetric>('population');
   const [showChart, setShowChart] = useState(false);
+  const [showCosts, setShowCosts] = useState(false);
   const [result, setResult] = useState<{ key: string; data?: AreaIndicators; error?: string }>();
   const drawing = w.sketch.tool === 'analysis';
   const boundPlan = w.indicatorPlan;
   const boundScenario = w.indicatorScenario;
+  const costsActive = dashboard && showCosts && !!boundPlan && !!boundScenario;
   const key = JSON.stringify({ geometry: w.analysisArea,
     ...(boundPlan && boundScenario ? { plan_id: boundPlan.id, revision: boundPlan.revision, scenario_id: boundScenario.id } : {}),
     include_scenario: !!boundPlan && w.includeScenario, assumptions });
   useEffect(() => {
-    if (!JSON.parse(key).geometry || drawing) return;
+    if (!JSON.parse(key).geometry || drawing || costsActive) return;
     const controller = new AbortController();
     const calculate = async () => {
       try {
@@ -38,16 +41,16 @@ export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace
     };
     void calculate();
     return () => controller.abort();
-  }, [key, drawing, retry]);
+  }, [key, drawing, retry, costsActive]);
   const data = result?.key === key ? result.data : undefined;
   const error = result?.key === key ? result.error : undefined;
   const { setIndicatorChart, indicatorScope } = w;
   useEffect(() => {
-    setIndicatorChart(data && !drawing && showChart ? {
+    setIndicatorChart(data && !drawing && showChart && !costsActive ? {
       scope: indicatorScope, geometry: data.geometry, metric, rows: chartRows(data, metric),
     } : null);
     return () => setIndicatorChart(null);
-  }, [data, drawing, showChart, metric, setIndicatorChart, indicatorScope]);
+  }, [data, drawing, showChart, costsActive, metric, setIndicatorChart, indicatorScope]);
   const change = (field: keyof IndicatorAssumptions, value: number) => setDraft(previous => ({ ...previous, [field]: value }));
   const assumptionsControl = <details className="indicator-assumptions"><summary aria-label="Assumptions" title="Assumptions">{dashboard ? <SlidersHorizontal size={18}/> : 'Assumptions'}</summary><form onSubmit={event => { event.preventDefault(); setAssumptions({ ...draft }); }}>
     <p className="zoning-muted">Illustrative defaults · adjust to local data</p>
@@ -69,14 +72,19 @@ export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace
     {boundPlan && !dashboard && <p className="indicator-bound-plan">{boundPlan.name} · {boundScenario?.name}</p>}
     <div className={`indicator-toolbar${dashboard ? ' indicator-toolbar-dashboard' : ''}`} role="group" aria-label="Indicator controls">
       {boundPlan && (dashboard ? <button className="quiet-icon-button" title="Include plan scenario" aria-label="Include plan scenario"
-        aria-pressed={w.includeScenario} disabled={w.busy} onClick={() => w.setIncludeScenario(!w.includeScenario)}><Layers size={18}/></button>
+        aria-pressed={w.includeScenario} disabled={w.busy || costsActive} onClick={() => w.setIncludeScenario(!w.includeScenario)}><Layers size={18}/></button>
         : <label className="zoning-check"><input type="checkbox" checked={w.includeScenario}
           disabled={drawing || w.busy} onChange={event => w.setIncludeScenario(event.target.checked)}/>Include plan scenario</label>)}
-      {assumptionsControl}
+      {costsActive ? <button className="quiet-icon-button" disabled aria-label="Indicator assumptions"><SlidersHorizontal size={18}/></button> : assumptionsControl}
       {dashboard && <button className="quiet-icon-button indicator-chart-toggle" title="3D chart" aria-label="3D chart"
-        aria-pressed={showChart} disabled={drawing || !w.analysisArea} onClick={() => setShowChart(value => !value)}><ChartColumnIncreasing size={18}/></button>}
+        aria-pressed={showChart && !costsActive} disabled={drawing || !w.analysisArea || costsActive} onClick={() => setShowChart(value => !value)}><ChartColumnIncreasing size={18}/></button>}
+      {dashboard && boundPlan && boundScenario && <button className="quiet-icon-button" title="Construction costs" aria-label="Construction costs"
+        aria-pressed={showCosts} aria-controls="plan-construction-costs" onClick={() => setShowCosts(value => !value)}><Coins size={18}/></button>}
     </div>
-    {!drawing && w.analysisArea && <>
+    {costsActive && boundPlan && boundScenario && <div id="plan-construction-costs"><ConstructionCosts
+      key={`${boundPlan.id}/${boundScenario.id}/${boundPlan.revision}`} plan={boundPlan} scenario={boundScenario} busy={w.busy}
+      onSave={async settings => !!await w.execute('save_cost_settings', {...settings}, boundScenario.id)}/></div>}
+    {!costsActive && !drawing && w.analysisArea && <>
       {data && <section className="indicator-chart-controls" aria-label="Map chart">
         {!dashboard && <button className="indicator-chart-toggle" title="3D chart" aria-label="3D chart"
           aria-pressed={showChart} onClick={() => setShowChart(value => !value)}><ChartColumnIncreasing size={17}/></button>}
@@ -89,7 +97,7 @@ export function IndicatorsPanel({ workspace: w, dashboard = false }: { workspace
       {error ? <div role="alert" className="zoning-error"><p>{error}</p><button onClick={() => setRetry(value => value+1)}>Retry</button></div>
         : data ? <AreaIndicatorResults data={data}/> : <div className="indicator-loading" role="status" aria-busy="true">Calculating selected area…</div>}
     </>}
-    {w.plan && !drawing && <details className="indicator-plan-report" onToggle={event => setShowPlanReport(event.currentTarget.open)}>
+    {w.plan && !drawing && !costsActive && <details className="indicator-plan-report" onToggle={event => setShowPlanReport(event.currentTarget.open)}>
       <summary>Plan comparison & validation</summary>{showPlanReport && <ZoningReport workspace={w}/>}</details>}
   </section>;
 }

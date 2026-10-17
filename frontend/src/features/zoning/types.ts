@@ -21,6 +21,7 @@ export interface Zone {
   label_point: [number, number];
 }
 export interface Scenario {
+  cost_settings?: import('./costTypes').CostSettings;
   id: string; name: string; kind: 'reference' | 'proposal'; locked: boolean; zones: Zone[];
   can_undo: boolean; can_redo: boolean;
   description?: string; copied_from?: string; created_at?: string;
