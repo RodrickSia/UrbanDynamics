@@ -29,6 +29,8 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # This workspace is also the live server checkout; preserve its ignored env files.
+          clean: false
       - name: Package the reviewed main revision
         run: git bundle create "$RUNNER_TEMP/main-backend.bundle" HEAD
       - name: Deploy backend and workers
@@ -63,6 +65,8 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # The backend job generates ignored production env files here for this job.
+          clean: false
       - name: Package the reviewed main revision
         run: git bundle create "$RUNNER_TEMP/main-frontend.bundle" HEAD
       - name: Deploy frontend
