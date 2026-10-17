@@ -16,7 +16,7 @@ function Distribution({ title, rows }: { title: string; rows: AreaShare[] | null
 }
 
 export function AreaIndicatorResults({ data }: { data: AreaIndicators }) {
-  const { baseline, proposal, population_source: population, transit } = data;
+  const { baseline, proposal, population_source: population, transit, existing_buildings: buildings } = data;
   return <div className="area-indicator-results" aria-label="Area analytics results">
     <p className="zoning-muted">{areaText(data.area_m2)} · {population.year ? `WorldPop ${population.year}` : 'Population unavailable'}</p>
     {population.status === 'partial' && <p role="status" className="zoning-muted">Population coverage {value(population.coverage_percent)}%. Total unavailable.</p>}
@@ -25,6 +25,16 @@ export function AreaIndicatorResults({ data }: { data: AreaIndicators }) {
         {indicatorMetrics.map(([key,label,unit]) => <tr key={key}><th scope="row">{label}<small>{unit}</small></th>
           <td>{value(baseline[key])}</td>{proposal && <td>{value(proposal[key])}</td>}</tr>)}
       </tbody></table></div>
+    <details className="indicator-methods"><summary>Existing data coverage</summary>
+      <p className="zoning-muted" role="note">{!buildings
+        ? 'This API version does not provide existing building capacity. Update the backend to use the residential building model.'
+        : buildings.status === 'unavailable'
+          ? 'Residential building data was unavailable for this area. Housing capacity is unknown.'
+          : buildings.status === 'partial'
+            ? 'Some residential buildings have missing floor counts. Housing capacity is unknown.'
+            : `Housing estimate: ${value(buildings.count, 0)} modeled residential buildings · ${value(buildings.floor_area_m2)} m² floor area. Model coverage is unknown.`}</p>
+      <p className="zoning-muted" role="note">Existing jobs need commercial/office floor area and use data. The connected building inventory supplies residential models only.</p>
+    </details>
     <p className="zoning-muted">Existing loads: residents only.{proposal ? ' Proposed: saved buildings only, not net change.' : ''}</p>
     <details className="indicator-methods"><summary>How estimates work</summary><ul>
       <li>Population capacity = net residential floor area ÷ m²/person.</li>
