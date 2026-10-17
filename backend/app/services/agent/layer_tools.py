@@ -230,7 +230,12 @@ def load_pois(region, radius):
         except (OSError,ValueError,KeyError,TypeError):
             pass
     key = hashlib.sha256(json.dumps([west,south,east,north,'amenities-v1']).encode()).hexdigest()
-    cache = root / (key+'.json')
+    # The bundled offline snapshot may live on a read-only or NAS-backed
+    # runtime volume. Keep writable Overpass cache files in the container's
+    # app-owned temporary directory instead of requiring chown on that mount.
+    cache_root = Path(os.getenv('AGENT_POI_CACHE_DIR', '/tmp/urbandynamics-agent-pois-cache'))
+    cache_root.mkdir(parents=True,exist_ok=True)
+    cache = cache_root / (key+'.json')
     with POI_LOCK:
         if cache.is_file():
             try:

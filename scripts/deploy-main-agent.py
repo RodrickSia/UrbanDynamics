@@ -136,14 +136,6 @@ def main():
     # Copy the supplementary POI dataset, not preview sessions/plans/job history.
     run(['docker', 'cp', preview['Id'] + ':/runtime/agent-pois', str(backup / 'agent-pois')])
     run(['docker', 'cp', str(backup / 'agent-pois'), backend['Id'] + ':/runtime/agent-pois'])
-    if backend['State']['Running']:
-        run(['docker', 'exec', '--user', '0', backend['Id'], 'chown', '-R', '10001:10001', '/runtime/agent-pois'])
-    else:
-        runtime = next(mount for mount in backend['Mounts'] if mount['Destination'] == '/runtime')
-        run([
-            'docker', 'run', '--rm', '--volume', runtime['Name'] + ':/runtime',
-            '--entrypoint', 'chown', backend['Image'], '-R', '10001:10001', '/runtime/agent-pois',
-        ])
     update_checkout(args.bundle)
     compose = ['docker', 'compose', '-p', 'urbandynamics', '--env-file', '.env', '--env-file', '.env.production.local', '-f', 'compose.yaml', '-f', 'compose.production-agent.yaml']
     # Validate and build before recreating any live service. Never restart PostGIS.
