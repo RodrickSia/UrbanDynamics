@@ -1,5 +1,6 @@
 export const simulationDefaults = {
   residential_m2_per_person: 35, work_m2_per_staff: 20, visitors_per_100m2_day: 10,
+  school_m2_per_student: 10, school_students_per_staff: 15,
   green_open_percent: 30, rainfall_mm: 60,
   landscape_mode: 'preserve' as 'preserve' | 'redesign', traffic_radius_m: 750,
 };
@@ -18,7 +19,8 @@ export interface SimulationResult {
   context?: { development_context?: {
     surfaces?: {status: string; note: string; landscape_mode: string; scope: string; unclassified_surface_m2: number; mapped_green_m2: number; landcover?: {dataset?: string; year?: number} | null};
     traffic?: {status: string; source: string; note: string; network: string; radius_m: number; background_vehicles_hour: number; snapshot_id: string | null; captured_at: string | null; network_source?: string | null};
-    inventory?: {status: string; source: string}; capacity?: {status: string; source: string};
+    inventory?: {status: string; source: string; building_count?: number; proposed_school_places?: number; school_note?: string};
+    capacity?: {status: string; source: string; power_capacity_kw?: number; water_capacity_m3_day?: number; wastewater_capacity_m3_day?: number};
   } };
   options: { id: string; comparison: ComparisonRow[]; traffic_comparison?: ComparisonRow[]; drainage_comparison?: ComparisonRow[]; state: {
     metrics: Record<string, number | null>;

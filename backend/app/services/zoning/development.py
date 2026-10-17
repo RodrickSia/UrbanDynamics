@@ -13,6 +13,7 @@ SPACE_USES = [
     {"id": "residential", "name": "Residential", "color": "#D79B8C", "default_floor_height": 3.2},
     {"id": "commercial", "name": "Commercial", "color": "#C18EAD", "default_floor_height": 4.0},
     {"id": "office", "name": "Office", "color": "#86A5C5", "default_floor_height": 3.6},
+    {"id": "school", "name": "School", "color": "#E1BB66", "default_floor_height": 3.6},
     {"id": "other", "name": "Other", "color": "#8CA6AD", "default_floor_height": 3.2},
 ]
 CATALOG = {"version": 1, "space_uses": SPACE_USES, "building_types": [

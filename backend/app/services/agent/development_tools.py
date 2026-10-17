@@ -81,7 +81,7 @@ def workspace_view(session):
             'buildings': [{k:b.get(k) for k in ('id','name','parcel_id','geometry','floors','floor_height','space_use_id','counts_gfa','counts_far','floor_overrides','height_m','footprint_m2')} for b in buildings[:40]],
             'building_count':len(buildings), 'limits':'Plan limits are user proposals unless explicitly verified. Missing inventory does not establish vacancy.',
             'zoning_types':plan.get('types',[]), 'zones':scenario.get('zones',[]),
-            'supported_uses':['residential','commercial','office','other'],
+            'supported_uses':['residential','commercial','office','school','other'],
             'occupancy':'Development derives demand from floor area and explicitly labelled m²/person or staff assumptions. No surveyed baseline occupancy or capacity is implied.'}
 
 
@@ -98,7 +98,7 @@ def settings(session, args):
     if not isinstance(values, dict):
         raise ValueError('settings_json must be an object')
     allowed = {'residential_m2_per_person','work_m2_per_staff','visitors_per_100m2_day','green_open_percent',
-               'rainfall_mm','landscape_mode','traffic_radius_m'}
+               'rainfall_mm','landscape_mode','traffic_radius_m','school_m2_per_student','school_students_per_staff'}
     if set(values) - allowed:
         raise ValueError('Unsupported simulation settings; identifiers are bound to the selected workspace')
     scope = args.get('scope', 'scenario')

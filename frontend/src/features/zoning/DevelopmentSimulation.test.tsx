@@ -59,3 +59,18 @@ it('keeps an unknown building baseline unknown instead of showing a hypothetical
   expect(within(row).getAllByRole('cell').map(cell=>cell.textContent)).toEqual(['Unknown','20','Unknown']);
   expect(within(row).getByText('Insufficient data')).toBeInTheDocument();
 });
+
+it('labels inferred connection limits and school places as demo assumptions', () => {
+  const assumed=structuredClone(result);
+  assumed.context!.development_context!.capacity={status:'synthetic',source:'125% of existing demand; not surveyed.',
+    water_capacity_m3_day:12.5,wastewater_capacity_m3_day:10,power_capacity_kw:15};
+  assumed.context!.development_context!.inventory={status:'estimated',source:'Mapped existing buildings',
+    building_count:11,proposed_school_places:719,school_note:'Demo assumption; not surveyed school capacity.'};
+  hook.mockReturnValue({result:assumed,requesting:false,running:false,run:vi.fn(),action:vi.fn()});
+  render(<DevelopmentSimulation plan={plan} scenario={scenario} parcelId="123" disabled={false}/>);
+  expect(screen.getByText(/Demo connection limits: water/)).toHaveTextContent(/12[,.]5/);
+  expect(screen.getByText(/11 existing buildings/)).toBeInTheDocument();
+  expect(screen.getByText(/Proposed school: 719 assumed student places/)).toBeInTheDocument();
+  expect(screen.getByText('Infrastructure capacity · demo assumption')).toBeInTheDocument();
+  expect(screen.queryByText(/Available infrastructure capacity: Unknown/)).not.toBeInTheDocument();
+});

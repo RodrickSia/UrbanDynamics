@@ -1,6 +1,6 @@
 import type { ProposedBuilding } from './developmentTypes';
 
-const uses: Record<string, string> = { residential: 'Residential', commercial: 'Commercial', office: 'Office', other: 'Other' };
+const uses: Record<string, string> = { residential: 'Residential', commercial: 'Commercial', office: 'Office', school: 'School', other: 'Other' };
 export function BuildingFloorSummary({ building }: { building: ProposedBuilding }) {
   if (!building.floor_stack?.length) return null;
   return <details open><summary>Floor uses</summary>

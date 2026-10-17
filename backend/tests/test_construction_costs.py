@@ -82,16 +82,31 @@ def test_demolition_uses_building_floors_and_unions_overlapping_masks(monkeypatc
     assert result['demolition'] == pytest.approx(round(projected(geometry).area * 3 * 200000), abs=1)
 
 
-def test_unknown_demolition_never_becomes_a_zero_total(monkeypatch):
+def test_missing_demolition_uses_labelled_nonzero_demo_assumptions(monkeypatch):
     monkeypatch.setattr(costs.baseline, 'buildings', lambda *args: None)
     scenario = {'kind': 'proposal', 'demolition_masks': [{'id': 'm', 'geometry': rectangle()}]}
     result = costs.calculate({'study_area': rectangle()}, scenario, CostSettings())
-    assert result['total'] is None
-    assert result['demolition'] is None
+    assert result['total'] == result['demolition'] > 0
+    assert result['demolition_basis'] == 'demo_assumed_floors'
+    assert result['settings']['demolition_rate'] == 200000
+    assert result['demolitions'][0]['area_m2'] == pytest.approx(projected(rectangle()).area*.6*2)
+    assert any('not a contractor quote' in warning for warning in result['warnings'])
     fixed = costs.calculate({'study_area': rectangle()}, scenario,
         CostSettings(demolition_area_m2=240, demolition_rate=200000))
     assert fixed['total'] == 48000000
     assert fixed['demolition_basis'] == 'user_area'
+
+
+def test_existing_demolition_uses_floor_inventory_with_demo_rate_only_when_quote_is_missing(monkeypatch):
+    geometry = rectangle(106.7602, 10.8202, 106.7605, 10.8205)
+    monkeypatch.setattr(costs.baseline, 'buildings', lambda *args: [
+        {'id':'old', 'geometry':geometry, 'floors':3, 'source':'Mapped existing building'}])
+    scenario = {'kind':'proposal', 'demolition_masks':[{'id':'mask', 'geometry':rectangle()}]}
+    result = costs.calculate({'study_area':rectangle()}, scenario, CostSettings())
+    assert result['demolition_basis'] == 'generated_scoped_floors'
+    assert result['demolition'] == costs.money(projected(geometry).area*3*200000)
+    quoted = costs.calculate({'study_area':rectangle()}, scenario, CostSettings(demolition_rate=150000))
+    assert quoted['demolition'] == costs.money(projected(geometry).area*3*150000)
 
 
 def test_reference_has_no_construction_bill():

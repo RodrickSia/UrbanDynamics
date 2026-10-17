@@ -39,16 +39,26 @@ def demolition(plan, scenario, settings):
             seen.add(fingerprint)
             shapes.append(shape)
             floors = record.get('floors')
+            floor_source = ''
+            if not floors or floors <= 0:
+                floors = max(1, round((record.get('height_m') or 6.4) / 3.2))
+                floor_source = '; assumed floors from height / 3.2 m, default 2 floors'
             rows.append({'id': record['id'], 'name': f"Existing building {len(rows)+1}",
-                         'area_m2': shape.area * floors if floors and floors > 0 else None,
-                         'source': record.get('source') or 'Generated baseline; estimated floors'})
-        complete = bool(rows) and all(row['area_m2'] is not None for row in rows)
-        complete = complete and all(any(shape.intersection(projected(mask['geometry'])).area > .01
-                                       for shape in shapes) for mask in masks)
+                         'area_m2': shape.area * floors,
+                         'source': (record.get('source') or 'Generated baseline; estimated floors') + floor_source})
         basis = 'generated_scoped_floors'
         warnings.append('Demolition uses generated buildings within the masks; verify coverage and floor area.')
-        if not complete:
-            warnings.append('Demolition floor area is incomplete. Enter the surveyed total to complete the estimate.')
+        missing_masks = [projected(mask['geometry']).intersection(region) for mask in masks
+                         if not any(shape.intersection(projected(mask['geometry'])).area > .01 for shape in shapes)]
+        if missing_masks:
+            missing = unary_union(missing_masks).difference(unary_union(shapes))
+            if missing.area > .01:
+                rows.append({'id':'assumed-demolition', 'name':'Assumed existing buildings in unmapped demolition area',
+                             'area_m2':missing.area * .6 * 2,
+                             'source':'Demo assumption: 60% building coverage and 2 floors in demolition masks without building records; not surveyed.'})
+                basis = 'mixed_inventory_and_demo' if shapes else 'demo_assumed_floors'
+                warnings.append('Unmapped demolition area uses a demo assumption: 60% coverage × 2 floors. Replace with a surveyed area when available.')
+        complete = bool(rows) and all(row['area_m2'] is not None for row in rows)
     if settings.demolition_rate is None:
         warnings.append('Enter a demolition rate in VND/m².')
         complete = False
@@ -66,6 +76,10 @@ def calculate(plan, scenario, settings: CostSettings):
         key: value for key, value in settings.building_overrides.items() if key in active_ids}})
     reference = scenario['kind'] == 'reference'
     rows, warnings = [], []
+    if not reference and scenario.get('demolition_masks') and not settings.demolition_included and settings.demolition_rate is None:
+        settings = settings.model_copy(update={'demolition_rate':200000,
+            'demolition_source':'Demo assumption: 200,000 VND per m² of demolished floor area; replace with a contractor quote.'})
+        warnings.append('Demolition rate assumes 200,000 VND/m² for this demo. It is not a contractor quote or an official rate.')
     for building in [] if reference else scenario.get('buildings', []):
         profile = settings.building_overrides.get(building['id'], settings.profile)
         footprint = projected(building['geometry']).area

@@ -65,7 +65,7 @@ class ScenarioInput(NameInput):
 class FloorOverride(Input):
     floor: int = Field(ge=1, le=200, strict=True)
     floor_height: float = Field(gt=0, le=20)
-    space_use_id: Literal["residential", "commercial", "office", "other"]
+    space_use_id: Literal["residential", "commercial", "office", "school", "other"]
     counts_gfa: bool = True
     counts_far: bool = True
 
@@ -78,7 +78,7 @@ class BuildingInput(Input):
     name: str = Field(default="Proposed building", min_length=1, max_length=120)
     floors: int = Field(ge=1, le=200, strict=True)
     floor_height: float = Field(gt=0, le=20)
-    space_use_id: Literal["residential", "commercial", "office", "other"]
+    space_use_id: Literal["residential", "commercial", "office", "school", "other"]
     counts_gfa: bool = True
     counts_far: bool = True
     template_id: Literal["low-rise-v1"] | None = None
@@ -99,4 +99,4 @@ class GenerationInput(Input):
     floor_height: float = Field(gt=0, le=20)
     coverage: float = Field(gt=0, le=100)
     setback: float = Field(ge=0, le=1000)
-    space_use_id: Literal["residential", "commercial", "office", "other"] = "residential"
+    space_use_id: Literal["residential", "commercial", "office", "school", "other"] = "residential"

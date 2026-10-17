@@ -175,7 +175,7 @@ def test_mixed_use_floors_height_metrics_and_scenario_persistence(client, plan, 
     assert result["metrics"]["gfa_m2"] == pytest.approx(area * 2)
     assert result["metrics"]["far"] == pytest.approx(area * 2 / projected(rectangle()).area)
     assert result["metrics"]["coverage_pct"] == pytest.approx(100 * area / projected(rectangle()).area)
-    assert result["metrics"]["space_use_m2"] == pytest.approx({"commercial": area, "residential": area, "office": 0, "other": 0})
+    assert result["metrics"]["space_use_m2"] == pytest.approx({"commercial": area, "residential": area, "office": 0, "school": 0, "other": 0})
     plan = command(client, plan, "save_building", payload)
     original = deepcopy(plan["scenarios"][1]["buildings"][0])
     plan = command(client, plan, "add_scenario", {"name": "Mixed-use alternative"})

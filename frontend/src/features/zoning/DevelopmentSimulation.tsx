@@ -10,6 +10,8 @@ const fields = [
   ['residential_m2_per_person', 'Residential m² / person', 5, 500],
   ['work_m2_per_staff', 'Workplace m² / staff', 5, 500],
   ['visitors_per_100m2_day', 'Visitors / 100 m² / day', 0, 1000],
+  ['school_m2_per_student', 'School gross floor m² / student (assumed)', 2, 100],
+  ['school_students_per_staff', 'School students / staff (assumed)', 1, 100],
   ['green_open_percent', 'Green / open space (%)', 0, 100],
   ['rainfall_mm', 'Rainfall (mm)', 0, 300],
   ['traffic_radius_m', 'Road context beyond study boundary (m)', 500, 1500],
@@ -51,7 +53,7 @@ export function DevelopmentSimulation({ plan, scenario, parcelId, disabled, mapB
   const storageKey = `plan-simulation-settings:${plan.id}:${scenario.id}`;
   const [settings, setSettings] = useState<SimulationSettings>(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+      const stored = { ...simulationDefaults, ...JSON.parse(localStorage.getItem(storageKey) ?? 'null') };
       if (stored && fields.filter(([key]) => key !== 'traffic_radius_m').every(([key, , min, max]) => Number.isFinite(stored[key]) && stored[key] >= min && stored[key] <= max)) {
         return { ...simulationDefaults, ...Object.fromEntries(fields.filter(([key, , min, max]) => Number.isFinite(stored[key]) && stored[key] >= min && stored[key] <= max).map(([key]) => [key, stored[key]])),
           landscape_mode: stored.landscape_mode === 'redesign' ? 'redesign' : 'preserve' };
@@ -114,7 +116,10 @@ export function DevelopmentSimulation({ plan, scenario, parcelId, disabled, mapB
       <p className="zoning-muted">Scenario estimates, not surveyed conditions. Unknown means the available data cannot establish a comparison.</p>
       {option && <ComparisonTable rows={impactRows.filter(row => metrics.some(([key]) => key === row.metric))
         .map(row => ({...row, after: row.after ?? state.metrics[row.metric] ?? null}))}/>}
-      <p className="zoning-muted">Available infrastructure capacity: Unknown. Demand alone does not establish overload.</p>
+      {sources?.capacity?.status === 'synthetic' ? <p className="zoning-muted">
+        Demo connection limits: water {format(sources.capacity.water_capacity_m3_day)} m³/day · wastewater {format(sources.capacity.wastewater_capacity_m3_day)} m³/day · peak power {format(sources.capacity.power_capacity_kw)} kW.
+        {' '}Assumed at 125% of existing building demand, not surveyed network capacity.
+      </p> : <p className="zoning-muted">Available infrastructure capacity: Unknown. Demand alone does not establish overload.</p>}
       {trafficRows.length > 0 && <>
         <h4>Traffic · same background, added building trips</h4>
         <p className="zoning-muted">Counts and delays are model outputs under the stated OD assumptions. When trips remain unfinished, completed-trip delay cannot establish an improvement.</p>
@@ -122,13 +127,15 @@ export function DevelopmentSimulation({ plan, scenario, parcelId, disabled, mapB
       </>}
       {sources && <details open className="simulation-sources"><summary>Data sources and assumptions</summary>
         <dl>
-          <dt>Existing buildings · {sources.inventory?.status ?? 'unknown'}</dt><dd>{sources.inventory?.source}</dd>
+          <dt>Existing buildings · {sources.inventory?.status ?? 'unknown'}</dt><dd>{sources.inventory?.source}
+            {sources.inventory?.building_count != null && <small>{sources.inventory.building_count} existing buildings used for the baseline estimate.</small>}
+            {!!sources.inventory?.proposed_school_places && <small>Proposed school: {format(sources.inventory.proposed_school_places)} assumed student places. {sources.inventory.school_note}</small>}</dd>
           <dt>Ground cover · {sources.surfaces?.status ?? 'unknown'}</dt><dd>{sources.surfaces?.note}
             {sources.surfaces && <small>Scope: {sources.surfaces.scope}. Unclassified ground: {format(sources.surfaces.unclassified_surface_m2)} m².
               {sources.surfaces.landcover && ` ${sources.surfaces.landcover.dataset ?? 'Historical landcover'}.`}</small>}</dd>
           <dt>Road network</dt><dd>{sources.traffic?.network === 'osm_local' ? `OSM local extract · ${sources.traffic.radius_m} m buffer · captured ${sources.traffic.captured_at ?? 'unknown'}` : 'Local OSM network is prepared on a detailed run.'}<small>{sources.traffic?.network_source}</small></dd>
           <dt>Background traffic · {sources.traffic?.status ?? 'unknown'}</dt><dd>{format(sources.traffic?.background_vehicles_hour)} vehicles/hour at 18:00. {sources.traffic?.source}<small>{sources.traffic?.note}</small></dd>
-          <dt>Infrastructure capacity · unknown</dt><dd>{sources.capacity?.source}</dd>
+          <dt>Infrastructure capacity · {sources.capacity?.status === 'synthetic' ? 'demo assumption' : sources.capacity?.status ?? 'unknown'}</dt><dd>{sources.capacity?.source}</dd>
         </dl>
       </details>}
       {state.vietnam_planning_requirements && <details><summary>Planning references</summary>

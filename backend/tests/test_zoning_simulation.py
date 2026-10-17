@@ -189,3 +189,55 @@ def test_excluded_gfa_keeps_physical_floor_demand(client, plan, parcel_source, t
     assert project.development.buildings[0].space_uses[0].floor_area_m2 > 0
     loads = demand.calculate(project.development, analysis["floor_areas"], parameters("base"))
     assert loads["energy_kwh_day"] > 0
+
+
+def test_whole_scenario_existing_inventory_produces_numeric_demand_comparison(client, plan, parcel_source, monkeypatch):
+    from app.services.simulation.planning.engine import run_screening
+    monkeypatch.setattr(baseline, 'buildings', lambda *_: [{'id':'existing', 'geometry':building()['geometry'],
+        'floors':2, 'height_m':6.4, 'space_use_id':'residential', 'source':'Mapped existing building'}])
+    plan = command(client, plan, 'save_building', building(floors=3, demolish=True))
+    study = study_from_plan(plan, SimulationInput(revision=plan['revision'], scenario_id=plan['scenarios'][1]['id']))
+    assert study.projects[0].baseline_occupancy == 'estimated'
+    result = run_screening(study)
+    rows = {r['metric']:r for r in result['options'][0]['comparison']}
+    for metric in ('residents', 'freshwater_m3_day', 'wastewater_m3_day', 'energy_kwh_day', 'power_peak_kw', 'person_trips_day'):
+        assert rows[metric]['before'] > 0
+        assert rows[metric]['after'] > rows[metric]['before']
+        assert rows[metric]['delta'] is not None
+    assert study.utility_zones[0].source_kind == 'synthetic'
+    assert study.utility_zones[0].water_capacity_m3_day == pytest.approx(rows['freshwater_m3_day']['before']*1.25)
+
+
+def test_retained_existing_buildings_are_added_to_new_buildings_without_demolition(client, plan, parcel_source, monkeypatch):
+    monkeypatch.setattr(baseline, 'buildings', lambda *_: [{'id':'existing',
+        'geometry':rectangle(106.761,10.821,106.7612,10.8212),
+        'floors':2, 'height_m':6.4, 'space_use_id':'residential', 'source':'Mapped existing building'}])
+    plan = command(client, plan, 'save_building', building())
+    study = study_from_plan(plan, SimulationInput(revision=plan['revision'], scenario_id=plan['scenarios'][1]['id']))
+    assert len(study.projects[0].baseline.buildings) == 1
+    assert len(study.projects[0].development.buildings) == 2
+
+
+def test_demolition_only_scope_clears_existing_demand(client, plan, parcel_source, monkeypatch):
+    from app.services.simulation.planning.engine import run_screening
+    monkeypatch.setattr(baseline, 'buildings', lambda *_: [{'id':'existing', 'geometry':building()['geometry'],
+        'floors':2, 'height_m':6.4, 'space_use_id':'residential', 'source':'Mapped existing building'}])
+    plan = command(client, plan, 'demolish_parcel', {'parcel_id':'3885881', 'confirm':True})
+    study = study_from_plan(plan, SimulationInput(revision=plan['revision'], scenario_id=plan['scenarios'][1]['id']))
+    result = run_screening(study)
+    wastewater = next(r for r in result['options'][0]['comparison'] if r['metric']=='wastewater_m3_day')
+    assert wastewater['before'] > 0 and wastewater['after'] == 0
+    assert wastewater['delta'] == -wastewater['before']
+    # Irrigation on the remaining ground can still require freshwater.
+
+
+def test_school_floor_program_has_students_staff_and_school_demand(client, plan, parcel_source, monkeypatch):
+    from app.services.simulation.planning.engine import run_screening
+    monkeypatch.setattr(baseline, 'buildings', lambda *_: None)
+    plan = command(client, plan, 'save_building', building(space_use_id='school'))
+    study = study_from_plan(plan, SimulationInput(revision=plan['revision'], scenario_id=plan['scenarios'][1]['id']))
+    school = study.projects[0].development.buildings[0]
+    assert school.use == 'school' and school.residents == 0
+    assert school.staff > 0 and school.daily_visitors == school.service_capacity > 0
+    result = run_screening(study)
+    assert result['options'][0]['state']['metrics']['freshwater_m3_day'] > 0

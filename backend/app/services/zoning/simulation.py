@@ -14,6 +14,9 @@ from ..simulation.engine import polygon_and_area
 from ..simulation.models import PolygonInput
 from ..simulation.planning.models import PlanningStudy
 from ..simulation.integrated.models import MapBuildingCollection
+from ..simulation.integrated import demand, geometry
+from ..simulation.integrated.library import parameters
+from ..simulation.integrated.models import Design
 from . import simulation_context
 
 
@@ -24,6 +27,8 @@ class SimulationInput(Input):
     residential_m2_per_person: float = Field(default=35, ge=5, le=500)
     work_m2_per_staff: float = Field(default=20, ge=5, le=500)
     visitors_per_100m2_day: float = Field(default=10, ge=0, le=1000)
+    school_m2_per_student: float = Field(default=10, ge=2, le=100)
+    school_students_per_staff: float = Field(default=15, ge=1, le=100)
     green_open_percent: float = Field(default=30, ge=0, le=100)
     landscape_mode: Literal['preserve', 'redesign'] = 'preserve'
     traffic_radius_m: int = Field(default=750, ge=500, le=1500)
@@ -58,15 +63,18 @@ def building_program(building, settings):
         uses["other" if floor["space_use_id"] == "commercial" else floor["space_use_id"]] += area
     programs = []
     for use, physical_area in sorted(uses.items()):
+        students = ceil(physical_area/settings.school_m2_per_student) if use == 'school' else 0
         programs.append({"use": use, "floor_area_m2": physical_area,
                          "residents": ceil(physical_area/settings.residential_m2_per_person) if use == "residential" else 0,
-                         "staff": ceil(physical_area/settings.work_m2_per_staff) if use != "residential" else 0,
-                         "daily_visitors": ceil(physical_area*settings.visitors_per_100m2_day/100) if use != "residential" else 0})
+                         "staff": ceil(students/settings.school_students_per_staff) if use == 'school' else ceil(physical_area/settings.work_m2_per_staff) if use != "residential" else 0,
+                         "daily_visitors": students if use == 'school' else ceil(physical_area*settings.visitors_per_100m2_day/100) if use != "residential" else 0,
+                         "service_capacity": students})
     return {"name": building["name"][:80], "footprint": footprint.model_dump(), "use": programs[0]["use"],
             "floors": building["floors"], "height_m": floors[-1]["top_m"],
             "gross_floor_area_m2": area*sum(f["counts_gfa"] for f in floors), "space_uses": programs,
             "residents": sum(p["residents"] for p in programs), "staff": sum(p["staff"] for p in programs),
-            "daily_visitors": sum(p["daily_visitors"] for p in programs)}
+            "daily_visitors": sum(p["daily_visitors"] for p in programs),
+            "service_capacity": sum(p['service_capacity'] for p in programs)}
 
 
 def study_from_plan(plan, settings):
@@ -82,6 +90,9 @@ def study_from_plan(plan, settings):
     for building in scenario.get("buildings", []):
         if settings.parcel_id is None or settings.parcel_id == building['parcel_id']:
             grouped[building["parcel_id"]].append(building)
+    for mask in scenario.get('demolition_masks', []):
+        if settings.parcel_id is None or settings.parcel_id == mask['parcel_id']:
+            grouped.setdefault(mask['parcel_id'], [])
     if settings.parcel_id:
         grouped.setdefault(settings.parcel_id, [])
     if not grouped:
@@ -105,7 +116,12 @@ def study_from_plan(plan, settings):
                     'floor_height':source['height_m']/source['floors'], 'counts_gfa':True, 'counts_far':True}, settings))
         baseline_blocks.extend(existing_blocks)
         demolished = any(m['parcel_id'] == parcel_id for m in scenario.get('demolition_masks', []))
-        blocks.extend([building_program(b, settings) for b in proposals] if proposals else [] if demolished else existing_blocks)
+        proposed_blocks = [building_program(b, settings) for b in proposals]
+        # An editor representation on exactly the same footprint replaces that
+        # building (e.g. unchanged massing or a remodel), rather than doubling it.
+        blocks.extend([] if demolished else [existing for existing in existing_blocks
+            if not any(shape(existing['footprint']).equals(shape(proposed['footprint'])) for proposed in proposed_blocks)])
+        blocks.extend(proposed_blocks)
     if not blocks and not baseline_blocks:
         raise ValueError('No building data for this scope. Draw and save a building first.')
     if max(len(blocks), len(baseline_blocks)) > 20:
@@ -141,13 +157,34 @@ def study_from_plan(plan, settings):
                           'captured_at':network_document.get('captured_at') if network_document else None,
                           'note':'Same road network, background vehicles and seeds before/after; building trips are added. This is a scenario, not a validated site forecast.'},
                'inventory':{'status':'estimated' if baseline_blocks else 'unknown',
-                            'source':'Generated buildings and/or supplied Goong map context. Heights, floors and occupancy may be estimated; missing buildings do not prove vacant land.'},
+                            'building_count':len(baseline_blocks),
+                            'source':'Generated buildings and/or supplied Goong map context. Existing floor area and use estimate occupancy, water, wastewater, power and trips with the same coefficients as the proposal. Missing buildings do not prove vacant land.',
+                            'occupancy_assumptions':{'residential_m2_per_person':settings.residential_m2_per_person,
+                                'work_m2_per_staff':settings.work_m2_per_staff,
+                                'visitors_per_100m2_day':settings.visitors_per_100m2_day,
+                                'school_m2_per_student':settings.school_m2_per_student,
+                                'school_students_per_staff':settings.school_students_per_staff},
+                            'proposed_school_places':sum(b['service_capacity'] for b in blocks),
+                            'school_note':f'Demo assumption: students = school physical floor area / {settings.school_m2_per_student:g} m², rounded up; staff = students / {settings.school_students_per_staff:g}, rounded up. Not a surveyed capacity or a legal design standard.'},
                'capacity':{'status':'unknown','source':'No verified utility capacities or external utility loads were supplied.'}}
+    utility_zone = {'id':'unknown', 'source_kind':'unknown',
+                    'source':'No verified infrastructure capacity or background load; proposal-only calculation'}
+    if baseline_blocks:
+        existing = Design(**baseline_design)
+        loads = demand.calculate(existing, geometry.analyze(site, existing)['floor_areas'], parameters('base'))
+        capacities = {'power_capacity_kw':max(1, max(loads['hourly']['power_kw'])*1.25),
+                      'water_capacity_m3_day':max(1, loads['freshwater_m3_day']*1.25),
+                      'wastewater_capacity_m3_day':max(1, loads['wastewater_m3_day']*1.25)}
+        capacity_source = ('Demo assumption: local connection capacity = 125% of estimated existing building demand, '
+                           'with a minimum of 1 kW / 1 m3 per day. External loads excluded. '
+                           'This is an assumed scenario limit, not measured network capacity or an operator commitment.')
+        utility_zone = {'id':'existing_demo', 'source_kind':'synthetic', 'source':capacity_source, **capacities}
+        sources['capacity'] = {'status':'synthetic', 'source':capacity_source, **capacities}
     projects = [{'id':'parcel_0', 'title':f'Parcel {settings.parcel_id}' if settings.parcel_id else 'Whole scenario',
                  'site':site.model_dump(), 'baseline':baseline_design, 'baseline_kind':'estimated',
-                 'baseline_occupancy':'estimated' if settings.parcel_id and baseline_blocks else 'unknown',
+                 'baseline_occupancy':'estimated' if baseline_blocks else 'unknown',
                  'baseline_source':'Generated buildings / supplied Goong tile context; estimated heights, floors, occupancy and surfaces; inventory may be incomplete',
-                 'development':proposed_design, 'utility_zone_id':'unknown'}]
+                 'development':proposed_design, 'utility_zone_id':utility_zone['id']}]
     return PlanningStudy(**{
         "title": f"{plan['name']} / {scenario['name']}"[:160], "mode": "cumulative", "planning_catalog":"qcvn_urban_2021",
         "study_area": region.model_dump(), "comparison_policy": "declared_programs",
@@ -157,6 +194,5 @@ def study_from_plan(plan, settings):
         "traffic_network_mode":"osm_snapshot" if network_id else "synthetic_corridor",
         "traffic_snapshot_id":network_id, "development_context":sources, "projects": projects,
         "options": [{"id": "proposal", "title": scenario["name"], "active_project_ids": [p["id"] for p in projects]}],
-        "utility_zones": [{"id": "unknown", "source_kind": "unknown",
-                           "source": "No verified infrastructure capacity or background load; proposal-only calculation"}],
+        "utility_zones": [utility_zone],
     })
