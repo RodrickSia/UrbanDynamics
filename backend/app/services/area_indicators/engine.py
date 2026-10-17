@@ -1,4 +1,5 @@
 from collections import defaultdict
+from math import isfinite
 
 from psycopg import Error as DatabaseError
 from shapely.geometry import GeometryCollection, shape
@@ -6,6 +7,7 @@ from shapely.ops import transform, unary_union
 
 from . import sources, transit
 from ..parcels import land_use, PALETTE
+from ..zoning import baseline as building_baseline
 from ..zoning.development import floor_stack
 from ..zoning.geometry import TO_METERS, study_geometry, projected, geojson
 
@@ -69,6 +71,39 @@ def proposal_metrics(scenario, area, a):
             'net_residential_m2': residential, 'net_workplace_m2': workplace}
 
 
+def existing_building_metrics(records, area, a):
+    """Housing capacity from the available generated residential model only."""
+    if not records:
+        return {'housing_capacity': None,
+                'inventory': {'status': 'unavailable', 'count': 0, 'floor_area_m2': None,
+                              'source': 'Generated residential 3D building model', 'coverage': 'unknown'}}
+    floor_area = 0.0
+    complete = True
+    count = 0
+    seen = set()
+    for building in records:
+        footprint = projected(building['geometry']).intersection(area)
+        if footprint.area <= .01:
+            continue
+        fingerprint = footprint.normalize().wkb
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        count += 1
+        floors = building.get('floors')
+        if floors is None or not isfinite(floors) or floors <= 0:
+            complete = False
+            continue
+        floor_area += footprint.area * floors
+    if count == 0:
+        return existing_building_metrics(None, area, a)
+    status = 'estimated' if complete else 'partial'
+    return {'housing_capacity': floor_area * a.net_area_factor / a.residential_m2_per_home if complete else None,
+            'inventory': {'status': status, 'count': count,
+                          'floor_area_m2': floor_area if complete else None,
+                          'source': 'Generated residential 3D building model', 'coverage': 'unknown'}}
+
+
 def analyze(body, plan=None):
     area = study_geometry(body.geometry)
     a = body.assumptions
@@ -94,6 +129,10 @@ def analyze(body, plan=None):
                         water_m3_day=people*a.residential_l_person_day/1000,
                         waste_kg_day=people*a.residential_waste_kg_person_day,
                         jobs_needed=people*a.labour_force_percent/100)
+    buildings = read('Existing residential building model', lambda: building_baseline.buildings(
+        {'id': 'zone:indicator-existing', 'geometry': body.geometry}, body.geometry))
+    existing = existing_building_metrics(buildings, area, a)
+    baseline['housing_capacity'] = existing['housing_capacity']
     proposal, zones = None, []
     scenario = next((s for s in plan['scenarios'] if s['id'] == str(body.scenario_id)), None) if plan else None
     if plan and scenario is None:
@@ -110,10 +149,10 @@ def analyze(body, plan=None):
                 kind = types[identifier]
                 zones.append({'code': kind['code'], 'label': kind['name'], 'color': kind['color'],
                               'area_m2': size, 'percent': size/area.area*100})
-    return {'area_m2': area.area, 'geometry': geojson(area), 'model_version': 'area-indicators-1',
+    return {'area_m2': area.area, 'geometry': geojson(area), 'model_version': 'area-indicators-2',
             'plan_id': plan['id'] if plan else None, 'revision': plan['revision'] if plan else None,
             'scenario_id': scenario['id'] if scenario else None, 'include_scenario': body.include_scenario,
-            'baseline': baseline, 'proposal': proposal, 'zoning': zones,
+            'baseline': baseline, 'existing_buildings': existing['inventory'], 'proposal': proposal, 'zoning': zones,
             'land_use': land_distribution(records, area) if records is not None else None,
             'population_source': {'status': 'estimated' if people is not None else 'partial' if pop else 'missing',
                                   'year': pop['year'] if pop else None, 'coverage_percent': coverage,
@@ -121,7 +160,8 @@ def analyze(body, plan=None):
                                   'source': 'WorldPop · area-weighted raster cells'},
             'transit': access or {'status': 'missing', 'coverage_percent': None, 'stops': [], 'geometry': None},
             'assumptions': a.model_dump(), 'issues': issues,
-            'notes': ['Baseline loads cover residents only; existing commercial demand is unknown.',
+            'notes': ['Baseline population loads use WorldPop. Existing housing capacity uses the generated residential 3D model; its citywide completeness is unknown.',
+                      'No existing commercial / office inventory is available for baseline jobs capacity or balance.',
                       'Scenario values are proposed capacity and demand, not net change. Existing occupancy and demolition losses are unknown.',
                       'Capacity uses net GFA; physical floors excluded from GFA still contribute demand.',
                       'Workplace rates apply to commercial and office floors. Other floor uses make aggregate jobs or demand unknown.',

@@ -26,7 +26,11 @@ Verify boundary clipping, holes, overlap percentages, zero vs missing data, scen
 
 `POST /api/v1/indicators/area` takes GeoJSON `geometry`, optional `plan_id`/`revision`/`scenario_id`, `include_scenario`, and editable `assumptions`. It returns baseline/proposal metrics separately, current land-use percentages, proposed zoning percentages, source coverage, and method notes. Plan writes and simulation runs are not needed.
 
-Population and cadastral shares use the existing PostGIS warehouse. Missing sources stay null; an empty parcel query is represented as unmapped land. Population totals require at least 99% cell coverage and never extrapolate uncovered cells. Existing housing/job capacities stay unknown because no verified occupancy dataset is available.
+Population and cadastral shares use the existing PostGIS warehouse. Missing sources stay null; an empty parcel query is represented as unmapped land. Population totals require at least 99% cell coverage and never extrapolate uncovered cells. Existing housing capacity now uses the generated residential building snapshot: intersected footprint × floors × net-area factor ÷ m²/home. It is modeled capacity, not occupied households, and source coverage remains unknown. Missing buildings or floors keep this estimate null. Existing job capacity/balance remain unknown because the connected inventory has no commercial/office floor-use data.
+
+`area-indicators-2` adds `existing_buildings` provenance. The frontend supports older responses and explains when the backend does not yet provide building capacity. The same selected-area calculation serves Indicators and the plan Dashboard.
+
+On 2026-10-17 the live `Hello` plan returned the reported 394.8 Existing / 259.6 Proposed population through `area-indicators-1`, with all three Existing capacity fields null. Its Development endpoint returned generated residential buildings (three buildings and 1,989.43 m² GFA in one saved zone), confirming that residential data existed but was not connected to Indicators. This zone sample is not the whole plan inventory.
 
 Transit requires a local GeoJSON snapshot. Prepare it with the existing Python environment:
 

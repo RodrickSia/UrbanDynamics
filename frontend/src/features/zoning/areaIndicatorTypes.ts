@@ -27,6 +27,8 @@ export interface AreaShare { code: string | null; label: string; color: string; 
 export interface AreaIndicators {
   area_m2: number; geometry: PolygonGeometry; revision: number | null;
   baseline: AreaMetrics; proposal: (AreaMetrics & { buildings: number }) | null;
+  existing_buildings?: { status: 'estimated' | 'partial' | 'unavailable'; count: number;
+    floor_area_m2: number | null; source: string; coverage: string };
   land_use: AreaShare[] | null; zoning: AreaShare[];
   population_source: { status: string; year: number | null; coverage_percent: number; covered_population: number | null; source: string };
   transit: { status: string; coverage_percent: number | null; mapped_coverage_percent?: number; stop_count?: number;

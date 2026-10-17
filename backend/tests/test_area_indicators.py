@@ -16,6 +16,7 @@ def rect(w=106.760, s=10.820, e=106.762, n=10.822):
 
 @pytest.fixture(autouse=True)
 def data_sources(monkeypatch, tmp_path):
+    monkeypatch.setattr(engine.building_baseline, 'buildings', lambda *_: None)
     monkeypatch.setattr(sources, 'population', lambda geometry: {'year': 2025, 'value': 100,
         'covered_m2': projected(geometry).area, 'files': ['test.tif']})
     monkeypatch.setattr(sources, 'parcels', lambda geometry: [{'code': 'ODT', 'geometry': geometry}])
