@@ -66,23 +66,23 @@ values, so it does not require enabling GDAL output drivers in PostGIS.
 
 The standalone SUMO traffic predictor is separate from development/zoning
 simulation. Each request runs exactly one selected weekday/start-time scenario
-for six simulated hours on the `traffic-prediction-worker` Compose service,
+for one simulated hour on the `traffic-prediction-worker` Compose service,
 builds/caches a SUMO road network from the HCMC OSM PBF, and returns one
 aggregate set of edge-level speeds, LOS, and simulated vehicle passages for
-that six-hour window. For the fast layer, demand is deliberately fixed at 360
-trip attempts total: 252 motorcycles (70%) and 108 passenger cars (30%),
+that one-hour window. For the fast layer, demand is deliberately fixed at 60
+trip attempts total: 42 motorcycles (70%) and 18 passenger cars (30%),
 independent of the selected start time. This is a minimum-load synthetic
 scenario, not an estimate of real city demand: it will generally understate
 traffic and congestion. The map displays only the
 currently selected run's result, with roads colored by total simulated vehicle
-passages over that six-hour run and feature details splitting cars from
+passages over that one-hour run and feature details splitting cars from
 motorcycles. It uses SUMO's mesoscopic queue model
 (`--mesosim true`) for throughput; this is less detailed than microscopic
 vehicle-following and lane-changing, and allows a stuck vehicle to be teleported
 after 300 seconds rather than disabling stuck-vehicle recovery. Cache lookups are model-versioned, so
-previously cached 30-minute results are not shown as six-hour data. Apply
+previously cached runs from other model versions are not shown as one-hour data. Apply
 `11-sumo-congestion-simulation.sql` and `12-sumo-congestion-scenario-cache.sql`
-before using the cached data API. The `Run one six-hour SUMO traffic scenario`
+before using the cached data API. The `Run one-hour SUMO traffic scenario`
 workflow accepts one weekday and HCMC start time, queues only that scenario,
 and uses one worker. It is resumable: rerunning it skips a matching cached
 scenario and retries failed or unfinished runs. The map only reads the latest

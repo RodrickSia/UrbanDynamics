@@ -306,9 +306,9 @@ const FIELDS: Record<string, string> = {
   simulated_speed_kmh: 'SUMO speed (km/h)',
   free_flow_speed_kmh: 'Free-flow speed (km/h)',
   speed_ratio: 'Speed ratio',
-  simulated_vehicles_6h: 'Simulated vehicle passages (6 hours)',
-  simulated_cars_6h: 'Simulated car passages (6 hours)',
-  simulated_motorcycles_6h: 'Simulated motorcycle passages (6 hours)',
+  simulated_vehicles_1h: 'Simulated vehicle passages (1 hour)',
+  simulated_cars_1h: 'Simulated car passages (1 hour)',
+  simulated_motorcycles_1h: 'Simulated motorcycle passages (1 hour)',
   vehicles_entered: 'Simulated vehicles entered',
   occupancy_percent: 'Simulated occupancy (%)',
   start: 'From',
@@ -556,7 +556,7 @@ export function DatasetLinePreview({ map, hover }: {
   ] : simulation ? [
     ['LOS', properties.simulated_los],
     ['Speed', properties.simulated_speed_kmh == null ? null : `${properties.simulated_speed_kmh} km/h`],
-    ['Vehicles / 6h', properties.simulated_vehicles_6h],
+    ['Vehicles / 1h', properties.simulated_vehicles_1h],
   ] : network ? [
     ['Road type', properties.road_type],
     ['Lanes', properties.lane_count],

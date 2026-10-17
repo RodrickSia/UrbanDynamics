@@ -1,4 +1,4 @@
-name: Run one six-hour SUMO traffic scenario
+name: Run one-hour SUMO traffic scenario
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   precompute:
-    name: Enqueue one six-hour scenario
+    name: Enqueue one-hour scenario
     runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') }}
     timeout-minutes: 15
     environment: production
@@ -66,7 +66,7 @@ jobs:
               echo "::error::SUMO scenario-cache migration is missing. Run the Deploy database workflow first." >&2
               exit 1
             }
-      - name: Enqueue selected six-hour scenario
+      - name: Enqueue selected one-hour scenario
         run: |
           set -eu
           created_env=false

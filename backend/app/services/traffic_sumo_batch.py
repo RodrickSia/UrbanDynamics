@@ -1,4 +1,4 @@
-"""Queue and monitor exactly one six-hour SUMO scenario."""
+"""Queue and monitor one-hour SUMO scenarios."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def enqueue_scenario(weekday: int, period: str) -> str:
     queued, cached = queue_missing_scenario(weekday, period)
     outcome = "cached" if cached else "queued" if queued else "already_active"
     logger.info(
-        "SUMO six-hour scenario enqueue result: weekday=%d start=%s outcome=%s",
+        "SUMO one-hour scenario enqueue result: weekday=%d start=%s outcome=%s",
         weekday,
         _validate_scenario(weekday, period).strftime("%H:%M"),
         outcome,
@@ -89,14 +89,14 @@ def run_batch(
     parsed_period = _validate_scenario(weekday, period)
     queued, cached = queue_missing_scenario(weekday, period)
     logger.info(
-        "SUMO six-hour scenario: weekday=%d start=%s queued=%d already_cached=%s",
+        "SUMO one-hour scenario: weekday=%d start=%s queued=%d already_cached=%s",
         weekday,
         parsed_period.strftime("%H:%M"),
         queued,
         cached,
     )
     if cached:
-        logger.info("The selected six-hour SUMO scenario is already cached")
+        logger.info("The selected one-hour SUMO scenario is already cached")
         return
 
     deadline = time.monotonic() + timeout_minutes * 60
@@ -131,20 +131,20 @@ def run_batch(
             return
         status, error = latest if latest else (None, None)
         logger.info(
-            "SUMO six-hour scenario progress: weekday=%d start=%s status=%s",
+            "SUMO one-hour scenario progress: weekday=%d start=%s status=%s",
             weekday,
             parsed_period.strftime("%H:%M"),
             status or "missing",
         )
         if active == 0 and status == "failed":
-            raise RuntimeError(f"SUMO six-hour scenario failed: {error}")
+            raise RuntimeError(f"SUMO one-hour scenario failed: {error}")
         if active == 0 and status == "completed":
-            raise RuntimeError("SUMO scenario completed without a matching six-hour cache entry")
+            raise RuntimeError("SUMO scenario completed without a matching one-hour cache entry")
         if active == 0:
             raise RuntimeError("SUMO scenario is no longer queued or running")
         if time.monotonic() >= deadline:
             raise TimeoutError(
-                f"SUMO six-hour scenario timed out (weekday={weekday}, "
+                f"SUMO one-hour scenario timed out (weekday={weekday}, "
                 f"start={parsed_period.strftime('%H:%M')}); rerun to resume"
             )
         time.sleep(poll_seconds)

@@ -11,7 +11,7 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
   const [trafficPeriod, setTrafficPeriod] = useState(data.trafficSchedule.period);
   const sumoVolumeMax = Math.max(
     0,
-    Math.floor(Number(data.sumoRunMetadata?.max_simulated_vehicles_6h ?? 0)),
+    Math.floor(Number(data.sumoRunMetadata?.max_simulated_vehicles_1h ?? 0)),
   );
   const sumoVolumeTicks = [...new Set([0, 0.25, 0.5, 0.75, 1].map((fraction) => Math.round(sumoVolumeMax * fraction)))];
   const StatusIcon =
@@ -201,7 +201,7 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
             <p className="dataset-status" role="status">Loading the latest precomputed SUMO layer…</p>
           )}
           {data.sumoRunStatus === 'empty' && (
-            <p className="dataset-status" role="status">No precomputed six-hour SUMO layer is available.</p>
+            <p className="dataset-status" role="status">No precomputed one-hour SUMO layer is available.</p>
           )}
           {data.sumoRunStatus === 'error' && (
             <p className="dataset-status" role="alert">SUMO layer unavailable: {data.sumoRunError ?? 'unknown error'}</p>
@@ -209,11 +209,11 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           {data.sumoRunStatus === 'completed' && (
             <p className="dataset-status" role="status">
               Latest precomputed scenario · weekday {String(data.sumoRunMetadata?.weekday ?? '')},
-              {' '}start {String(data.sumoRunMetadata?.period ?? '')} HCMC · six hours
+              {' '}start {String(data.sumoRunMetadata?.period ?? '')} HCMC · one hour
             </p>
           )}
-          <div className="sumo-volume-legend" role="group" aria-label="Simulated vehicle passages, including motorcycles, per road over six hours">
-            <small>Simulated vehicle passages · six hours</small>
+          <div className="sumo-volume-legend" role="group" aria-label="Simulated vehicle passages, including motorcycles, per road over one hour">
+            <small>Simulated vehicle passages · one hour</small>
             <div className="sumo-volume-ramp" aria-hidden="true" />
             {data.sumoRunStatus === 'completed' ? (
               <div className="sumo-volume-ticks">
@@ -227,9 +227,9 @@ export function DatasetControls({ id, data }: { id: DataLayerId; data: BackendLa
           </div>
           <DatasetNote>
             This is a precomputed data layer; enabling it never starts a simulation. The fast
-            synthetic run uses 360 planned trips over six hours (252 motorcycles and 108 cars),
+            synthetic run uses 60 planned trips over one hour (42 motorcycles and 18 cars),
             so it is not representative of real city demand and will generally understate
-            congestion. The latest workflow-published scenario is shown as a six-hour aggregate,
+            congestion. The latest workflow-published scenario is shown as a one-hour aggregate,
             not live traffic or a validated forecast. Road colors show total simulated vehicle
             passages, including motorcycles; the feature details separate cars from motorcycles.
           </DatasetNote>

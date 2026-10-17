@@ -26,19 +26,19 @@ LOS_COLORS = {
     "E": "#d9583c",
     "F": "#8c3047",
 }
-SIMULATION_SECONDS = 6 * 60 * 60
+SIMULATION_SECONDS = 60 * 60
 TOTAL_TRIP_PERIOD_SECONDS = 60.0
-PLANNED_TOTAL_TRIPS_6H = int(SIMULATION_SECONDS / TOTAL_TRIP_PERIOD_SECONDS)
+PLANNED_TOTAL_TRIPS_1H = int(SIMULATION_SECONDS / TOTAL_TRIP_PERIOD_SECONDS)
 MOTORCYCLE_SHARE = 0.7
-PLANNED_MOTORCYCLE_TRIPS_6H = round(PLANNED_TOTAL_TRIPS_6H * MOTORCYCLE_SHARE)
-PLANNED_CAR_TRIPS_6H = PLANNED_TOTAL_TRIPS_6H - PLANNED_MOTORCYCLE_TRIPS_6H
+PLANNED_MOTORCYCLE_TRIPS_1H = round(PLANNED_TOTAL_TRIPS_1H * MOTORCYCLE_SHARE)
+PLANNED_CAR_TRIPS_1H = PLANNED_TOTAL_TRIPS_1H - PLANNED_MOTORCYCLE_TRIPS_1H
 SIMULATION_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_SIMULATION_TIMEOUT_SECONDS", "12600"))
 TRIP_GENERATION_TIMEOUT_SECONDS = int(
     os.getenv("TRAFFIC_TRIP_GENERATION_TIMEOUT_SECONDS", "3600")
 )
 ROUTE_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_ROUTE_BUILD_TIMEOUT_SECONDS", "1800"))
 NETWORK_BUILD_TIMEOUT_SECONDS = int(os.getenv("TRAFFIC_NETWORK_BUILD_TIMEOUT_SECONDS", "1800"))
-SIMULATION_MODEL = "mesoscopic-6h-mixed-motorcycle-v1"
+SIMULATION_MODEL = "mesoscopic-1h-mixed-motorcycle-v1"
 logger = logging.getLogger(__name__)
 
 
@@ -177,7 +177,7 @@ def _network_file(data: Path, runtime: Path) -> Path:
 
 
 def _target_demand(weekday: int, period: str) -> tuple[float, int]:
-    """Use a fixed, deliberately low synthetic mixed-fleet demand for the six-hour layer."""
+    """Use a fixed, deliberately low synthetic mixed-fleet demand for the one-hour layer."""
     del weekday, period  # Scenario identity does not alter this minimal test demand.
     return TOTAL_TRIP_PERIOD_SECONDS, 0
 
@@ -272,9 +272,9 @@ def _features_from_intervals(
                     "free_flow_speed_kmh": round(free_speed * 3.6, 1),
                     "speed_ratio": round(ratio, 3),
                     "congestion_score": round((1 - min(1, ratio)) * 100, 1),
-                    "simulated_vehicles_6h": entered_by_edge.get(edge_id, 0),
-                    "simulated_cars_6h": entered_cars_by_edge.get(edge_id, 0),
-                    "simulated_motorcycles_6h": entered_motorcycles_by_edge.get(edge_id, 0),
+                    "simulated_vehicles_1h": entered_by_edge.get(edge_id, 0),
+                    "simulated_cars_1h": entered_cars_by_edge.get(edge_id, 0),
+                    "simulated_motorcycles_1h": entered_motorcycles_by_edge.get(edge_id, 0),
                     "occupancy_percent": round(
                         occupancy_seconds_by_edge.get(edge_id, 0) / sampled if sampled else 0, 1
                     ),
@@ -298,20 +298,20 @@ def _features_from_intervals(
                 float(intervals[-1].get("end", "0")) - float(intervals[0].get("begin", "0"))
             ),
             "vehicle_count_period_seconds": SIMULATION_SECONDS,
-            "vehicle_count_period_label": "simulated 6-hour period",
+            "vehicle_count_period_label": "simulated 1-hour period",
             "vehicle_count_type": "passenger cars and motorcycles",
-            "max_simulated_vehicles_6h": max(
-                (feature["properties"]["simulated_vehicles_6h"] for feature in features),
+            "max_simulated_vehicles_1h": max(
+                (feature["properties"]["simulated_vehicles_1h"] for feature in features),
                 default=0,
             ),
             "total_trip_period_seconds": trip_period,
-            "planned_total_trips_6h": PLANNED_TOTAL_TRIPS_6H,
-            "planned_car_trips_6h": PLANNED_CAR_TRIPS_6H,
-            "planned_motorcycle_trips_6h": PLANNED_MOTORCYCLE_TRIPS_6H,
+            "planned_total_trips_1h": PLANNED_TOTAL_TRIPS_1H,
+            "planned_car_trips_1h": PLANNED_CAR_TRIPS_1H,
+            "planned_motorcycle_trips_1h": PLANNED_MOTORCYCLE_TRIPS_1H,
             "motorcycle_share": MOTORCYCLE_SHARE,
             "historical_observation_rows_used": observation_rows,
             "demand_method": (
-                "Fixed low-load synthetic rate: 360 planned vehicle trip attempts across six hours, "
+                "Fixed low-load synthetic rate: 60 planned vehicle trip attempts across one hour, "
                 "split 70% motorcycles and 30% passenger cars; not observed demand, vehicle counts, "
                 "or an origin-destination matrix"
             ),
@@ -319,7 +319,7 @@ def _features_from_intervals(
             "motorcycles_simulated": True,
             "stuck_vehicle_teleport_after_seconds": 300,
             "interpretation": (
-                "Standalone six-hour, low-demand mixed car/motorcycle SUMO scenario output; not live traffic, "
+                "Standalone one-hour, low-demand mixed car/motorcycle SUMO scenario output; not live traffic, "
                 "observed congestion, or a validated forecast."
             ),
             "features": len(features),
@@ -412,8 +412,8 @@ def run_prediction(weekday: int, period: str, run_id: str | None = None) -> dict
         directory / "vehicle-types.xml", encoding="utf-8", xml_declaration=True
     )
     modes = (
-        ("car", "passenger", PLANNED_CAR_TRIPS_6H),
-        ("motorcycle", "motorcycle", PLANNED_MOTORCYCLE_TRIPS_6H),
+        ("car", "passenger", PLANNED_CAR_TRIPS_1H),
+        ("motorcycle", "motorcycle", PLANNED_MOTORCYCLE_TRIPS_1H),
     )
     for vehicle_type, edge_permission, planned_trips in modes:
         _run(
@@ -571,7 +571,7 @@ def cached_scenario(weekday: int, period: str) -> dict | None:
 
 
 def latest_cached_scenario() -> dict | None:
-    """Return the newest six-hour scenario published by the offline workflow."""
+    """Return the newest one-hour scenario published by the offline workflow."""
     with connect_to_warehouse() as connection:
         row = connection.execute(
             """

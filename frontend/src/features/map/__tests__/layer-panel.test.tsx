@@ -39,10 +39,10 @@ function mockCatalog() {
                     run_id: 'a4b0baab-5b88-42e3-932d-72a8103fe870',
                     weekday: 1,
                     period: '08:00',
-                    metadata: { features: 420, max_simulated_vehicles_6h: 120 },
+                    metadata: { features: 420, max_simulated_vehicles_1h: 120 },
                   }
               : input.includes('/traffic/sumo-simulations/runs/')
-                ? { status: 'completed', metadata: { features: 420, max_simulated_vehicles_6h: 120 } }
+                ? { status: 'completed', metadata: { features: 420, max_simulated_vehicles_1h: 120 } }
               : input.endsWith('/traffic/catalog')
                 ? { available: true, network_available: true }
               : {
@@ -109,7 +109,7 @@ it('shows the latest cached SUMO result as a data layer without submitting a run
   await waitFor(() => expect(screen.getByText(/Latest precomputed scenario/)).toBeInTheDocument());
   expect(screen.queryByRole('button', { name: /run .*SUMO/i })).not.toBeInTheDocument();
   expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
-  expect(screen.getByRole('group', { name: 'Simulated vehicle passages, including motorcycles, per road over six hours' })).toBeInTheDocument();
+  expect(screen.getByRole('group', { name: 'Simulated vehicle passages, including motorcycles, per road over one hour' })).toBeInTheDocument();
   expect(screen.getByText('120')).toBeInTheDocument();
 });
 it('reveals compact controls only for active layers and supports keyboard toggling', async () => {

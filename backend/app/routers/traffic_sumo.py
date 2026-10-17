@@ -25,7 +25,7 @@ def get_latest_scenario():
             503, "SUMO scenario cache unavailable; apply database migrations"
         ) from None
     if cached is None:
-        raise HTTPException(404, "No precomputed six-hour SUMO scenario is available")
+        raise HTTPException(404, "No precomputed one-hour SUMO scenario is available")
     return {**cached, "status": "completed", "cached": True}
 
 
