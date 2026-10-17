@@ -2,6 +2,13 @@ name: traffic_feat — Run all three traffic pipelines
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner where the traffic pipelines should run
+        required: true
+        default: gpu156
+        type: choice
+        options: [gpu156, aws-singapore]
 
 permissions:
   contents: read
@@ -13,7 +20,7 @@ concurrency:
 jobs:
   run:
     name: traffic_feat — OSM/SUMO → traffic history → TomTom
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') }}
     environment: production
     env:
       WAREHOUSE_DATABASE: ${{ vars.WAREHOUSE_DATABASE || 'urbandynamics' }}

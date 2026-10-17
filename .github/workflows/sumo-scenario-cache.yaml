@@ -14,6 +14,12 @@ on:
         required: true
         type: string
         default: '08:00'
+      runner:
+        description: Runner where the scenario should be queued
+        required: true
+        default: gpu156
+        type: choice
+        options: [gpu156, aws-singapore]
 
 permissions:
   contents: read
@@ -25,7 +31,7 @@ concurrency:
 jobs:
   precompute:
     name: Enqueue one six-hour scenario
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') }}
     timeout-minutes: 15
     environment: production
     env:

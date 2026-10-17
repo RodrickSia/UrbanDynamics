@@ -33,6 +33,14 @@ on:
           - extract
           - transform
           - load
+      runner:
+        description: Self-hosted runner where the pipeline should run
+        type: choice
+        required: true
+        default: gpu156
+        options:
+          - gpu156
+          - aws-singapore
 
 permissions:
   contents: read
@@ -50,7 +58,7 @@ jobs:
       WAREHOUSE_USER: ${{ vars.WAREHOUSE_USER || 'urbandynamics' }}
       WAREHOUSE_PASSWORD: ${{ secrets.WAREHOUSE_PASSWORD }}
     # This runner needs Docker, database access, and persistent space for WorldPop files.
-    runs-on: [self-hosted, linux]
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') }}
     steps:
       - uses: actions/checkout@v5
         with:

@@ -3,9 +3,23 @@ on:
   push:
   pull_request:
   workflow_call:
+    inputs:
+      runner:
+        description: Runner for reusable or manually started checks
+        required: false
+        type: string
+        default: ubuntu-latest
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner for manually started checks
+        required: true
+        default: ubuntu-latest
+        type: choice
+        options: [ubuntu-latest, gpu156, aws-singapore]
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

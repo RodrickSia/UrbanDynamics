@@ -3,17 +3,25 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner for manually started CI jobs
+        required: true
+        default: ubuntu-latest
+        type: choice
+        options: [ubuntu-latest, gpu156, aws-singapore]
 
 jobs:
   deployment-environment:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - name: Test deployment environment generation
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
   compose-build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - name: Test deployment environment generation
@@ -39,7 +47,7 @@ jobs:
             etl-road-data-tomtom
 
   database:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - name: Build PostGIS image
@@ -133,7 +141,7 @@ jobs:
         run: docker rm --force postgis-ci || true
 
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
@@ -146,7 +154,7 @@ jobs:
         run: docker build --tag urbandynamics-backend:ci --file backend/Dockerfile .
 
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v5
       - name: Build frontend image

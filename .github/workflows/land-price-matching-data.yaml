@@ -13,6 +13,12 @@ on:
         default: full
         type: choice
         options: [full, wards]
+      runner:
+        description: Runner where the data preparation should run
+        required: true
+        default: ubuntu-latest
+        type: choice
+        options: [ubuntu-latest, gpu156, aws-singapore]
 
 permissions:
   contents: read
@@ -20,7 +26,7 @@ permissions:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     timeout-minutes: 45
     env:
       DATA_DIR: etl/data

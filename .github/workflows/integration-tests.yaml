@@ -2,9 +2,17 @@ name: Integration tests — flood, land price, and API
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner for manually started integration tests
+        required: true
+        default: ubuntu-latest
+        type: choice
+        options: [ubuntu-latest, gpu156, aws-singapore]
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner == 'gpu156' && fromJSON('["self-hosted","Linux","X64","gpu156"]') || inputs.runner == 'aws-singapore' && fromJSON('["self-hosted","Linux","X64","aws","singapore","m7i-flex-large"]') || 'ubuntu-latest' }}
     env:
       COMPOSE_PROJECT_NAME: khoi-ci-${{ github.run_id }}
     steps:
