@@ -47,8 +47,8 @@ jobs:
           sys.argv = [str(script), '--bundle', str(Path(os.environ['RUNNER_TEMP']) / 'main-backend.bundle'), '--backend-only']
           exec(compile(source.read_text(), str(script), 'exec'), {'__name__': '__main__', '__file__': str(script)})
           PY
-      - name: Verify backend API through the current frontend proxy
-        run: curl --fail --silent --show-error --retry 10 --retry-delay 3 http://127.0.0.1:51873/api/v1/openapi.json >/dev/null
+      - name: Verify backend API directly
+        run: docker exec urbandynamics-backend-1 python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=20).read()"
       - name: Remove temporary source bundle
         if: always()
         run: python3 -c "import os; from pathlib import Path; (Path(os.environ['RUNNER_TEMP']) / 'main-backend.bundle').unlink(missing_ok=True)"
