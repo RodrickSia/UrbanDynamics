@@ -41,6 +41,7 @@ class Command(Input):
         "study_area", "rename_plan", "undo", "redo",
         "save_building", "delete_building", "demolish_parcel", "restore_parcel",
         "generate_building", "undo_development", "redo_development",
+        "save_cost_settings",
     ]
     scenario_id: str | None = Field(default=None, max_length=80)
     payload: dict = Field(default_factory=dict)

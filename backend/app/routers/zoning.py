@@ -11,6 +11,8 @@ from shapely.errors import GEOSException
 from app.services.zoning import baseline, development, engine, store
 from app.services.zoning.indicators import report
 from app.services.zoning.models import Command, PlanInput
+from app.services.zoning.cost_models import CostSettings
+from app.services.zoning import costs
 from app.services.zoning.simulation import SimulationInput, SimulationRunInput, study_from_plan
 from app.services.simulation.integrated.models import MapBuildingCollection
 
@@ -196,6 +198,18 @@ def parcel_development_report(identifier, parcel_id, scenario_id, map_buildings=
 @router.get("/{identifier}/indicators")
 def indicators(identifier: UUID, scenario_id: str, compare_id: str | None = None):
     return execute(lambda: report(require_plan(identifier), scenario_id, compare_id))
+
+
+@router.get("/{identifier}/costs")
+def construction_costs(identifier: UUID, scenario_id: str, revision: int = Query(ge=1)):
+    def read():
+        plan = require_plan(identifier)
+        if plan['revision'] != revision:
+            raise store.Conflict('Plan changed. Reload before estimating costs.')
+        scenario = engine.find(plan['scenarios'], scenario_id)
+        result = costs.calculate(plan, scenario, CostSettings.model_validate(scenario.get('cost_settings', {})))
+        return {**result, 'plan_id': str(identifier), 'scenario_id': scenario_id, 'revision': plan['revision']}
+    return execute(read)
 
 
 @router.get("/{identifier}/land-use")

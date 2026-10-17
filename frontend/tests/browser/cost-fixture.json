@@ -1,0 +1,252 @@
+{
+  "plan": {
+    "id": "cost-plan",
+    "name": "Budget test plan",
+    "description": "",
+    "horizon": null,
+    "study_area": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            106.76000000000002,
+            10.820000000000002
+          ],
+          [
+            106.76010000000001,
+            10.819999999999999
+          ],
+          [
+            106.76010000000001,
+            10.820099999999998
+          ],
+          [
+            106.76000000000002,
+            10.820100000000002
+          ],
+          [
+            106.76000000000002,
+            10.820000000000002
+          ]
+        ]
+      ]
+    },
+    "area_m2": 120.973497548052,
+    "revision": 1,
+    "created_at": "2026-10-17T06:10:30.895681+00:00",
+    "updated_at": "2026-10-17T06:10:30.895681+00:00",
+    "status": "draft",
+    "jurisdiction": "HCMC pilot",
+    "types": [],
+    "baseline": {
+      "version": "d9e509f1-264d-4563-9c20-12823e6e7eeb",
+      "captured_at": "2026-10-17T06:10:30.895681+00:00",
+      "study_area": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              106.76000000000002,
+              10.820000000000002
+            ],
+            [
+              106.76010000000001,
+              10.819999999999999
+            ],
+            [
+              106.76010000000001,
+              10.820099999999998
+            ],
+            [
+              106.76000000000002,
+              10.820100000000002
+            ],
+            [
+              106.76000000000002,
+              10.820000000000002
+            ]
+          ]
+        ]
+      },
+      "status": "unverified",
+      "source": "No authoritative zoning snapshot imported"
+    },
+    "scenarios": [
+      {
+        "id": "ea8db4b6-f310-498a-9655-3a9351096e26",
+        "name": "Existing",
+        "kind": "reference",
+        "locked": true,
+        "zones": [],
+        "description": "",
+        "created_at": "2026-10-17T06:10:30.895681+00:00",
+        "created_by": "local-workspace",
+        "revision": 1
+      },
+      {
+        "id": "cost-proposal",
+        "name": "Scenario A",
+        "kind": "proposal",
+        "locked": false,
+        "zones": [],
+        "description": "",
+        "created_at": "2026-10-17T06:10:30.895681+00:00",
+        "created_by": "local-workspace",
+        "revision": 1,
+        "buildings": [
+          {
+            "id": "house",
+            "name": "House 1",
+            "parcel_id": "parcel-1",
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    106.76,
+                    10.82
+                  ],
+                  [
+                    106.7601,
+                    10.82
+                  ],
+                  [
+                    106.7601,
+                    10.8201
+                  ],
+                  [
+                    106.76,
+                    10.8201
+                  ],
+                  [
+                    106.76,
+                    10.82
+                  ]
+                ]
+              ]
+            },
+            "floors": 3,
+            "space_use_id": "residential"
+          }
+        ],
+        "demolition_masks": [
+          {
+            "id": "mask",
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    106.76,
+                    10.82
+                  ],
+                  [
+                    106.7601,
+                    10.82
+                  ],
+                  [
+                    106.7601,
+                    10.8201
+                  ],
+                  [
+                    106.76,
+                    10.8201
+                  ],
+                  [
+                    106.76,
+                    10.82
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "report": {
+    "settings": {
+      "version": 1,
+      "profile": {
+        "package": "standard",
+        "unit_price": 5300000,
+        "rate_source": "User-supplied HCMC 2026 townhouse reference",
+        "location_factor": 1,
+        "access_factor": 1,
+        "complexity_factor": 1,
+        "foundation_factor": 0.5,
+        "roof_factor": 0.4,
+        "area_source": "User reference: strip foundation 50%; concrete roof 40%",
+        "floor_area_m2": null,
+        "additional_areas": [],
+        "additional_areas_confirmed": false
+      },
+      "building_overrides": {},
+      "demolition_rate": 200000.0,
+      "demolition_area_m2": 240.0,
+      "demolition_included": false,
+      "demolition_source": "User demolition quote required",
+      "extras": {},
+      "vat_included": false,
+      "vat_pct": 0,
+      "reserve_pct": 0
+    },
+    "currency": "VND",
+    "status": "estimate",
+    "buildings": [
+      {
+        "id": "house",
+        "name": "House 1",
+        "parcel_id": "parcel-1",
+        "physical_floor_m2": 362.92049264415596,
+        "converted_m2": 471.79664043740274,
+        "components": [
+          {
+            "name": "Floors",
+            "area_m2": 362.92049264415596,
+            "factor": 1
+          },
+          {
+            "name": "Foundation",
+            "area_m2": 120.973497548052,
+            "factor": 0.5
+          },
+          {
+            "name": "Roof",
+            "area_m2": 120.973497548052,
+            "factor": 0.4
+          }
+        ],
+        "unit_price": 5300000,
+        "adjustment": 1,
+        "base": 2500522194,
+        "source": "User-supplied HCMC 2026 townhouse reference",
+        "area_source": "User reference: strip foundation 50%; concrete roof 40%",
+        "total": 2500522194
+      }
+    ],
+    "demolitions": [
+      {
+        "id": "manual-demolition",
+        "name": "Demolition scope",
+        "area_m2": 240.0,
+        "source": "User demolition quote required",
+        "cost": 48000000,
+        "total": 48000000
+      }
+    ],
+    "demolition_basis": "user_area",
+    "construction": 2500522194,
+    "demolition": 48000000,
+    "extras": 0,
+    "subtotal": 2548522194,
+    "vat": 0,
+    "reserve": 0,
+    "known_total": 2548522194,
+    "total": 2548522194,
+    "warnings": [],
+    "plan_id": "cost-plan",
+    "scenario_id": "cost-proposal",
+    "revision": 1
+  }
+}

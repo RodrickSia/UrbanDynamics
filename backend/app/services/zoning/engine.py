@@ -8,6 +8,7 @@ from shapely.ops import split, unary_union
 from .geometry import EPSILON, geojson, polygonal, projected, study_geometry, zone_record
 from .models import BoundaryInput, Command, NameInput, PlanInput, ScenarioInput, ZoneType
 from . import development
+from .cost_models import CostSettings
 
 
 def now():
@@ -146,6 +147,8 @@ def apply(original, command: Command):
                 if zone["type_id"] == type_id:
                     zone["type_id"] = copied["id"]
         site_ids = {}
+        cost_overrides = clone.get('cost_settings', {}).get('building_overrides', {})
+        remapped_costs = {}
         for key in ("zones", "buildings", "demolition_masks"):
             for item in clone.get(key, []):
                 old_id, next_id = item['id'], new_id()
@@ -154,6 +157,10 @@ def apply(original, command: Command):
                 elif item.get('parcel_id') in site_ids:
                     item['parcel_id'] = site_ids[item['parcel_id']]
                 item.update(origin_id=item.get("origin_id") or old_id, id=next_id)
+                if key == 'buildings' and old_id in cost_overrides:
+                    remapped_costs[next_id] = cost_overrides[old_id]
+        if 'cost_settings' in clone:
+            clone['cost_settings']['building_overrides'] = remapped_costs
         plan["scenarios"].append(clone)
     elif action == "reorder_scenarios":
         ids = data.get("ids", [])
@@ -198,6 +205,13 @@ def apply(original, command: Command):
                     zones.append(zone_record(clipped, z["type_id"], z["id"], revision))
             scenario.update(zones=zones, _past=[], _future=[])
         plan.update(study_area=geojson(area), area_m2=area.area)
+    elif action == 'save_cost_settings':
+        scenario = editable(plan, command.scenario_id)
+        settings = CostSettings.model_validate(data)
+        ids = {b['id'] for b in scenario.get('buildings', [])}
+        if set(settings.building_overrides) - ids:
+            raise ValueError('A cost override refers to a building outside this scenario')
+        scenario['cost_settings'] = settings.model_dump()
     elif action in development.ACTIONS:
         development.apply(plan, editable(plan, command.scenario_id), action, data)
     elif action == "generate_building":
