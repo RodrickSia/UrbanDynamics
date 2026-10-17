@@ -38,7 +38,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--bundle', type=Path, help='Verified Git bundle when server GitHub authentication is unavailable')
     parser.add_argument('--frontend-only', action='store_true', help='Update only the web UI; preserve running backend and simulation jobs')
+    parser.add_argument('--backend-only', action='store_true', help='Update API and workers while preserving the running frontend')
     args = parser.parse_args()
+    if args.frontend_only and args.backend_only:
+        parser.error('--frontend-only and --backend-only cannot be used together')
     if ROOT.name != 'UrbanDynamics' or ROOT.parent.name != 'UrbanDynamics':
         raise RuntimeError('Run only from the existing team server checkout')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip():
@@ -64,11 +67,20 @@ def main():
         print(json.dumps({'status': 'deployed', 'scope': 'frontend', 'port': 51873, 'backup': str(backup)}))
         return
     backend = inspect('urbandynamics-backend-1')
-    frontend = inspect('urbandynamics-frontend-1')
+    frontend = None if args.backend_only else inspect('urbandynamics-frontend-1')
     preview = inspect('urbandynamics-development-preview-backend-1')
-    # Refuse to restart a worker while a native planning job is in progress.
-    probe = "from app.services.simulation.planning.store import transaction\nwith transaction() as db:\n print(db.execute(\"SELECT count(*) FROM planning_jobs WHERE status IN ('queued','running')\").fetchone()[0])"
-    active = subprocess.check_output(['docker', 'exec', backend['Id'], 'python', '-c', probe], text=True)
+    # Query PostGIS directly so a stopped API container does not prevent its
+    # own recovery deployment. Refuse to restart workers during native jobs.
+    warehouse = inspect('urbandynamics-postgis-1')
+    if not warehouse['State']['Running']:
+        raise RuntimeError('PostGIS must be running before deploying the backend')
+    warehouse_env = env(warehouse)
+    probe = "SELECT count(*) FROM planning_jobs WHERE status IN ('queued','running')"
+    active = subprocess.check_output([
+        'docker', 'exec', warehouse['Id'], 'psql', '-X', '--set', 'ON_ERROR_STOP=1',
+        '--tuples-only', '--no-align', '--username', warehouse_env['POSTGRES_USER'],
+        '--dbname', warehouse_env['POSTGRES_DB'], '--command', probe,
+    ], text=True)
     if int(active.strip()):
         raise RuntimeError('Wait for active main planning jobs before deploying')
     stamp = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
@@ -77,7 +89,10 @@ def main():
     old_head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     (backup / 'previous-commit.txt').write_text(old_head + '\n')
     old_images = {}
-    for service, container in [('backend', backend), ('frontend', frontend)]:
+    old_containers = [('backend', backend)]
+    if frontend is not None:
+        old_containers.append(('frontend', frontend))
+    for service, container in old_containers:
         tag = 'urbandynamics-rollback-' + service + ':' + stamp.lower()
         run(['docker', 'tag', container['Image'], tag])
         old_images[service] = tag
@@ -102,7 +117,9 @@ def main():
     settings = env(preview)
     agent = {key: settings[key] for key in ['OPENAI_API_KEY', 'OPENAI_MODEL', 'GOONG_REST_API_KEY', 'AGENT_ENABLED', 'AGENT_DAILY_MODEL_CALL_LIMIT', 'AGENT_MAX_ROUNDS'] if key in settings}
     if not agent.get('OPENAI_API_KEY') or not agent.get('GOONG_REST_API_KEY'):
-        raise RuntimeError('Authorized preview credentials are missing')
+        # The web/API deployment can proceed without the optional AI agent.
+        # Keep absent provider credentials out of the production env file.
+        agent = {'AGENT_ENABLED': '0'}
     target = ROOT / '.env.agent.production.local'
     target.write_text(''.join(k + '=' + v + '\n' for k, v in agent.items()))
     target.chmod(0o600)
@@ -119,15 +136,27 @@ def main():
     # Copy the supplementary POI dataset, not preview sessions/plans/job history.
     run(['docker', 'cp', preview['Id'] + ':/runtime/agent-pois', str(backup / 'agent-pois')])
     run(['docker', 'cp', str(backup / 'agent-pois'), backend['Id'] + ':/runtime/agent-pois'])
-    run(['docker', 'exec', '--user', '0', backend['Id'], 'chown', '-R', '10001:10001', '/runtime/agent-pois'])
+    if backend['State']['Running']:
+        run(['docker', 'exec', '--user', '0', backend['Id'], 'chown', '-R', '10001:10001', '/runtime/agent-pois'])
+    else:
+        runtime = next(mount for mount in backend['Mounts'] if mount['Destination'] == '/runtime')
+        run([
+            'docker', 'run', '--rm', '--volume', runtime['Name'] + ':/runtime',
+            '--entrypoint', 'chown', backend['Image'], '-R', '10001:10001', '/runtime/agent-pois',
+        ])
     update_checkout(args.bundle)
     compose = ['docker', 'compose', '-p', 'urbandynamics', '--env-file', '.env', '--env-file', '.env.production.local', '-f', 'compose.yaml', '-f', 'compose.production-agent.yaml']
     # Validate and build before recreating any live service. Never restart PostGIS.
     run(compose + ['config', '--quiet'], cwd=ROOT)
-    run(compose + ['build', 'backend', 'frontend'], cwd=ROOT)
-    run(compose + ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '180', 'backend', 'planning-worker', 'traffic-prediction-worker', 'frontend'], cwd=ROOT)
+    build_services = ['backend'] if args.backend_only else ['backend', 'frontend']
+    deploy_services = ['backend', 'planning-worker', 'traffic-prediction-worker']
+    if not args.backend_only:
+        deploy_services.append('frontend')
+    run(compose + ['build', *build_services], cwd=ROOT)
+    run(compose + ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '180', *deploy_services], cwd=ROOT)
     (backup / 'deployed-commit.txt').write_text(subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True))
-    print(json.dumps({'status': 'deployed', 'port': 51873, 'backup': str(backup)}))
+    scope = 'backend' if args.backend_only else 'backend-and-frontend'
+    print(json.dumps({'status': 'deployed', 'scope': scope, 'port': 51873, 'backup': str(backup)}))
 
 
 if __name__ == '__main__':

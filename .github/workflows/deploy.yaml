@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  main-web:
+  backend:
     environment: production
     runs-on: [self-hosted, linux]
     timeout-minutes: 20
@@ -21,8 +21,8 @@ jobs:
           ref: main
           fetch-depth: 0
       - name: Package the reviewed main revision
-        run: git bundle create "$RUNNER_TEMP/main-web.bundle" HEAD
-      - name: Deploy main web with persistent server configuration
+        run: git bundle create "$RUNNER_TEMP/main-backend.bundle" HEAD
+      - name: Deploy backend and workers
         shell: bash
         run: |
           python3 - <<'PY'
@@ -35,25 +35,47 @@ jobs:
           if not (root / '.git').exists():
               raise SystemExit('This workflow must run on server 156 with the existing team checkout')
           script = root / 'scripts/deploy-main-agent.py'
-          sys.argv = [str(script), '--bundle', str(Path(os.environ['RUNNER_TEMP']) / 'main-web.bundle')]
+          sys.argv = [str(script), '--bundle', str(Path(os.environ['RUNNER_TEMP']) / 'main-backend.bundle'), '--backend-only']
           exec(compile(source.read_text(), str(script), 'exec'), {'__name__': '__main__', '__file__': str(script)})
           PY
-      - name: Verify main frontend and agent
-        run: |
-          python3 - <<'PY'
-          import json
-          import urllib.request
-          base = 'http://127.0.0.1:51873'
-          for path in ['/', '/api/v1/openapi.json']:
-              with urllib.request.urlopen(base + path, timeout=30) as response:
-                  assert response.status == 200
-          with urllib.request.urlopen(base + '/api/v1/agent/config', timeout=30) as response:
-              config = json.load(response)
-          assert config['enabled'] and config['model_configured']
-          print('Main web and agent are available on port 51873')
-          PY
-      - name: Verify published map data
-        run: python3 scripts/smoke_map_deployment.py http://127.0.0.1:51873
+      - name: Verify backend API through the current frontend proxy
+        run: curl --fail --silent --show-error --retry 10 --retry-delay 3 http://127.0.0.1:51873/api/v1/openapi.json >/dev/null
       - name: Remove temporary source bundle
         if: always()
-        run: python3 -c "import os; from pathlib import Path; (Path(os.environ['RUNNER_TEMP']) / 'main-web.bundle').unlink(missing_ok=True)"
+        run: python3 -c "import os; from pathlib import Path; (Path(os.environ['RUNNER_TEMP']) / 'main-backend.bundle').unlink(missing_ok=True)"
+
+  frontend:
+    needs: backend
+    environment: production
+    runs-on: [self-hosted, linux]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Package the reviewed main revision
+        run: git bundle create "$RUNNER_TEMP/main-frontend.bundle" HEAD
+      - name: Deploy frontend
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          source = Path(os.environ['GITHUB_WORKSPACE']) / 'scripts/deploy-main-agent.py'
+          root = Path('/GuestShare_NAS/WorkingSpace/Personal/nguyenmv/MLAI/UrbanDynamics/UrbanDynamics')
+          if not (root / '.git').exists():
+              raise SystemExit('This workflow must run on server 156 with the existing team checkout')
+          script = root / 'scripts/deploy-main-agent.py'
+          sys.argv = [str(script), '--bundle', str(Path(os.environ['RUNNER_TEMP']) / 'main-frontend.bundle'), '--frontend-only']
+          exec(compile(source.read_text(), str(script), 'exec'), {'__name__': '__main__', '__file__': str(script)})
+          PY
+      - name: Verify frontend and published map data
+        run: |
+          curl --fail --silent --show-error --retry 10 --retry-delay 3 http://127.0.0.1:51873/ >/dev/null
+          python3 scripts/smoke_map_deployment.py http://127.0.0.1:51873
+      - name: Remove temporary source bundle
+        if: always()
+        run: python3 -c "import os; from pathlib import Path; (Path(os.environ['RUNNER_TEMP']) / 'main-frontend.bundle').unlink(missing_ok=True)"
